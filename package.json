@@ -11,7 +11,8 @@
     "build": "tsc -p tsconfig.json",
     "discover": "tsx src/cli/index.ts discover",
     "replay": "tsx src/cli/index.ts replay",
-    "operator": "tsx src/cli/index.ts operator"
+    "operator": "tsx src/cli/index.ts operator",
+    "mock": "tsx mock-app/index.ts"
   },
   "license": "ISC",
   "dependencies": {
@@ -23,6 +24,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^26.2.0",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
