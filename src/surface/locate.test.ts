@@ -18,17 +18,26 @@ beforeAll(async () => {
   await surface.act({ kind: "navigate", url: `${baseUrl}/login` });
   await surface.act({
     kind: "type",
-    target: { describedAs: "User ID field", labelText: "User ID" },
-    text: "tester",
+    target: {
+      describedAs: "User ID field",
+      strategies: [{ kind: "labelText", labelText: "User ID", confidence: 0.9 }],
+    },
+    value: "tester",
   });
   await surface.act({
     kind: "type",
-    target: { describedAs: "Password field", labelText: "Password" },
-    text: "pw",
+    target: {
+      describedAs: "Password field",
+      strategies: [{ kind: "labelText", labelText: "Password", confidence: 0.9 }],
+    },
+    value: "pw",
   });
   await surface.act({
     kind: "click",
-    target: { describedAs: "Log In button", role: { role: "button", name: "Log In" } },
+    target: {
+      describedAs: "Log In button",
+      strategies: [{ kind: "roleName", role: "button", name: "Log In", confidence: 0.95 }],
+    },
   });
 }, 30000);
 
@@ -38,23 +47,25 @@ afterAll(async () => {
 });
 
 describe("locator strategies against the mock app", () => {
-  it("resolves the Search button via role+accessibleName", async () => {
+  it("resolves the Search button via roleName+accessibleName", async () => {
     await surface.act({ kind: "navigate", url: `${baseUrl}/` });
     const handle = await surface.locate({
       describedAs: "Search button",
-      role: { role: "button", name: "Search" },
+      strategies: [{ kind: "roleName", role: "button", name: "Search", confidence: 0.95 }],
     });
-    expect(handle?.strategy).toBe("role");
+    expect(handle?.strategy).toBe("roleName");
     expect(handle?.locator).not.toBeNull();
   });
 
-  it("resolves the Open Sub-Account button via role+accessibleName", async () => {
+  it("resolves the Open Sub-Account button via roleName+accessibleName", async () => {
     await surface.act({ kind: "navigate", url: `${baseUrl}/member/10001` });
     const handle = await surface.locate({
       describedAs: "Open Sub-Account button",
-      role: { role: "button", name: "Open Sub-Account" },
+      strategies: [
+        { kind: "roleName", role: "button", name: "Open Sub-Account", confidence: 0.95 },
+      ],
     });
-    expect(handle?.strategy).toBe("role");
+    expect(handle?.strategy).toBe("roleName");
     expect(handle?.locator).not.toBeNull();
   });
 
@@ -62,7 +73,7 @@ describe("locator strategies against the mock app", () => {
     await surface.act({ kind: "navigate", url: `${baseUrl}/` });
     const handle = await surface.locate({
       describedAs: "Member ID field",
-      labelText: "Member ID",
+      strategies: [{ kind: "labelText", labelText: "Member ID", confidence: 0.9 }],
     });
     expect(handle?.strategy).toBe("labelText");
     expect(handle?.locator).not.toBeNull();
@@ -72,7 +83,9 @@ describe("locator strategies against the mock app", () => {
     await surface.act({ kind: "navigate", url: `${baseUrl}/member/10001` });
     const handle = await surface.locate({
       describedAs: "Current Savings Balance value",
-      tableCell: { rowLabel: "Current Savings Balance" },
+      strategies: [
+        { kind: "tableCell", rowLabel: "Current Savings Balance", confidence: 0.85 },
+      ],
     });
     expect(handle?.strategy).toBe("tableCell");
     expect(handle?.locator).not.toBeNull();

@@ -1,8 +1,8 @@
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { resolveDescriptor } from "./locate.js";
 import type {
-  Action,
   ElementDescriptor,
+  ExecutableAction,
   Handle,
   LocatorProvenanceEntry,
   Observation,
@@ -39,6 +39,24 @@ function assertLiveLocator(
         `clicking implemented yet).`,
     );
   }
+}
+
+// target/value are optional on ExecutableAction's type (they're runtime-only additions to the
+// persisted Action shape), but every non-navigate action needs a target, and type/selectOption
+// need a value -- the artifact schema enforces this on Step at authoring time; this is the
+// matching runtime check for whoever calls act() directly.
+function requireTarget(action: ExecutableAction): ElementDescriptor {
+  if (!action.target) {
+    throw new Error(`Action "${action.kind}" requires a target, but none was provided.`);
+  }
+  return action.target;
+}
+
+function requireValue(action: ExecutableAction): string {
+  if (action.value === undefined) {
+    throw new Error(`Action "${action.kind}" requires a value, but none was provided.`);
+  }
+  return action.value;
 }
 
 /** WebSurface (Playwright/Chromium) — the only concrete Surface implementation for now. */
@@ -112,38 +130,43 @@ export class WebSurface implements Surface {
     return handle;
   }
 
-  async act(action: Action): Promise<void> {
+  async act(action: ExecutableAction): Promise<void> {
     switch (action.kind) {
       case "navigate": {
         await this.page.goto(action.url);
         return;
       }
       case "click": {
-        const handle = await this.locate(action.target);
-        assertLiveLocator(handle, action.target);
+        const target = requireTarget(action);
+        const handle = await this.locate(target);
+        assertLiveLocator(handle, target);
         await handle.locator.click();
         return;
       }
       case "type": {
-        const handle = await this.locate(action.target);
-        assertLiveLocator(handle, action.target);
-        await handle.locator.fill(action.text);
+        const target = requireTarget(action);
+        const handle = await this.locate(target);
+        assertLiveLocator(handle, target);
+        await handle.locator.fill(requireValue(action));
         return;
       }
       case "selectOption": {
-        const handle = await this.locate(action.target);
-        assertLiveLocator(handle, action.target);
-        await handle.locator.selectOption(action.value);
+        const target = requireTarget(action);
+        const handle = await this.locate(target);
+        assertLiveLocator(handle, target);
+        await handle.locator.selectOption(requireValue(action));
         return;
       }
       case "readText": {
-        const handle = await this.locate(action.target);
-        assertLiveLocator(handle, action.target);
+        const target = requireTarget(action);
+        const handle = await this.locate(target);
+        assertLiveLocator(handle, target);
         this.lastReadTextValue = await handle.locator.innerText();
         return;
       }
       case "waitFor": {
-        await this.waitForDescriptor(action.target, action.timeoutMs ?? DEFAULT_WAIT_FOR_TIMEOUT_MS);
+        const target = requireTarget(action);
+        await this.waitForDescriptor(target, action.timeoutMs ?? DEFAULT_WAIT_FOR_TIMEOUT_MS);
         return;
       }
     }

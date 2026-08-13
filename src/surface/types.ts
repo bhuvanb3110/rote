@@ -1,29 +1,21 @@
-// Local minimal types for the Surface abstraction. ElementDescriptor/Action will become the
-// canonical Zod schemas in Stage 3; these capture the same shape so Surface implementations
-// have something concrete to build against in the meantime.
+// Runtime-only Surface types. ElementDescriptor/Action/LocatorStrategy are now the canonical
+// Zod-derived types from src/artifact -- imported here, not redefined. Handle/Observation/
+// Surface/LocatorProvenanceEntry stay local: a live Playwright Locator and a screenshot Buffer
+// are runtime-only, not persisted artifact data, so they don't belong in the Zod schema.
 import type { Locator } from "playwright";
+import type { Action, ElementDescriptor, LocatorStrategy } from "../artifact/index.js";
+
+export type { Action, ElementDescriptor, LocatorStrategy };
 
 /**
- * Ranked, ordered set of ways to find an element. Never a single brittle CSS selector: a
- * descriptor may carry fields for several strategies, tried in priority order by locate().
+ * A fully resolved, directly-executable action for Surface.act(): the artifact's declarative
+ * Action (kind + kind-intrinsic config like navigate's url) plus the runtime target/value that,
+ * in a persisted Capability, live on the Step instead. target: ElementDescriptor is not
+ * sensitive, so it's safe to carry directly here; value has already been resolved from a
+ * ValueRef (literal or param-substituted) and any redaction decisions already made upstream, so
+ * it is a plain string here.
  */
-export interface ElementDescriptor {
-  /** Human description of the element, e.g. "Search button". Also the visual-strategy fallback. */
-  describedAs: string;
-  role?: { role: string; name: string };
-  labelText?: string;
-  textAnchor?: { anchorText: string };
-  tableCell?: { rowLabel: string; column?: number };
-  css?: string;
-}
-
-export type LocatorStrategy =
-  | "role"
-  | "labelText"
-  | "textAnchor"
-  | "tableCell"
-  | "css"
-  | "visual";
+export type ExecutableAction = Action & { target?: ElementDescriptor; value?: string };
 
 /**
  * Result of resolving an ElementDescriptor. `locator` is null only for the "visual" strategy,
@@ -31,18 +23,10 @@ export type LocatorStrategy =
  * element must check for that case.
  */
 export interface Handle {
-  strategy: LocatorStrategy;
+  strategy: LocatorStrategy["kind"];
   describedAs: string;
   locator: Locator | null;
 }
-
-export type Action =
-  | { kind: "click"; target: ElementDescriptor }
-  | { kind: "type"; target: ElementDescriptor; text: string }
-  | { kind: "selectOption"; target: ElementDescriptor; value: string }
-  | { kind: "navigate"; url: string }
-  | { kind: "waitFor"; target: ElementDescriptor; timeoutMs?: number }
-  | { kind: "readText"; target: ElementDescriptor };
 
 /** Compact snapshot of surface state — enough for an LLM to decide and recognizers to classify. */
 export interface Observation {
@@ -56,7 +40,7 @@ export interface Observation {
 /** A resolved locate() call, recorded for provenance/drift-detection by later stages. */
 export interface LocatorProvenanceEntry {
   descriptor: ElementDescriptor;
-  strategy: LocatorStrategy;
+  strategy: LocatorStrategy["kind"];
   timestamp: number;
 }
 
@@ -67,6 +51,6 @@ export interface LocatorProvenanceEntry {
  */
 export interface Surface {
   perceive(): Promise<Observation>;
-  act(action: Action): Promise<void>;
+  act(action: ExecutableAction): Promise<void>;
   locate(descriptor: ElementDescriptor): Promise<Handle | null>;
 }
