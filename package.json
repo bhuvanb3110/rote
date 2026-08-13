@@ -12,7 +12,8 @@
     "discover": "tsx src/cli/index.ts discover",
     "replay": "tsx src/cli/index.ts replay",
     "operator": "tsx src/cli/index.ts operator",
-    "mock": "tsx mock-app/index.ts"
+    "mock": "tsx mock-app/index.ts",
+    "test": "vitest run"
   },
   "license": "ISC",
   "dependencies": {

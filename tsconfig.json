@@ -11,5 +11,6 @@
     "resolveJsonModule": true,
     "outDir": "dist"
   },
-  "include": ["src/**/*", "mock-app/**/*"]
+  "include": ["src/**/*", "mock-app/**/*"],
+  "exclude": ["**/*.test.ts", "node_modules", "dist"]
 }
