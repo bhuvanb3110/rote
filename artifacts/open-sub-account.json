@@ -1,0 +1,279 @@
+{
+  "schemaVersion": 1,
+  "id": "open-sub-account",
+  "name": "Open Sub-Account",
+  "description": "Open a new sub-account for member 10001 and reach the confirmation screen.",
+  "version": "1.0.0",
+  "target": {
+    "appId": "great-plains-cu-backoffice",
+    "entryUrlPattern": "^http://localhost:4100/",
+    "surfaceType": "web"
+  },
+  "inputs": [
+    {
+      "name": "username",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"User ID textbox\".",
+      "redact": true
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"Password textbox\".",
+      "redact": true
+    },
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"Member ID textbox\".",
+      "redact": false
+    },
+    {
+      "name": "initialDeposit",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"Initial Deposit textbox\".",
+      "redact": false
+    }
+  ],
+  "outputs": [],
+  "steps": [
+    {
+      "id": "step-01",
+      "intent": "Enter the operator username to log in.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "User ID textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "User ID",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "User ID",
+            "confidence": 0.8
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "username",
+        "redact": true
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-02",
+      "intent": "Enter the operator password to log in.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "Password textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "Password",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "Password",
+            "confidence": 0.8
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "password",
+        "redact": true
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-03",
+      "intent": "Submit credentials to enter the back office.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Log In button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Log In",
+            "confidence": 0.95
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-04",
+      "intent": "Look up member 10001 to open a sub-account for them.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "Member ID textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "Member ID",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "Member ID",
+            "confidence": 0.8
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "memberId",
+        "redact": false
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-05",
+      "intent": "Search for member 10001 to open their record.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Search button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Search",
+            "confidence": 0.95
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-06",
+      "intent": "Start the sub-account opening flow for member 10001.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Open Sub-Account button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Open Sub-Account",
+            "confidence": 0.95
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-07",
+      "intent": "Provide a nominal initial deposit so the form can be submitted.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "Initial Deposit textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "Initial Deposit",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "Initial Deposit",
+            "confidence": 0.8
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "initialDeposit",
+        "redact": false
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-08",
+      "intent": "Submit the sub-account details to advance toward the confirmation screen.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Continue button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Continue",
+            "confidence": 0.95
+          }
+        ]
+      },
+      "risk": "safe"
+    }
+  ],
+  "successCondition": {
+    "kind": "urlMatches",
+    "pattern": "/sub-account/confirm$"
+  },
+  "knownOutcomes": [
+    {
+      "code": "NO_SUCH_MEMBER",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "Record not found"
+      },
+      "detail": "No member exists with the given ID."
+    },
+    {
+      "code": "PERMISSION_DENIED",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "do not have permission"
+      },
+      "detail": "The current operator is not permitted to view this member."
+    }
+  ],
+  "recoverables": [
+    {
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "System temporarily unavailable"
+      },
+      "action": "retry",
+      "maxAttempts": 3,
+      "backoffMs": 500
+    }
+  ],
+  "provenance": {
+    "recordedAt": "2026-08-13T20:31:05.187Z",
+    "model": "claude-opus-5",
+    "transcriptRef": "evidence://evidence/open-sub-account-2026-08-13T20-30-32-534Z-1b54b280/run.jsonl",
+    "tokenUsage": {
+      "inputTokens": 120557,
+      "outputTokens": 1460
+    }
+  }
+}

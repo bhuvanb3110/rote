@@ -247,6 +247,12 @@ export const CapabilitySchema = z
       tenantId: z.string().optional(),
       appVersion: z.string().optional(),
       transcriptRef: z.string().min(1),
+      tokenUsage: z
+        .object({
+          inputTokens: z.number().int().nonnegative(),
+          outputTokens: z.number().int().nonnegative(),
+        })
+        .optional(),
     }),
   })
   .superRefine((capability, ctx) => {
