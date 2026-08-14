@@ -128,7 +128,8 @@ re-pauses). Elaborated with real evidence in §5.
 
 ## 4. Heterogeneity & multi-tenant
 
-*This section is design, not built code — flagged explicitly, per the project's own scoping.*
+*Desktop heterogeneity below is design, not built code, flagged explicitly per the project's own
+scoping. Multi-tenant is no longer a sketch — it's working code, described as built.*
 
 The same seam from §1 is the mechanism: `Surface` is `perceive/act/locate` and nothing else;
 `ElementDescriptor`/`Checkpoint`/`Capability` never mention Playwright, HTML, or the web. A
@@ -138,22 +139,48 @@ the *same* replay loop drive a legacy Win32/WPF back-office client — only the 
 `Surface` changes. `ElementDescriptor`'s `roleName`/`labelText` strategies map naturally onto
 accessibility-tree role/name queries; `tableCell`/`textAnchor`/`css` would need
 desktop-appropriate equivalents (e.g. a grid-cell-by-header strategy), but the *vocabulary* — an
-ordered list of ways to find the same control — doesn't change.
+ordered list of ways to find the same control — doesn't change. No `DesktopSurface` exists yet;
+this stays a design claim.
 
-Multi-tenant sketch: a base `Capability` plus a per-tenant override layer (different entry URL,
-different locator strategy for a control that's positioned or labeled differently in one tenant's
-build, same `id`/steps otherwise) rather than one artifact per tenant. Values that are
-tenant/record-specific would be canonicalized to patterns before comparison — e.g.
-`/member/12345` → `/member/:id` — so a `urlMatches` checkpoint authored against one tenant's data
-still recognizes the same *shape* of URL in another. Drift across tenants would be detected the
-same way §3's single-session drift is (low-priority-locator usage, checkpoint-text mismatches),
-just aggregated per tenant; a detected drift would route through versioning and human approval
-before being applied, never trigger a silent re-recording of the capability.
+**Multi-tenant, built**: `mock-app/` now serves two tenants of the same vendor product from one
+Express app ([mock-app/tenants.ts](mock-app/tenants.ts)) — `tenant-a` (root-mounted, identical to
+this app's original single-tenant behavior) and `tenant-b` (`/tenant-b`, different institution
+branding, its Member Lookup button reads "Find Member" instead of "Search," and its balance row
+reads "Savings Balance" instead of "Current Savings Balance"). `src/tenant/` is the override
+layer: a `TenantOverride` ([src/tenant/types.ts](src/tenant/types.ts)) is data — `tenantId`,
+`capabilityId`, an `entryUrl`, a `stepOverrides` map keyed by step id, and an optional
+`successCondition` replacement — applied by `applyTenantOverride()` to produce an *effective*
+Capability. The base artifact (`artifacts/member-lookup.json`) is never touched: steps not named
+in `stepOverrides` keep the exact same descriptor object the base capability declared;
+[overrides/member-lookup.tenant-b.json](overrides/member-lookup.tenant-b.json) patches only the
+two steps that actually differ. `replay --tenant <id>` (and `operator --tenant <id>`) loads
+`overrides/<capabilityId>.<tenant>.json` by convention and applies it before replaying — no new
+`runReplay` option needed; the tenant layer sits entirely above it. Verified live: the SAME
+compiled `member-lookup.json` replays to `success` with the identical `savingsBalance` against
+both tenants (`src/tenant/multiTenant.test.ts`), and replaying that same base artifact against
+tenant B *without* the override fails outright — proof the override is load-bearing, not
+decorative.
 
-Follow-ons if this were continued: a hostile-DOM `Surface` variant (attribute noise, restructured
-tables) to stress-test the ranked-locator fallback chain from §3 beyond the mock app's current
-mild obfuscation, and a genuine two-tenant variant of the mock app to validate the override-layer
-design against real divergent markup rather than a paper sketch.
+Canonicalization is built too, additively: `canonicalizePath()`
+([src/tenant/canonicalize.ts](src/tenant/canonicalize.ts)) maps `/member/12345` → `/member/:id`;
+`matchesCanonically()` is wired into `evaluateCheckpoint`'s `urlMatches` case
+([src/replay/checkpoint.ts](src/replay/checkpoint.ts)) as a fallback tried *only* when the direct
+regex match fails, so it can never change behavior for a pattern that already matched — every
+pre-existing artifact and test is unaffected. This is what lets a `urlMatches` checkpoint
+authored against one tenant's concrete route recognize another tenant's differently-prefixed,
+different-record-id URL of the same shape.
+
+Drift across tenants is detected by the exact mechanism §3 already has, not a second system: the
+override's replacement descriptors are still *ranked* (e.g. tenant-b's Search-button override
+keeps `roleName: "Search"` as strategy 1, which legitimately fails there, falling back to a
+`css` strategy that succeeds), so the same expected-vs-actual-strategy comparison fires and logs
+a `drift` evidence entry — verified live for both overridden controls. A detected drift would
+route through versioning and human approval before being applied to the shipped override, never
+trigger a silent re-recording of the capability.
+
+Follow-on if this were continued: a hostile-DOM `Surface` variant (attribute noise, restructured
+tables) to stress-test the ranked-locator fallback chain from §3 beyond tenant-b's current mild
+obfuscation.
 
 ## 5. Escalation & handoff
 
@@ -223,8 +250,12 @@ Stated plainly, not glossed over:
 - **The operator console is intentionally minimal** — server-rendered HTML, inline CSS, no
   client-side JS, a `<meta refresh>` for polling instead of push updates. It proves the handoff
   mechanism is real (§5); it is not a production operator UI.
-- **`DesktopSurface` and multi-tenant support are design-only** (§4) — no second `Surface`
-  implementation exists, and no override-layer or canonicalization code has been written.
+- **`DesktopSurface` is design-only** (§4) — no second `Surface` implementation exists. (The
+  per-tenant override layer and canonicalization, by contrast, ARE built — §4, `src/tenant/`.)
+  The override layer also has a real gap of its own: `TenantOverride` only patches step targets
+  and `successCondition`; `knownOutcomes`/`recoverables` recognizers can't be overridden yet, so
+  a tenant whose business-outcome or recoverable-interstitial text differs from the base
+  artifact's would need a genuinely new artifact, not just an override.
 - **The `"visual"` locator strategy never produces a live handle.** It's `locate()`'s guaranteed
   fallback (carries `describedAs` forward, `locator: null`), and any action that needs a real
   element throws an explicit "no coordinate clicking implemented yet" error if that's all that
@@ -236,9 +267,9 @@ Stated plainly, not glossed over:
   a bounded wait-and-recheck of the same page rather than a real dismiss interaction; not
   exercised by any required test.
 
-What I'd build next, in order: the two heterogeneity follow-ons from §4 (a hostile-DOM `Surface`
-variant, a real two-tenant mock-app variant) to move multi-tenant from sketch to validated design;
-confidence/approval gating on low-ranked locator matches (today every resolved strategy is
-accepted equally at replay time, regardless of how far down its own ranked list it was); and the
-canonicalization step multi-tenant drift detection depends on (`/member/12345` → `/member/:id`),
-which doesn't exist yet even as a standalone utility.
+What I'd build next, in order: extending `TenantOverride` to cover `knownOutcomes`/`recoverables`
+recognizers, not just step targets and `successCondition` (the real gap noted above); a
+hostile-DOM `Surface` variant (§4) to stress-test the ranked-locator fallback chain beyond
+tenant-b's current mild obfuscation; and confidence/approval gating on low-ranked locator matches
+(today every resolved strategy is accepted equally at replay time, regardless of how far down its
+own ranked list it was).

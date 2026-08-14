@@ -15,7 +15,36 @@ npm run mock
 
 Listens on `http://localhost:4100` by default. Override with `MOCK_APP_PORT`.
 
+## Two tenants, one app
+
+The same routes, same flow, and same seed members are served for **two tenants** — two branded
+variants of the same vendor product, exactly what you'd see if a bank ran the same back-office
+software under two different institution names. Both are defined once in `app.ts`'s
+`createTenantRouter()` factory and configured in [tenants.ts](tenants.ts):
+
+| Tenant | Mounted at | Institution name | Search button | Balance row label |
+| ------ | ---------- | ----------------- | -------------- | ------------------ |
+| `tenant-a` | `/` (unprefixed) | Great Plains Member Credit Union | "Search" | "Current Savings Balance" |
+| `tenant-b` | `/tenant-b` | Rolling Hills Credit Union | "Find Member" | "Savings Balance" |
+
+`tenant-a` is exactly this app's original, single-tenant behavior — mounting it unprefixed at
+`/` with unchanged labels means every artifact/test written before multi-tenancy existed still
+works with zero changes. `tenant-b` deliberately differs in a way that breaks a Capability
+recorded against tenant A if replayed unmodified: its Member Lookup button is labeled "Find
+Member" (not "Search"), and its member-detail balance row is labeled "Savings Balance" (not
+"Current Savings Balance") — see [src/tenant/](../src/tenant/) for the override layer that lets
+one base Capability replay against both without being re-recorded, and the root
+[REPORT.md](../REPORT.md) §4 for the design writeup.
+
+Each tenant has its own session cookie (`sid` for tenant-a, `sid_tenant_b` for tenant-b), so
+visiting both in the same browser doesn't cross-contaminate sessions. The failure-injection
+controls below are global (shared across both tenants) except `/control/session-timeout`, which
+only ever clears tenant-a's session (unchanged from before multi-tenancy).
+
 ## Routes
+
+Routes below are shown unprefixed (tenant-a); tenant-b serves the identical set under
+`/tenant-b/...` (e.g. `/tenant-b/member/:id`).
 
 | Method | Path                                  | Notes                                              |
 | ------ | -------------------------------------- | --------------------------------------------------- |

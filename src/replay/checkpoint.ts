@@ -6,6 +6,7 @@
 // rather than the src/agent barrel, so it isn't the one pulling the Anthropic SDK in here.
 import type { Checkpoint } from "../artifact/index.js";
 import type { Observation, Surface } from "../surface/index.js";
+import { matchesCanonically } from "../tenant/canonicalize.js";
 
 export interface CheckpointEvaluation {
   passed: boolean;
@@ -19,7 +20,14 @@ export async function evaluateCheckpoint(
 ): Promise<CheckpointEvaluation> {
   switch (checkpoint.kind) {
     case "urlMatches": {
-      const passed = new RegExp(checkpoint.pattern).test(observation.url);
+      // Direct regex match first (unchanged semantics for every existing artifact). Only if
+      // that fails, fall back to a canonical-shape comparison -- this is what lets a pattern
+      // authored against one tenant's concrete route (e.g. "/member/10001") still recognize
+      // another tenant's differently-prefixed, different-record-id URL of the same shape
+      // ("/tenant-b/member/99999"), without changing behavior for any pattern that already
+      // matched directly.
+      const direct = new RegExp(checkpoint.pattern).test(observation.url);
+      const passed = direct || matchesCanonically(checkpoint.pattern, observation.url);
       return {
         passed,
         detail: passed

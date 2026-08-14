@@ -1,0 +1,30 @@
+{
+  "tenantId": "tenant-b",
+  "capabilityId": "member-lookup",
+  "entryUrl": "http://localhost:4100/tenant-b/",
+  "stepOverrides": {
+    "step-05": {
+      "describedAs": "Find Member button",
+      "strategies": [
+        { "kind": "roleName", "role": "button", "name": "Search", "confidence": 0.95 },
+        { "kind": "css", "css": "form[action*='/member/search'] button", "confidence": 0.5 }
+      ]
+    },
+    "step-06": {
+      "describedAs": "Savings Balance value cell",
+      "strategies": [
+        { "kind": "labelText", "labelText": "Savings Balance", "confidence": 0.9 },
+        { "kind": "tableCell", "rowLabel": "Savings Balance", "confidence": 0.85 }
+      ]
+    }
+  },
+  "successCondition": {
+    "kind": "elementPresent",
+    "target": {
+      "describedAs": "Savings Balance value",
+      "strategies": [
+        { "kind": "tableCell", "rowLabel": "Savings Balance", "confidence": 0.85 }
+      ]
+    }
+  }
+}
