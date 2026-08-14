@@ -6,12 +6,28 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import app from "../../mock-app/app.js";
 import { deserializeCapability, type Capability } from "../artifact/index.js";
+import { EscalationController } from "../escalation/index.js";
 import { runReplay } from "./replay.js";
 
 let server: Server;
 let baseUrl: string;
 let capability: Capability;
 let subAccountCapability: Capability;
+let confirmedCapability: Capability;
+
+const CONFIRM_TARGET = {
+  describedAs: "Confirm button",
+  strategies: [{ kind: "roleName" as const, role: "button", name: "Confirm", confidence: 0.95 }],
+};
+
+async function waitForPendingRequest(controller: EscalationController, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (controller.pendingRequest) return controller.pendingRequest;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Timed out waiting for a pending intervention request after ${timeoutMs}ms.`);
+}
 
 const CREDS = { username: "operator", password: "operator" };
 
@@ -33,6 +49,7 @@ beforeAll(async () => {
 
   capability = await loadRelaxed("../../artifacts/member-lookup.json");
   subAccountCapability = await loadRelaxed("../../artifacts/open-sub-account.json");
+  confirmedCapability = await loadRelaxed("../../artifacts/open-sub-account-confirmed.json");
 });
 
 afterAll(async () => {
@@ -166,6 +183,69 @@ describe("replay against the mock app", () => {
       headless: true,
       approveRisky: true,
     });
+    expect(result.status).toBe("success");
+  }, 30000);
+
+  it("(g) escalation: pauses on the risky step, resumes to success once a human resolves it", async () => {
+    const controller = new EscalationController();
+    const resultPromise = runReplay({
+      capability: confirmedCapability,
+      params: { ...CREDS, memberId: "10001", initialDeposit: "50.00" },
+      entryUrl: baseUrl,
+      headless: true, // only a REAL human needs headed; simulating one here works headless
+      controller,
+    });
+
+    const request = await waitForPendingRequest(controller);
+    expect(controller.controller).toBe("human");
+    expect(request.atStepId).toBe("step-09");
+    expect(request.reason).toContain("risky");
+    expect(request.capabilityId).toBe("open-sub-account-confirmed");
+    expect(request.screenshot.length).toBeGreaterThan(0);
+
+    // Simulate the human: operate the SAME live session the controller is bound to.
+    await controller.boundSurface!.act({ kind: "click", target: CONFIRM_TARGET });
+    const handoff = await controller.handBack("resolved manually in test");
+    expect(handoff?.note).toBe("resolved manually in test");
+    expect(controller.controller).toBe("automation");
+
+    const result = await resultPromise;
+    expect(result.status).toBe("success");
+
+    if (result.status === "success") {
+      // evidenceRef is "evidence://evidence/<runId>/run.jsonl" -- strip the scheme to get the
+      // real relative path (which already includes the "evidence/" base dir).
+      const relativeLogPath = result.evidenceRef.replace("evidence://", "");
+      const log = await readFile(path.join(process.cwd(), relativeLogPath), "utf8");
+      const kinds = log.trim().split("\n").map((line) => JSON.parse(line).kind);
+      expect(kinds).toContain("escalation_raised");
+      expect(kinds).toContain("escalation_resumed");
+    }
+  }, 30000);
+
+  it("(h) escalation: a no-op hand-back safely re-pauses instead of crashing", async () => {
+    const controller = new EscalationController();
+    const resultPromise = runReplay({
+      capability: confirmedCapability,
+      params: { ...CREDS, memberId: "10001", initialDeposit: "50.00" },
+      entryUrl: baseUrl,
+      headless: true,
+      controller,
+    });
+
+    const first = await waitForPendingRequest(controller);
+    await controller.handBack("did nothing"); // no-op: doesn't touch the Confirm button
+    expect(controller.controller).toBe("automation");
+
+    // Replay retries the same step, hits the same risky-blocked condition, pauses again.
+    const second = await waitForPendingRequest(controller);
+    expect(second.atStepId).toBe("step-09");
+    expect(second.id).not.toBe(first.id);
+
+    await controller.boundSurface!.act({ kind: "click", target: CONFIRM_TARGET });
+    await controller.handBack("resolved on the second attempt");
+
+    const result = await resultPromise;
     expect(result.status).toBe("success");
   }, 30000);
 });

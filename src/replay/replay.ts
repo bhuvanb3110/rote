@@ -2,12 +2,17 @@
 // in this file. Every exit path builds a ReplayResult and validates it through
 // ReplayResultSchema.parse before returning -- the same "fail loudly" discipline as artifact
 // serialization.
+//
+// needs_human is either a terminal exit (no controller supplied -- unattended replay, the
+// original behavior, still exercised by every test that doesn't pass one) or a PAUSE (a
+// controller supplied -- see pauseOrFail below and src/escalation/controller.ts).
 import { randomUUID } from "node:crypto";
 import { WebSurface } from "../surface/index.js";
 import type { ExecutableAction, Observation } from "../surface/index.js";
 import { buildPolicyForOrigin, policyGate, redact } from "../safety/index.js";
 import { EvidenceRecorder } from "../evidence/index.js";
-import { ReplayResultSchema, type ReplayResult, type Step } from "../artifact/index.js";
+import { ReplayResultSchema, type Capability, type ReplayResult, type Step } from "../artifact/index.js";
+import type { EscalationController } from "../escalation/index.js";
 import { evaluateCheckpoint } from "./checkpoint.js";
 import { describeCheckpoint, findBusinessOutcome, findRecoverableRule, isSessionTimeoutState } from "./recognize.js";
 import { resolveStepValue, validateParams } from "./params.js";
@@ -28,8 +33,54 @@ function buildExecutableAction(step: Step, params: Record<string, unknown>): Exe
   }
 }
 
+type PauseOutcome =
+  | { kind: "exit"; result: ReplayResult }
+  | { kind: "complete" }
+  | { kind: "skip" }
+  | { kind: "retry" };
+
+/**
+ * The single place every needs_human trigger funnels through. Without a controller, behavior is
+ * unchanged: builds and returns the same terminal ReplayResult as before. With one, it pauses
+ * (raise + wait) and, on resume, decides where to continue from -- this is what "re-checks the
+ * current checkpoint, and resumes from where it paused (or completes)" means concretely:
+ * successCondition now passing means the human already finished the job by hand ("complete");
+ * the current step's own checkpoint now passing means just this step is done ("skip", so its
+ * action -- e.g. a click on a button the human already clicked -- is never re-run); neither
+ * means retry the step fresh (safe even if the human did nothing: it just re-pauses).
+ */
+async function pauseOrFail(
+  controller: EscalationController | undefined,
+  surface: WebSurface,
+  capability: Capability,
+  step: Step,
+  reason: string,
+  buildFailureResult: () => Promise<ReplayResult>,
+): Promise<PauseOutcome> {
+  if (!controller) {
+    return { kind: "exit", result: await buildFailureResult() };
+  }
+
+  await controller.raise({
+    capabilityId: capability.id,
+    goal: capability.description,
+    atStepId: step.id,
+    reason,
+  });
+  await controller.waitForAutomation();
+
+  const observation = await surface.perceive();
+  const successNow = await evaluateCheckpoint(surface, observation, capability.successCondition);
+  if (successNow.passed) return { kind: "complete" };
+  if (step.checkpoint) {
+    const stepNow = await evaluateCheckpoint(surface, observation, step.checkpoint);
+    if (stepNow.passed) return { kind: "skip" };
+  }
+  return { kind: "retry" };
+}
+
 export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
-  const { capability, params } = options;
+  const { capability, params, controller } = options;
   validateParams(capability, params);
 
   // entryUrlPattern is always generated as "^<origin>/" (see compile.ts), so normalize the
@@ -50,6 +101,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
 
   const policy = buildPolicyForOrigin(options.entryUrl);
   const surface = await WebSurface.launch({ headless: options.headless ?? true });
+  controller?.bind(surface, evidence);
   const outputsByStepId = new Map<string, string>();
 
   let closed = false;
@@ -70,7 +122,8 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   try {
     await surface.act({ kind: "navigate", url: options.entryUrl });
 
-    for (let stepIndex = 0; stepIndex < capability.steps.length; stepIndex += 1) {
+    let stepIndex = 0;
+    stepLoop: while (stepIndex < capability.steps.length) {
       const step = capability.steps[stepIndex]!;
       const executable = buildExecutableAction(step, params);
 
@@ -94,20 +147,35 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
       // A live-classified risky action is never auto-executed by default -- the artifact's own
       // recorded risk reflects what discovery observed, not a standing authorization to replay
       // it unattended. The caller must explicitly opt in per run via approveRisky; otherwise
-      // this is exactly the "needs_human" case CLAUDE.md's "discovery stops at confirmation
-      // screens" is protecting -- that same caution must not evaporate at replay time.
+      // this pauses for a human (or, with no controller, is exactly the "needs_human" case
+      // CLAUDE.md's "discovery stops at confirmation screens" is protecting).
       if (decision.risk === "risky" && !options.approveRisky) {
         await evidence.append({
           turn: stepIndex,
           kind: "blocked",
           detail: { stepId: step.id, reason: `risky/irreversible (unapproved): ${decision.reason}` },
         });
-        return await finish({
-          status: "needs_human",
-          reason: `Step "${step.id}" is risky/irreversible and requires human authorization (rerun with approveRisky to proceed): ${decision.reason}`,
-          atStepId: step.id,
-          contextRef: evidenceRef,
-        });
+        const outcome = await pauseOrFail(
+          controller,
+          surface,
+          capability,
+          step,
+          `risky/irreversible action blocked: ${decision.reason}`,
+          () =>
+            finish({
+              status: "needs_human",
+              reason: `Step "${step.id}" is risky/irreversible and requires human authorization (rerun with approveRisky to proceed): ${decision.reason}`,
+              atStepId: step.id,
+              contextRef: evidenceRef,
+            }),
+        );
+        if (outcome.kind === "exit") return outcome.result;
+        if (outcome.kind === "complete") break stepLoop;
+        if (outcome.kind === "skip") {
+          stepIndex += 1;
+          continue stepLoop;
+        }
+        continue stepLoop;
       }
       if (decision.risk === "risky" && options.approveRisky) {
         await evidence.append({
@@ -122,7 +190,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
       let attempts = 0;
       let isFirstAttempt = true;
 
-      while (true) {
+      actLoop: while (true) {
         // Only the FIRST pass runs the step's actual action. A retry must not re-run it: once
         // a recoverable interstitial is showing, the original target (e.g. a "Log In" button)
         // is no longer on the page at all, so re-clicking it would just throw and we'd spin
@@ -180,14 +248,29 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
             screenshotFile,
           });
           if (attempts > maxAttempts) {
-            return await finish({
-              status: "needs_human",
-              reason:
-                `Recoverable rule ("${recoverable.action}") exhausted after ${maxAttempts} ` +
-                `attempts at step "${step.id}".`,
-              atStepId: step.id,
-              contextRef: evidenceRef,
-            });
+            const outcome = await pauseOrFail(
+              controller,
+              surface,
+              capability,
+              step,
+              `recoverable rule ("${recoverable.action}") exhausted after ${maxAttempts} attempts`,
+              () =>
+                finish({
+                  status: "needs_human",
+                  reason:
+                    `Recoverable rule ("${recoverable.action}") exhausted after ${maxAttempts} ` +
+                    `attempts at step "${step.id}".`,
+                  atStepId: step.id,
+                  contextRef: evidenceRef,
+                }),
+            );
+            if (outcome.kind === "exit") return outcome.result;
+            if (outcome.kind === "complete") break stepLoop;
+            if (outcome.kind === "skip") {
+              stepIndex += 1;
+              continue stepLoop;
+            }
+            continue stepLoop;
           }
           if (recoverable.backoffMs) {
             await new Promise((resolve) => setTimeout(resolve, recoverable.backoffMs));
@@ -199,10 +282,10 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
           // "dismiss" has no target field in the schema to click, so it degrades to a bounded
           // wait-and-recheck of the same page -- a documented limitation, not exercised by any
           // required test.
-          continue;
+          continue actLoop;
         }
 
-        break;
+        break actLoop;
       }
 
       const finalObservationForStep: Observation = observation ?? (await surface.perceive());
@@ -238,26 +321,58 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         });
         if (!evalResult.passed) {
           const category = isSessionTimeoutState(finalObservationForStep, step) ? "session-timeout" : "unexpected-state";
-          return await finish({
-            status: "failure",
-            atStepId: step.id,
-            expected: describeCheckpoint(step.checkpoint),
-            observed: evalResult.detail,
-            category,
-            evidenceRef,
-          });
+          const outcome = await pauseOrFail(
+            controller,
+            surface,
+            capability,
+            step,
+            `checkpoint failed: ${evalResult.detail}`,
+            () =>
+              finish({
+                status: "failure",
+                atStepId: step.id,
+                expected: describeCheckpoint(step.checkpoint!),
+                observed: evalResult.detail,
+                category,
+                evidenceRef,
+              }),
+          );
+          if (outcome.kind === "exit") return outcome.result;
+          if (outcome.kind === "complete") break stepLoop;
+          if (outcome.kind === "skip") {
+            stepIndex += 1;
+            continue stepLoop;
+          }
+          continue stepLoop;
         }
       } else if (actionError) {
         const category = isSessionTimeoutState(finalObservationForStep, step) ? "session-timeout" : "unexpected-state";
-        return await finish({
-          status: "failure",
-          atStepId: step.id,
-          expected: step.intent,
-          observed: actionError.message,
-          category,
-          evidenceRef,
-        });
+        const outcome = await pauseOrFail(
+          controller,
+          surface,
+          capability,
+          step,
+          `no locator resolved / action failed: ${actionError.message}`,
+          () =>
+            finish({
+              status: "failure",
+              atStepId: step.id,
+              expected: step.intent,
+              observed: actionError!.message,
+              category,
+              evidenceRef,
+            }),
+        );
+        if (outcome.kind === "exit") return outcome.result;
+        if (outcome.kind === "complete") break stepLoop;
+        if (outcome.kind === "skip") {
+          stepIndex += 1;
+          continue stepLoop;
+        }
+        continue stepLoop;
       }
+
+      stepIndex += 1;
     }
 
     const finalObservation = await surface.perceive();

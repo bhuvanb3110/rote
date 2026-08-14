@@ -1,2 +1,5 @@
-// Control-transfer state machine (owner token: automation|human) for the same live session.
-export {};
+// Explicit control-transfer state machine (owner: automation|human) + a minimal operator
+// console for human-in-the-loop escalation. The human operates the SAME live browser session
+// replay was already using, then hands back.
+export * from "./controller.js";
+export * from "./console.js";

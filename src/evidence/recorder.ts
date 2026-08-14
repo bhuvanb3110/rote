@@ -17,7 +17,9 @@ export interface RunLogEntry {
     | "recover"
     | "drift"
     | "result"
-    | "risk_approved";
+    | "risk_approved"
+    | "escalation_raised"
+    | "escalation_resumed";
   detail: Record<string, unknown>;
   screenshotFile?: string;
 }

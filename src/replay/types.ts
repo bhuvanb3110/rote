@@ -1,4 +1,5 @@
 import type { Capability } from "../artifact/index.js";
+import type { EscalationController } from "../escalation/index.js";
 
 export interface ReplayOptions {
   capability: Capability;
@@ -18,4 +19,11 @@ export interface ReplayOptions {
    * authorization to replay it unattended. See src/safety/policy.ts's guardrail comment.
    */
   approveRisky?: boolean;
+  /**
+   * When supplied, every needs_human trigger PAUSES instead of exiting: replay hands the live
+   * session to a human via this controller and waits for hand-back, rather than returning a
+   * terminal `needs_human` ReplayResult. Omit it (the default) to keep replay's old, unattended
+   * behavior -- needs_human/failure remain normal terminal outcomes, exactly as before.
+   */
+  controller?: EscalationController;
 }

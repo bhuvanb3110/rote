@@ -6,6 +6,7 @@ import pino from "pino";
 import { runDiscovery } from "../agent/index.js";
 import { runReplay } from "../replay/index.js";
 import { deserializeCapability } from "../artifact/index.js";
+import { EscalationController, createOperatorConsole } from "../escalation/index.js";
 
 const logger = pino();
 const program = new Command();
@@ -93,11 +94,62 @@ program
     }
   });
 
+const DEFAULT_OPERATOR_PORT = 4200;
+
 program
   .command("operator")
-  .description("Run the operator escalation session for human hand-off")
-  .action(() => {
-    logger.info("operator: not implemented yet");
+  .description(
+    "Replay an artifact with human-in-the-loop escalation: hosts an operator console and " +
+      "PAUSES on needs_human (headed browser) instead of exiting, resuming once handed back",
+  )
+  .option("-a, --artifact <path>", "path to the Capability JSON file", DEFAULT_ARTIFACT)
+  .option("-p, --params <json>", "JSON object of input params", "{}")
+  .option("-u, --url <url>", "entry URL to replay against", DEFAULT_URL)
+  .option("--port <n>", "operator console port", (v) => Number(v), DEFAULT_OPERATOR_PORT)
+  .option(
+    "--approve-risky",
+    "allow a risky/irreversible step to execute without pausing for a human at all",
+    false,
+  )
+  .action(async (opts: { artifact: string; params: string; url: string; port: number; approveRisky: boolean }) => {
+    const capability = deserializeCapability(await readFile(opts.artifact, "utf8"));
+    let params: Record<string, unknown>;
+    try {
+      params = JSON.parse(opts.params) as Record<string, unknown>;
+    } catch (err) {
+      logger.error({ err }, "operator: --params is not valid JSON");
+      process.exitCode = 1;
+      return;
+    }
+
+    const controller = new EscalationController();
+    const app = createOperatorConsole(controller);
+    const server = app.listen(opts.port, () => {
+      logger.info({ port: opts.port }, `operator: console listening on http://localhost:${opts.port}`);
+    });
+
+    logger.info(
+      { artifact: opts.artifact, capabilityId: capability.id, url: opts.url },
+      "operator: starting replay (headed) -- will pause on needs_human instead of exiting",
+    );
+
+    const result = await runReplay({
+      capability,
+      params,
+      entryUrl: opts.url,
+      headless: false, // a human must be able to see and click the SAME window
+      approveRisky: opts.approveRisky,
+      controller,
+    });
+
+    if (result.status === "success") {
+      logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef }, "operator: success");
+    } else {
+      logger.warn(result, "operator: did not succeed");
+      process.exitCode = 1;
+    }
+
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
 program.parse();
