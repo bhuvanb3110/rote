@@ -1,7 +1,9 @@
 // Evaluates a Checkpoint (the artifact's shared recognizer vocabulary) against a live
-// Observation/Surface. Used by discovery now (success-condition polling, assert_checkpoint);
-// replay will need the same evaluator in a later stage, so this is written against the generic
-// Surface interface rather than WebSurface specifically.
+// Observation/Surface. This is replay's canonical recognizer primitive -- used directly for
+// step checkpoints and successCondition, and reused by recognize.ts for knownOutcomes/
+// recoverables recognizers (they're all just Checkpoints). Discovery also uses this (for
+// assert_checkpoint and its own success-condition polling); it imports this file directly
+// rather than the src/agent barrel, so it isn't the one pulling the Anthropic SDK in here.
 import type { Checkpoint } from "../artifact/index.js";
 import type { Observation, Surface } from "../surface/index.js";
 

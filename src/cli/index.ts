@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import "dotenv/config";
+import { readFile } from "node:fs/promises";
 import { Command } from "commander";
 import pino from "pino";
 import { runDiscovery } from "../agent/index.js";
+import { runReplay } from "../replay/index.js";
+import { deserializeCapability } from "../artifact/index.js";
 
 const logger = pino();
 const program = new Command();
@@ -46,11 +49,38 @@ program
     }
   });
 
+const DEFAULT_ARTIFACT = "artifacts/member-lookup.json";
+
 program
   .command("replay")
   .description("Replay a compiled Capability artifact deterministically, no LLM in the loop")
-  .action(() => {
-    logger.info("replay: not implemented yet");
+  .option("-a, --artifact <path>", "path to the Capability JSON file", DEFAULT_ARTIFACT)
+  .option("-p, --params <json>", "JSON object of input params", "{}")
+  .option("-u, --url <url>", "entry URL to replay against", DEFAULT_URL)
+  .option("--headed", "run the browser headed instead of headless", false)
+  .action(async (opts: { artifact: string; params: string; url: string; headed: boolean }) => {
+    const capability = deserializeCapability(await readFile(opts.artifact, "utf8"));
+    let params: Record<string, unknown>;
+    try {
+      params = JSON.parse(opts.params) as Record<string, unknown>;
+    } catch (err) {
+      logger.error({ err }, "replay: --params is not valid JSON");
+      process.exitCode = 1;
+      return;
+    }
+    logger.info({ artifact: opts.artifact, capabilityId: capability.id, url: opts.url }, "replay: starting");
+    const result = await runReplay({
+      capability,
+      params,
+      entryUrl: opts.url,
+      headless: !opts.headed,
+    });
+    if (result.status === "success") {
+      logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef }, "replay: success");
+    } else {
+      logger.warn(result, "replay: did not succeed");
+      process.exitCode = 1;
+    }
   });
 
 program

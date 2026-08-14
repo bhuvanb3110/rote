@@ -3,7 +3,6 @@
 // for transcript-to-artifact compilation.
 export * from "./types.js";
 export * from "./goals.js";
-export * from "./checkpoint.js";
 export * from "./fieldHints.js";
 export * from "./tools.js";
 export * from "./compile.js";

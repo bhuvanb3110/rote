@@ -12,7 +12,7 @@ import { buildPolicyForOrigin, evaluateAction, type SafetyPolicy } from "../safe
 import { EvidenceRecorder, redactValue } from "../evidence/index.js";
 import { ElementDescriptorSchema, CheckpointSchema } from "../artifact/index.js";
 import { DISCOVERY_TOOLS } from "./tools.js";
-import { evaluateCheckpoint } from "./checkpoint.js";
+import { evaluateCheckpoint } from "../replay/checkpoint.js";
 import { isKnownSensitiveField } from "./fieldHints.js";
 import { resolveGoalConfig, type GoalConfig } from "./goals.js";
 import { compileCapability } from "./compile.js";

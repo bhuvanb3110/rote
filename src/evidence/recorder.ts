@@ -6,7 +6,17 @@ import path from "node:path";
 
 export interface RunLogEntry {
   turn: number;
-  kind: "action" | "checkpoint" | "output" | "escalate" | "blocked" | "model_call";
+  kind:
+    | "action"
+    | "checkpoint"
+    | "output"
+    | "escalate"
+    | "blocked"
+    | "model_call"
+    | "business_outcome"
+    | "recover"
+    | "drift"
+    | "result";
   detail: Record<string, unknown>;
   screenshotFile?: string;
 }
