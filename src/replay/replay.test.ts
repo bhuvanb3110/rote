@@ -213,10 +213,13 @@ describe("replay against the mock app", () => {
     expect(result.status).toBe("success");
 
     if (result.status === "success") {
-      // evidenceRef is "evidence://evidence/<runId>/run.jsonl" -- strip the scheme to get the
-      // real relative path (which already includes the "evidence/" base dir).
-      const relativeLogPath = result.evidenceRef.replace("evidence://", "");
-      const log = await readFile(path.join(process.cwd(), relativeLogPath), "utf8");
+      // evidenceRef is "evidence://<baseDir>/<runId>/run.jsonl" -- strip the scheme. Under
+      // vitest, defaultEvidenceBaseDir() resolves to an absolute os.tmpdir() path (so test runs
+      // never land in the committed evidence/ folder), so the stripped path may already be
+      // absolute rather than relative to process.cwd().
+      const strippedLogPath = result.evidenceRef.replace("evidence://", "");
+      const logPath = path.isAbsolute(strippedLogPath) ? strippedLogPath : path.join(process.cwd(), strippedLogPath);
+      const log = await readFile(logPath, "utf8");
       const kinds = log.trim().split("\n").map((line) => JSON.parse(line).kind);
       expect(kinds).toContain("escalation_raised");
       expect(kinds).toContain("escalation_resumed");

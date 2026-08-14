@@ -9,7 +9,7 @@ import { z } from "zod";
 import { WebSurface } from "../surface/index.js";
 import type { ExecutableAction } from "../surface/index.js";
 import { buildPolicyForOrigin, policyGate, redact, type SafetyPolicy } from "../safety/index.js";
-import { EvidenceRecorder } from "../evidence/index.js";
+import { EvidenceRecorder, defaultEvidenceBaseDir } from "../evidence/index.js";
 import { ElementDescriptorSchema, CheckpointSchema } from "../artifact/index.js";
 import { DISCOVERY_TOOLS } from "./tools.js";
 import { evaluateCheckpoint } from "../replay/checkpoint.js";
@@ -86,7 +86,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
   const policy: SafetyPolicy = buildPolicyForOrigin(options.entryUrl);
 
   const runId = `${goal.id}-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
-  const evidence = await EvidenceRecorder.create(options.evidenceBaseDir ?? "evidence", runId);
+  const evidence = await EvidenceRecorder.create(options.evidenceBaseDir ?? defaultEvidenceBaseDir(), runId);
   const artifactsDir = options.artifactsDir ?? "artifacts";
 
   const client = new Anthropic({ apiKey });

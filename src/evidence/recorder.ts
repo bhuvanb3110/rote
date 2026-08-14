@@ -2,7 +2,17 @@
 // Redaction itself lives in src/safety/redact.ts (the single redact() helper) -- callers pass
 // already-redacted values in; this module is pure I/O and doesn't decide what's sensitive.
 import { mkdir, appendFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
+
+/**
+ * Vitest always sets process.env.VITEST, regardless of config -- used here so test runs
+ * physically cannot write into the committed evidence/ folder, without every test file needing
+ * to remember to pass evidenceBaseDir itself.
+ */
+export function defaultEvidenceBaseDir(): string {
+  return process.env.VITEST ? path.join(os.tmpdir(), "rote-evidence-test") : "evidence";
+}
 
 export interface RunLogEntry {
   turn: number;

@@ -1,8 +1,0 @@
-{"timestamp":"2026-08-14T00:06:25.098Z","turn":0,"kind":"action","detail":{"stepId":"step-01","actionKind":"type","target":"User ID textbox","value":"[REDACTED]","intent":"Enter the operator username to log in."}}
-{"timestamp":"2026-08-14T00:06:25.142Z","turn":1,"kind":"action","detail":{"stepId":"step-02","actionKind":"type","target":"Password textbox","value":"[REDACTED]","intent":"Enter the operator password to log in."}}
-{"timestamp":"2026-08-14T00:06:25.258Z","turn":2,"kind":"action","detail":{"stepId":"step-03","actionKind":"click","target":"Log In button","intent":"Submit credentials to enter the back office."}}
-{"timestamp":"2026-08-14T00:06:25.290Z","turn":3,"kind":"action","detail":{"stepId":"step-04","actionKind":"type","target":"Member ID textbox","value":"10001","intent":"Enter the member ID to look up."}}
-{"timestamp":"2026-08-14T00:06:25.393Z","turn":4,"kind":"action","detail":{"stepId":"step-05","actionKind":"click","target":"Search button","intent":"Run the member lookup for ID 10001."}}
-{"timestamp":"2026-08-14T00:06:25.394Z","turn":4,"kind":"checkpoint","detail":{"stepId":"step-05","checkpoint":{"kind":"urlMatches","pattern":"/member/10001"},"passed":true,"message":"URL \"http://localhost:6466/member/10001\" matches //member/10001/"}}
-{"timestamp":"2026-08-14T00:06:25.441Z","turn":5,"kind":"action","detail":{"stepId":"step-06","actionKind":"readText","target":"Current Savings Balance value cell","intent":"Capture the member's current savings balance."}}
-{"timestamp":"2026-08-14T00:06:25.475Z","turn":-1,"kind":"result","detail":{"status":"success"}}

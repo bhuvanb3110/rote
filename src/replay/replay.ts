@@ -10,7 +10,7 @@ import { randomUUID } from "node:crypto";
 import { WebSurface } from "../surface/index.js";
 import type { ExecutableAction, Observation } from "../surface/index.js";
 import { buildPolicyForOrigin, policyGate, redact } from "../safety/index.js";
-import { EvidenceRecorder } from "../evidence/index.js";
+import { EvidenceRecorder, defaultEvidenceBaseDir } from "../evidence/index.js";
 import { ReplayResultSchema, type Capability, type ReplayResult, type Step } from "../artifact/index.js";
 import type { EscalationController } from "../escalation/index.js";
 import { evaluateCheckpoint } from "./checkpoint.js";
@@ -96,7 +96,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   }
 
   const runId = `${capability.id}-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
-  const evidence = await EvidenceRecorder.create(options.evidenceBaseDir ?? "evidence", runId);
+  const evidence = await EvidenceRecorder.create(options.evidenceBaseDir ?? defaultEvidenceBaseDir(), runId);
   const evidenceRef = `evidence://${evidence.directory.replace(/\\/g, "/")}/run.jsonl`;
 
   const policy = buildPolicyForOrigin(options.entryUrl);
