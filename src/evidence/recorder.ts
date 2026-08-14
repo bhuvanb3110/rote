@@ -1,6 +1,6 @@
-// Evidence capture and redaction: every discovery/replay turn writes a JSONL record plus a
-// screenshot. Redaction happens here, at the write boundary — callers pass the raw value and a
-// redact flag, and only the recorder decides what actually reaches disk.
+// Evidence capture: every discovery/replay turn writes a JSONL record plus a screenshot.
+// Redaction itself lives in src/safety/redact.ts (the single redact() helper) -- callers pass
+// already-redacted values in; this module is pure I/O and doesn't decide what's sensitive.
 import { mkdir, appendFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -16,14 +16,10 @@ export interface RunLogEntry {
     | "business_outcome"
     | "recover"
     | "drift"
-    | "result";
+    | "result"
+    | "risk_approved";
   detail: Record<string, unknown>;
   screenshotFile?: string;
-}
-
-/** Never writes the raw value when shouldRedact is true — the only case that matters. */
-export function redactValue(value: string, shouldRedact: boolean): string {
-  return shouldRedact ? "[REDACTED]" : value;
 }
 
 export class EvidenceRecorder {

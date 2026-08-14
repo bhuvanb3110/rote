@@ -58,7 +58,13 @@ program
   .option("-p, --params <json>", "JSON object of input params", "{}")
   .option("-u, --url <url>", "entry URL to replay against", DEFAULT_URL)
   .option("--headed", "run the browser headed instead of headless", false)
-  .action(async (opts: { artifact: string; params: string; url: string; headed: boolean }) => {
+  .option(
+    "--approve-risky",
+    "allow a risky/irreversible step (e.g. a final Confirm) to actually execute; " +
+      "without this, replay stops at needs_human instead",
+    false,
+  )
+  .action(async (opts: { artifact: string; params: string; url: string; headed: boolean; approveRisky: boolean }) => {
     const capability = deserializeCapability(await readFile(opts.artifact, "utf8"));
     let params: Record<string, unknown>;
     try {
@@ -68,12 +74,16 @@ program
       process.exitCode = 1;
       return;
     }
-    logger.info({ artifact: opts.artifact, capabilityId: capability.id, url: opts.url }, "replay: starting");
+    logger.info(
+      { artifact: opts.artifact, capabilityId: capability.id, url: opts.url, approveRisky: opts.approveRisky },
+      "replay: starting",
+    );
     const result = await runReplay({
       capability,
       params,
       entryUrl: opts.url,
       headless: !opts.headed,
+      approveRisky: opts.approveRisky,
     });
     if (result.status === "success") {
       logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef }, "replay: success");

@@ -8,8 +8,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { WebSurface } from "../surface/index.js";
 import type { ExecutableAction } from "../surface/index.js";
-import { buildPolicyForOrigin, evaluateAction, type SafetyPolicy } from "../safety/index.js";
-import { EvidenceRecorder, redactValue } from "../evidence/index.js";
+import { buildPolicyForOrigin, policyGate, redact, type SafetyPolicy } from "../safety/index.js";
+import { EvidenceRecorder } from "../evidence/index.js";
 import { ElementDescriptorSchema, CheckpointSchema } from "../artifact/index.js";
 import { DISCOVERY_TOOLS } from "./tools.js";
 import { evaluateCheckpoint } from "../replay/checkpoint.js";
@@ -300,7 +300,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
           return { resultText: `Invalid navigate input: ${z.prettifyError(parsed.error)}`, isError: true, terminal: null };
         }
         const action: ExecutableAction = { kind: "navigate", url: parsed.data.url };
-        const decision = evaluateAction(policy, surface.playwrightPage.url(), action);
+        const decision = policyGate(action, { policy, currentUrl: surface.playwrightPage.url() });
         if (!decision.allowed) {
           await evidence.append({ turn, kind: "blocked", detail: { action: "navigate", url: parsed.data.url, reason: decision.reason } });
           return { resultText: `Blocked by safety policy: ${decision.reason}`, isError: true, terminal: null };
@@ -340,7 +340,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
         executable = { kind: name, target };
       }
 
-      const decision = evaluateAction(policy, surface.playwrightPage.url(), executable);
+      const decision = policyGate(executable, { policy, currentUrl: surface.playwrightPage.url() });
       if (!decision.allowed) {
         await evidence.append({
           turn,
@@ -389,7 +389,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
           actionKind: name,
           target: target.describedAs,
           resolvedStrategy: handle?.strategy,
-          value: rawValue ? redactValue(rawValue.value, rawValue.redact) : undefined,
+          value: rawValue ? redact(rawValue.value, rawValue.redact) : undefined,
           intent,
           stepId,
         },

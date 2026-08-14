@@ -12,4 +12,10 @@ export interface ReplayOptions {
   /** Defaults to true -- unlike discovery, replay doesn't need a human watching. */
   headless?: boolean;
   evidenceBaseDir?: string;
+  /**
+   * Defaults to false. A risky/irreversible step is refused unless this is explicitly true --
+   * the artifact's own recorded `risk` reflects what discovery observed, not a standing
+   * authorization to replay it unattended. See src/safety/policy.ts's guardrail comment.
+   */
+  approveRisky?: boolean;
 }

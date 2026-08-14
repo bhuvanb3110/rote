@@ -11,8 +11,19 @@ import { runReplay } from "./replay.js";
 let server: Server;
 let baseUrl: string;
 let capability: Capability;
+let subAccountCapability: Capability;
 
 const CREDS = { username: "operator", password: "operator" };
+
+async function loadRelaxed(relativePath: string): Promise<Capability> {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const artifactPath = path.join(here, relativePath);
+  const recorded = deserializeCapability(await readFile(artifactPath, "utf8"));
+  // The real artifacts' entryUrlPattern is pinned to the fixed dev port (4100); tests run the
+  // mock app on an ephemeral port to stay CI-safe, so relax just the pattern -- everything else
+  // (steps, inputs, outputs, recognizers) is the real, unmodified artifact.
+  return { ...recorded, target: { ...recorded.target, entryUrlPattern: "^http://localhost:\\d+/" } };
+}
 
 beforeAll(async () => {
   server = createServer(app);
@@ -20,13 +31,8 @@ beforeAll(async () => {
   const { port } = server.address() as AddressInfo;
   baseUrl = `http://localhost:${port}`;
 
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const artifactPath = path.join(here, "../../artifacts/member-lookup.json");
-  const recorded = deserializeCapability(await readFile(artifactPath, "utf8"));
-  // The real artifact's entryUrlPattern is pinned to the fixed dev port (4100); tests run the
-  // mock app on an ephemeral port to stay CI-safe, so relax just the pattern -- everything else
-  // (steps, inputs, outputs, recognizers) is the real, unmodified artifact.
-  capability = { ...recorded, target: { ...recorded.target, entryUrlPattern: "^http://localhost:\\d+/" } };
+  capability = await loadRelaxed("../../artifacts/member-lookup.json");
+  subAccountCapability = await loadRelaxed("../../artifacts/open-sub-account.json");
 });
 
 afterAll(async () => {
@@ -103,5 +109,63 @@ describe("replay against the mock app", () => {
       expect(result.observed.length).toBeGreaterThan(0);
       expect(result.atStepId.length).toBeGreaterThan(0);
     }
+  }, 30000);
+
+  it("(e) risky action without approveRisky returns needs_human, not silent execution", async () => {
+    const withConfirm: Capability = {
+      ...subAccountCapability,
+      steps: [
+        ...subAccountCapability.steps,
+        {
+          id: "step-09",
+          intent: "Confirm the new sub-account.",
+          action: { kind: "click" },
+          target: {
+            describedAs: "Confirm button",
+            strategies: [{ kind: "roleName", role: "button", name: "Confirm", confidence: 0.95 }],
+          },
+          risk: "risky",
+        },
+      ],
+      successCondition: { kind: "textPresent", text: "Created" },
+    };
+    const result = await runReplay({
+      capability: withConfirm,
+      params: { ...CREDS, memberId: "10001", initialDeposit: "50.00" },
+      entryUrl: baseUrl,
+      headless: true,
+    });
+    expect(result.status).toBe("needs_human");
+    if (result.status === "needs_human") {
+      expect(result.atStepId).toBe("step-09");
+    }
+  }, 30000);
+
+  it("(f) risky action WITH approveRisky executes and actually completes the flow", async () => {
+    const withConfirm: Capability = {
+      ...subAccountCapability,
+      steps: [
+        ...subAccountCapability.steps,
+        {
+          id: "step-09",
+          intent: "Confirm the new sub-account.",
+          action: { kind: "click" },
+          target: {
+            describedAs: "Confirm button",
+            strategies: [{ kind: "roleName", role: "button", name: "Confirm", confidence: 0.95 }],
+          },
+          risk: "risky",
+        },
+      ],
+      successCondition: { kind: "textPresent", text: "Created" },
+    };
+    const result = await runReplay({
+      capability: withConfirm,
+      params: { ...CREDS, memberId: "10001", initialDeposit: "50.00" },
+      entryUrl: baseUrl,
+      headless: true,
+      approveRisky: true,
+    });
+    expect(result.status).toBe("success");
   }, 30000);
 });

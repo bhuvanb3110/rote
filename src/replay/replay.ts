@@ -5,8 +5,8 @@
 import { randomUUID } from "node:crypto";
 import { WebSurface } from "../surface/index.js";
 import type { ExecutableAction, Observation } from "../surface/index.js";
-import { buildPolicyForOrigin, evaluateAction } from "../safety/index.js";
-import { EvidenceRecorder, redactValue } from "../evidence/index.js";
+import { buildPolicyForOrigin, policyGate, redact } from "../safety/index.js";
+import { EvidenceRecorder } from "../evidence/index.js";
 import { ReplayResultSchema, type ReplayResult, type Step } from "../artifact/index.js";
 import { evaluateCheckpoint } from "./checkpoint.js";
 import { describeCheckpoint, findBusinessOutcome, findRecoverableRule, isSessionTimeoutState } from "./recognize.js";
@@ -75,7 +75,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
       const executable = buildExecutableAction(step, params);
 
       const currentUrl = surface.playwrightPage.url();
-      const decision = evaluateAction(policy, currentUrl, executable);
+      const decision = policyGate(executable, { policy, currentUrl });
       if (!decision.allowed) {
         await evidence.append({
           turn: stepIndex,
@@ -91,21 +91,29 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
           evidenceRef,
         });
       }
-      // Same gate, same behavior as discovery: a live-classified risky action is never
-      // auto-executed, even if the artifact's own recorded risk happens to say "safe" for a
-      // different reason -- nothing in this stage authorizes bypassing human review of an
-      // irreversible action.
-      if (decision.risk === "risky") {
+      // A live-classified risky action is never auto-executed by default -- the artifact's own
+      // recorded risk reflects what discovery observed, not a standing authorization to replay
+      // it unattended. The caller must explicitly opt in per run via approveRisky; otherwise
+      // this is exactly the "needs_human" case CLAUDE.md's "discovery stops at confirmation
+      // screens" is protecting -- that same caution must not evaporate at replay time.
+      if (decision.risk === "risky" && !options.approveRisky) {
         await evidence.append({
           turn: stepIndex,
           kind: "blocked",
-          detail: { stepId: step.id, reason: `risky/irreversible: ${decision.reason}` },
+          detail: { stepId: step.id, reason: `risky/irreversible (unapproved): ${decision.reason}` },
         });
         return await finish({
           status: "needs_human",
-          reason: `Step "${step.id}" is risky/irreversible and requires human authorization: ${decision.reason}`,
+          reason: `Step "${step.id}" is risky/irreversible and requires human authorization (rerun with approveRisky to proceed): ${decision.reason}`,
           atStepId: step.id,
           contextRef: evidenceRef,
+        });
+      }
+      if (decision.risk === "risky" && options.approveRisky) {
+        await evidence.append({
+          turn: stepIndex,
+          kind: "risk_approved",
+          detail: { stepId: step.id, reason: decision.reason },
         });
       }
 
@@ -206,7 +214,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
           stepId: step.id,
           actionKind: step.action.kind,
           target: step.target?.describedAs,
-          value: step.value ? redactValue(executable.value ?? "", step.value.redact) : undefined,
+          value: step.value ? redact(executable.value ?? "", step.value.redact) : undefined,
           intent: step.intent,
           actionError: actionError?.message,
         },
