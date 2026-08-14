@@ -13,6 +13,14 @@ export interface TenantConfig {
   searchButtonLabel: string;
   /** Row label above the member's savings balance on the member detail page. */
   balanceLabel: string;
+  /**
+   * When true, mock-app/views.ts renders every field/button/balance with hostile markup: no
+   * ARIA-bearing elements (real <a href> links instead of <button>, defeating roleName), no
+   * <label for> association (defeating labelText), and the balance in bare sibling <div>s with
+   * no <table> at all (defeating tableCell). Visible TEXT is unchanged from tenant-a -- the
+   * point is structural hostility, not relabeling (that's tenant-b's angle).
+   */
+  hostile: boolean;
 }
 
 export const TENANT_A: TenantConfig = {
@@ -22,6 +30,7 @@ export const TENANT_A: TenantConfig = {
   cookieName: "sid",
   searchButtonLabel: "Search",
   balanceLabel: "Current Savings Balance",
+  hostile: false,
 };
 
 export const TENANT_B: TenantConfig = {
@@ -31,9 +40,22 @@ export const TENANT_B: TenantConfig = {
   cookieName: "sid_tenant_b",
   searchButtonLabel: "Find Member",
   balanceLabel: "Savings Balance",
+  hostile: false,
 };
 
-export const TENANTS: TenantConfig[] = [TENANT_A, TENANT_B];
+export const TENANT_C: TenantConfig = {
+  id: "tenant-c",
+  institutionName: "Frontier Legacy Credit Union",
+  pathPrefix: "/tenant-c",
+  cookieName: "sid_tenant_c",
+  // Same visible text as tenant-a on purpose -- tenant-c's hostility is purely structural
+  // (markup), so any locator failure here is provably NOT a text-matching problem.
+  searchButtonLabel: "Search",
+  balanceLabel: "Current Savings Balance",
+  hostile: true,
+};
+
+export const TENANTS: TenantConfig[] = [TENANT_A, TENANT_B, TENANT_C];
 
 /** Prefixes an app-relative path with the tenant's mount point (a no-op for TENANT_A). */
 export function tenantUrl(tenant: TenantConfig, path: string): string {

@@ -99,6 +99,18 @@ descriptor's own top-ranked strategy; a mismatch is logged as a `"drift"` eviden
 `expectedStrategy`/`actualStrategy` — the concrete signal that the page's structure has moved out
 from under the top-choice locator, even though a lower-ranked one still worked.
 
+This chain is proven load-bearing, not decorative, against a genuinely hostile surface: `tenant-c`
+(§4) strips every semantic affordance the top strategies depend on — real `<a href>` links
+instead of `<button>` (no "button" role), no `<label for>` association, no `<table>` at all for
+the balance — while keeping every visible string identical to tenant-a, so the failure is
+provably structural, not lexical. The same `member-lookup.json` still replays to `success` with
+`savingsBalance: "$4532.10"` against it, purely by falling through to `textAnchor` (for every
+button/field) and `css` (for the balance, which isn't clickable and so can never resolve via
+`textAnchor`) — six `drift` entries, one per step, are the receipt (`evidence/replay-hostile-tenant/`).
+Replaying the *unmodified* base artifact (no override, so only its own recorded roleName/labelText
+strategies) against the same hostile surface fails outright at the very first step — the fallback
+chain, not the top strategy, is what makes the hostile case work at all.
+
 `waitFor` polls, it doesn't sleep: `waitForDescriptor`
 ([src/surface/webSurface.ts](src/surface/webSurface.ts)) re-resolves the target descriptor every
 150ms against a deadline, and the schema requires `waitFor` to carry a real `target` — there is
@@ -178,9 +190,17 @@ a `drift` evidence entry — verified live for both overridden controls. A detec
 route through versioning and human approval before being applied to the shipped override, never
 trigger a silent re-recording of the capability.
 
-Follow-on if this were continued: a hostile-DOM `Surface` variant (attribute noise, restructured
-tables) to stress-test the ranked-locator fallback chain from §3 beyond tenant-b's current mild
-obfuscation.
+**A third tenant, `tenant-c`, is a hostile-DOM variant** — same flow, same seed data, every
+visible string identical to tenant-a, but every top-ranked strategy structurally defeated (no
+ARIA roles, no label association, no table for the balance — full writeup in
+[mock-app/README.md](mock-app/README.md)). Its override
+([overrides/member-lookup.tenant-c.json](overrides/member-lookup.tenant-c.json)) keeps the base
+artifact's own recorded strategies as a literal prefix and appends exactly the fallback each
+control needs — `textAnchor` for every button/field, `css` for the non-clickable balance value.
+This is the concrete answer to "is the ranked fallback load-bearing, or decorative": §3 has the
+result. Note the distinction from the *desktop* heterogeneity claim above — this proves the
+ranked `ElementDescriptor` chain survives hostile HTML at the locator level; it says nothing new
+about `Surface` portability, which is what would need a real `DesktopSurface` to prove.
 
 ## 5. Escalation & handoff
 
@@ -251,11 +271,12 @@ Stated plainly, not glossed over:
   client-side JS, a `<meta refresh>` for polling instead of push updates. It proves the handoff
   mechanism is real (§5); it is not a production operator UI.
 - **`DesktopSurface` is design-only** (§4) — no second `Surface` implementation exists. (The
-  per-tenant override layer and canonicalization, by contrast, ARE built — §4, `src/tenant/`.)
-  The override layer also has a real gap of its own: `TenantOverride` only patches step targets
-  and `successCondition`; `knownOutcomes`/`recoverables` recognizers can't be overridden yet, so
-  a tenant whose business-outcome or recoverable-interstitial text differs from the base
-  artifact's would need a genuinely new artifact, not just an override.
+  per-tenant override layer, canonicalization, and the hostile-DOM tenant, by contrast, ARE
+  built — §3, §4, `src/tenant/`, `mock-app/tenants.ts`.) The override layer also has a real gap
+  of its own: `TenantOverride` only patches step targets and `successCondition`;
+  `knownOutcomes`/`recoverables` recognizers can't be overridden yet, so a tenant whose
+  business-outcome or recoverable-interstitial text differs from the base artifact's would need
+  a genuinely new artifact, not just an override.
 - **The `"visual"` locator strategy never produces a live handle.** It's `locate()`'s guaranteed
   fallback (carries `describedAs` forward, `locator: null`), and any action that needs a real
   element throws an explicit "no coordinate clicking implemented yet" error if that's all that
@@ -268,8 +289,10 @@ Stated plainly, not glossed over:
   exercised by any required test.
 
 What I'd build next, in order: extending `TenantOverride` to cover `knownOutcomes`/`recoverables`
-recognizers, not just step targets and `successCondition` (the real gap noted above); a
-hostile-DOM `Surface` variant (§4) to stress-test the ranked-locator fallback chain beyond
-tenant-b's current mild obfuscation; and confidence/approval gating on low-ranked locator matches
-(today every resolved strategy is accepted equally at replay time, regardless of how far down its
-own ranked list it was).
+recognizers, not just step targets and `successCondition` (the real gap noted above); confidence/
+approval gating on low-ranked locator matches (today every resolved strategy is accepted equally
+at replay time, regardless of how far down its own ranked list it was — tenant-c's six `drift`
+entries all resolve via `textAnchor`/`css` with zero extra scrutiny even though they're the least
+confident strategies in their chains); and an actual `DesktopSurface`, now that the locator
+vocabulary itself has been proven to survive hostile HTML (§3) — the remaining open question is
+the driver, not the descriptor design.

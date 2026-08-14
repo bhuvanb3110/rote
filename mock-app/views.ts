@@ -14,6 +14,57 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+// Fixed, deterministic "noisy" class names for hostile-mode markup -- stand-ins for what a
+// bundler/CSS-in-JS build would emit. NOT randomized per render: an override's css locator
+// strategy needs a stable selector to target, and reusing one flat name across fields is fine
+// since css uniqueness isn't what's under test here -- DOM structure (isolated wrapper divs) is.
+const HZ = { fieldWrap: "zk9f", fieldLbl: "zk9l", fieldCtl: "zk9c", actWrap: "zk9a", actLink: "zk9x", balWrap: "zk9w", balLbl: "zk9y", balVal: "zk9bv" };
+
+/**
+ * Renders one form field. Classic mode: today's <label for>/<input id> table row (real
+ * association -- labelText resolves). Hostile mode: label text and control live in their OWN
+ * isolated wrapper <div> (nothing else inside it) with no <label> element and no id/placeholder
+ * on the control -- roleName's name-matching and labelText both cleanly fail (no accessible
+ * name, no association), but textAnchor still resolves the control since it's the sole
+ * button/a[href]/input/select match inside that div (see locate.ts's tryTextAnchor).
+ */
+function field(tenant: TenantConfig, label: string, controlHtml: string, forId: string): string {
+  if (tenant.hostile) {
+    return `<div class="${HZ.fieldWrap}"><div class="${HZ.fieldLbl}">${escapeHtml(label)}</div><div class="${HZ.fieldCtl}">${controlHtml}</div></div>`;
+  }
+  return `<tr><td><label for="${forId}">${escapeHtml(label)}</label></td><td>${controlHtml}</td></tr>`;
+}
+
+/**
+ * Renders a form's submit control. Classic mode: a real <button type="submit"> (roleName
+ * resolves it directly). Hostile mode: a real <a href="#"> -- NOT a bare <div onclick>, which
+ * tryTextAnchor's clickable selector (button, a[href], input, select, [role='button']) wouldn't
+ * recognize at all -- styled/labeled identically but with an implicit role of "link," not
+ * "button," so roleName cleanly fails while textAnchor still finds it via a[href]. Its own
+ * onclick submits the enclosing form (works for both GET and POST forms).
+ */
+function actionControl(tenant: TenantConfig, label: string): string {
+  if (tenant.hostile) {
+    return `<div class="${HZ.actWrap}"><a href="#" class="${HZ.actLink}" onclick="this.closest('form').submit();return false;">${escapeHtml(label)}</a></div>`;
+  }
+  return `<button type="submit">${escapeHtml(label)}</button>`;
+}
+
+/**
+ * Renders the member's balance. Classic mode: today's <table> row (tableCell resolves it
+ * directly). Hostile mode: two sibling <div>s, label and value, with NO <table>/<tr> at all --
+ * tableCell requires a tr and cleanly fails (0 matches, not a silently-wrong cell); textAnchor
+ * is structurally for CLICKABLES only (see tryTextAnchor), so a non-interactive value can never
+ * resolve through it either -- the honest last-resort fallback is `css` on the value's own
+ * stable class, exactly as the schema's own comment prescribes ("css only as a last resort").
+ */
+function balanceBlock(tenant: TenantConfig, rowLabel: string, valueText: string): string {
+  if (tenant.hostile) {
+    return `<div class="${HZ.balWrap}"><div class="${HZ.balLbl}">${escapeHtml(rowLabel)}</div><div class="${HZ.balVal}">${escapeHtml(valueText)}</div></div>`;
+  }
+  return `<table class="grid1"><tr><th>${escapeHtml(rowLabel)}</th><td>${escapeHtml(valueText)}</td></tr></table>`;
+}
+
 export function layout(tenant: TenantConfig, title: string, body: string): string {
   return `<!doctype html>
 <html>
@@ -48,28 +99,31 @@ ${body}
 
 export function renderLogin(tenant: TenantConfig, error?: string): string {
   const errBlock = error ? `<div class="msg1 err">${escapeHtml(error)}</div>` : "";
+  const fields = [
+    field(tenant, "User ID", `<input name="username" type="text"${tenant.hostile ? "" : ' id="f-user"'} />`, "f-user"),
+    field(tenant, "Password", `<input name="password" type="password"${tenant.hostile ? "" : ' id="f-pass"'} />`, "f-pass"),
+  ].join("");
+  const fieldsBlock = tenant.hostile ? fields : `<table class="grid1">${fields}</table>`;
   return layout(
     tenant,
     "Sign In",
     `
 ${errBlock}
 <form method="post" action="${tenantUrl(tenant, "/login")}">
-  <table class="grid1">
-    <tr>
-      <td><label for="f-user">User ID</label></td>
-      <td><input id="f-user" name="username" type="text" /></td>
-    </tr>
-    <tr>
-      <td><label for="f-pass">Password</label></td>
-      <td><input id="f-pass" name="password" type="password" /></td>
-    </tr>
-  </table>
-  <p><button type="submit">Log In</button></p>
+  ${fieldsBlock}
+  <p>${actionControl(tenant, "Log In")}</p>
 </form>`,
   );
 }
 
 export function renderHome(tenant: TenantConfig, username: string): string {
+  const fieldHtml = field(
+    tenant,
+    "Member ID",
+    `<input name="id" type="text"${tenant.hostile ? "" : ' id="f-memberid"'} />`,
+    "f-memberid",
+  );
+  const fieldsBlock = tenant.hostile ? fieldHtml : `<table class="grid1">${fieldHtml}</table>`;
   return layout(
     tenant,
     "Member Lookup",
@@ -77,13 +131,8 @@ export function renderHome(tenant: TenantConfig, username: string): string {
 <div>Signed in as ${escapeHtml(username)}</div>
 <h3>Member Lookup</h3>
 <form method="get" action="${tenantUrl(tenant, "/member/search")}">
-  <table class="grid1">
-    <tr>
-      <td><label for="f-memberid">Member ID</label></td>
-      <td><input id="f-memberid" name="id" type="text" /></td>
-    </tr>
-  </table>
-  <p><button type="submit">${escapeHtml(tenant.searchButtonLabel)}</button></p>
+  ${fieldsBlock}
+  <p>${actionControl(tenant, tenant.searchButtonLabel)}</p>
 </form>`,
   );
 }
@@ -104,15 +153,11 @@ export function renderMemberDetail(tenant: TenantConfig, member: Member): string
   <tr><th>Account</th><th>Detail</th></tr>
   <tr>
     <td>Primary Savings</td>
-    <td>
-      <table class="grid1">
-        <tr><th>${escapeHtml(tenant.balanceLabel)}</th><td>$${member.savingsBalance.toFixed(2)}</td></tr>
-      </table>
-    </td>
+    <td>${balanceBlock(tenant, tenant.balanceLabel, `$${member.savingsBalance.toFixed(2)}`)}</td>
   </tr>
 </table>
 <form method="get" action="${tenantUrl(tenant, `/member/${encodeURIComponent(member.id)}/sub-account`)}">
-  <p><button type="submit">Open Sub-Account</button></p>
+  <p>${actionControl(tenant, "Open Sub-Account")}</p>
 </form>`,
   );
 }
@@ -148,29 +193,29 @@ export function renderTransientInterstitial(tenant: TenantConfig, retryPath: str
 }
 
 export function renderSubAccountForm(tenant: TenantConfig, memberId: string): string {
+  const selectHtml = `<select name="accountType"${tenant.hostile ? "" : ' id="f-accttype"'}>
+          <option value="Christmas Club">Christmas Club</option>
+          <option value="Holiday Club">Holiday Club</option>
+          <option value="Youth Savings">Youth Savings</option>
+        </select>`;
+  const fields = [
+    field(tenant, "Account Type", selectHtml, "f-accttype"),
+    field(
+      tenant,
+      "Initial Deposit",
+      `<input name="initialDeposit" type="text"${tenant.hostile ? "" : ' id="f-deposit"'} />`,
+      "f-deposit",
+    ),
+  ].join("");
+  const fieldsBlock = tenant.hostile ? fields : `<table class="grid1">${fields}</table>`;
   return layout(
     tenant,
     "Open Sub-Account",
     `
 <h3>Open Sub-Account &mdash; Member ${escapeHtml(memberId)}</h3>
 <form method="post" action="${tenantUrl(tenant, `/member/${encodeURIComponent(memberId)}/sub-account`)}">
-  <table class="grid1">
-    <tr>
-      <td><label for="f-accttype">Account Type</label></td>
-      <td>
-        <select id="f-accttype" name="accountType">
-          <option value="Christmas Club">Christmas Club</option>
-          <option value="Holiday Club">Holiday Club</option>
-          <option value="Youth Savings">Youth Savings</option>
-        </select>
-      </td>
-    </tr>
-    <tr>
-      <td><label for="f-deposit">Initial Deposit</label></td>
-      <td><input id="f-deposit" name="initialDeposit" type="text" /></td>
-    </tr>
-  </table>
-  <p><button type="submit">Continue</button></p>
+  ${fieldsBlock}
+  <p>${actionControl(tenant, "Continue")}</p>
 </form>`,
   );
 }
@@ -201,7 +246,7 @@ export function renderSubAccountConfirm(
   <tr><th>Initial Deposit</th><td>$${escapeHtml(draft.initialDeposit)}</td></tr>
 </table>
 <form method="post" action="${tenantUrl(tenant, `/member/${encodeURIComponent(memberId)}/sub-account/confirm`)}">
-  <p><button type="submit">Confirm</button></p>
+  <p>${actionControl(tenant, "Confirm")}</p>
 </form>`,
   );
 }

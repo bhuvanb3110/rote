@@ -117,4 +117,60 @@ describe("member-lookup replays against multiple tenants without being re-record
     // click throws, landing here as an unrecognized-state failure.
     expect(result.status).toBe("failure");
   }, 30000);
+
+  it("tenant C (hostile DOM), with override: the SAME base capability still succeeds -- no ARIA roles, no <label for>, no table for the balance -- and every overridden control logs drift", async () => {
+    const override = deserializeTenantOverride(
+      await loadJson("../../overrides/member-lookup.tenant-c.json"),
+    );
+    const effective = applyTenantOverride(capability, override);
+
+    const result = await runReplay({
+      capability: effective,
+      params: { ...CREDS, memberId: "10001" },
+      entryUrl: `${baseUrl}/tenant-c/`,
+      headless: true,
+    });
+
+    expect(result.status).toBe("success");
+    if (result.status !== "success") return;
+    expect(String(result.outputs.savingsBalance)).toContain("4532.10");
+
+    const entries = await readEvidenceEntries(result.evidenceRef);
+    const driftByStep = new Map(
+      entries
+        .filter((e) => e.kind === "drift")
+        .map((e) => [(e.detail as Record<string, unknown>).stepId, e.detail as Record<string, unknown>]),
+    );
+
+    // Every control on the hostile page defeats its top-ranked strategy structurally (no ARIA
+    // role, no label association) and falls through to textAnchor -- except the balance value,
+    // which isn't clickable at all (textAnchor is structurally for clickables only) and falls
+    // all the way to css, the documented last resort.
+    for (const stepId of ["step-01", "step-02", "step-03", "step-04", "step-05"]) {
+      const drift = driftByStep.get(stepId);
+      expect(drift, `expected a drift entry for ${stepId}`).toBeDefined();
+      expect(drift!.expectedStrategy).toBe("roleName");
+      expect(drift!.actualStrategy).toBe("textAnchor");
+    }
+    const balanceDrift = driftByStep.get("step-06");
+    expect(balanceDrift).toBeDefined();
+    expect(balanceDrift!.expectedStrategy).toBe("tableCell");
+    expect(balanceDrift!.actualStrategy).toBe("css");
+  }, 30000);
+
+  it("tenant C without the override would fail: roleName/labelText alone can't survive hostile markup", async () => {
+    const result = await runReplay({
+      capability, // no override -- just the base artifact's own roleName(+labelText) strategies
+      params: { ...CREDS, memberId: "10001" },
+      entryUrl: `${baseUrl}/tenant-c/`,
+      headless: true,
+    });
+    // step-01's User ID textbox has no accessible name (no <label>) and no role-matching
+    // affordance either (hostile mode strips both) -- locate() falls through to the unusable
+    // "visual" stub and the very first action throws.
+    expect(result.status).toBe("failure");
+    if (result.status === "failure") {
+      expect(result.atStepId).toBe("step-01");
+    }
+  }, 30000);
 });

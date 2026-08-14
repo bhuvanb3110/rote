@@ -15,36 +15,59 @@ npm run mock
 
 Listens on `http://localhost:4100` by default. Override with `MOCK_APP_PORT`.
 
-## Two tenants, one app
+## Three tenants, one app
 
-The same routes, same flow, and same seed members are served for **two tenants** — two branded
-variants of the same vendor product, exactly what you'd see if a bank ran the same back-office
-software under two different institution names. Both are defined once in `app.ts`'s
-`createTenantRouter()` factory and configured in [tenants.ts](tenants.ts):
+The same routes, same flow, and same seed members are served for **three tenants**. Each is
+defined once in `app.ts`'s `createTenantRouter()` factory and configured in
+[tenants.ts](tenants.ts):
 
-| Tenant | Mounted at | Institution name | Search button | Balance row label |
-| ------ | ---------- | ----------------- | -------------- | ------------------ |
-| `tenant-a` | `/` (unprefixed) | Great Plains Member Credit Union | "Search" | "Current Savings Balance" |
-| `tenant-b` | `/tenant-b` | Rolling Hills Credit Union | "Find Member" | "Savings Balance" |
+| Tenant | Mounted at | Institution name | What differs | Why |
+| ------ | ---------- | ----------------- | ------------- | --- |
+| `tenant-a` | `/` (unprefixed) | Great Plains Member Credit Union | Nothing — this is the app's original behavior | Baseline |
+| `tenant-b` | `/tenant-b` | Rolling Hills Credit Union | Search button says "Find Member"; balance row says "Savings Balance" | Same vendor product, different **branding/labels** |
+| `tenant-c` | `/tenant-c` | Frontier Legacy Credit Union | Every control is real, visible-text-identical to tenant-a, but structurally hostile (see below) | Same vendor product, deliberately **hostile markup** |
 
 `tenant-a` is exactly this app's original, single-tenant behavior — mounting it unprefixed at
 `/` with unchanged labels means every artifact/test written before multi-tenancy existed still
-works with zero changes. `tenant-b` deliberately differs in a way that breaks a Capability
-recorded against tenant A if replayed unmodified: its Member Lookup button is labeled "Find
-Member" (not "Search"), and its member-detail balance row is labeled "Savings Balance" (not
-"Current Savings Balance") — see [src/tenant/](../src/tenant/) for the override layer that lets
-one base Capability replay against both without being re-recorded, and the root
-[REPORT.md](../REPORT.md) §4 for the design writeup.
+works with zero changes.
 
-Each tenant has its own session cookie (`sid` for tenant-a, `sid_tenant_b` for tenant-b), so
-visiting both in the same browser doesn't cross-contaminate sessions. The failure-injection
-controls below are global (shared across both tenants) except `/control/session-timeout`, which
-only ever clears tenant-a's session (unchanged from before multi-tenancy).
+`tenant-b` varies **text**: its Member Lookup button is labeled "Find Member" (not "Search"), and
+its member-detail balance row is labeled "Savings Balance" (not "Current Savings Balance") — a
+Capability recorded against tenant A breaks if replayed unmodified.
+
+`tenant-c` is **hostile-DOM mode** (`TenantConfig.hostile: true`), not a text change — every
+visible string is identical to tenant-a on purpose, so any locator failure there is provably a
+structural problem, not a relabeling one:
+- **Buttons/links are `<a href="#">`, not `<button>`** (with an inline `onclick` that submits the
+  enclosing form) — implicit role "link," not "button," so `roleName` matching a `button` role
+  finds nothing.
+- **No `<label for>` association on any input** — label text sits in a plain sibling `<div>`,
+  visually identical but with no accessible-name link, so `labelText` finds nothing. Inputs also
+  carry no `id`/`placeholder` (a `placeholder` would accidentally supply an accessible name and
+  defeat the point).
+- **The savings balance has no `<table>`/`<tr>` at all** — label and value are bare sibling
+  `<div>`s, so a `tableCell` strategy (which requires a `tr`) cleanly finds nothing.
+- **Every field/action lives in its own isolated wrapper `<div>`** (nothing else inside it) so a
+  `textAnchor` fallback — which needs to find *exactly one* clickable/input near the anchor text
+  — resolves cleanly instead of failing for the wrong reason (a shared container with multiple
+  inputs would make it ambiguous).
+- **Class names are short and non-semantic** (`zk9f`, `zk9bv`, ...) — no `data-testid`, nothing
+  a naive `css` selector could guess without having actually inspected the page.
+
+See [src/tenant/](../src/tenant/) for the override layer that lets one base Capability replay
+against all three tenants without being re-recorded, [overrides/member-lookup.tenant-c.json](../overrides/member-lookup.tenant-c.json)
+for exactly which fallback strategy each hostile control needs, and the root
+[REPORT.md](../REPORT.md) §3/§4 for the design writeup.
+
+Each tenant has its own session cookie (`sid`, `sid_tenant_b`, `sid_tenant_c`), so visiting all
+three in the same browser doesn't cross-contaminate sessions. The failure-injection controls
+below are global (shared across all tenants) except `/control/session-timeout`, which only ever
+clears tenant-a's session (unchanged from before multi-tenancy).
 
 ## Routes
 
-Routes below are shown unprefixed (tenant-a); tenant-b serves the identical set under
-`/tenant-b/...` (e.g. `/tenant-b/member/:id`).
+Routes below are shown unprefixed (tenant-a); tenant-b and tenant-c serve the identical set under
+`/tenant-b/...` / `/tenant-c/...` (e.g. `/tenant-c/member/:id`).
 
 | Method | Path                                  | Notes                                              |
 | ------ | -------------------------------------- | --------------------------------------------------- |

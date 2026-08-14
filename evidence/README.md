@@ -12,6 +12,7 @@ screenshots captured at each turn. Sensitive fields (passwords, etc.) are record
 | [`replay-success/`](replay-success/) | Deterministic replay (no LLM) of `member-lookup.json` for member `10001` — the happy path. | No `model_call` entries at all (replay never calls the LLM). A `checkpoint` entry confirming the post-login state, then a final `result: {status:"success"}` — cross-check the CLI's `savingsBalance` output against the corresponding screenshot. |
 | [`replay-business-outcome/`](replay-business-outcome/) | Same replay, member `99999` (doesn't exist). | A `business_outcome` entry with `code: "NO_SUCH_MEMBER"` — a normal, recognized outcome the artifact was compiled to detect, not a crash or an `unexpected-state` failure. Ends `result: {status:"business_outcome"}`. |
 | [`escalation-handoff/`](escalation-handoff/) | `operator` CLI run of `open-sub-account-confirmed.json`: replay pauses at a risky, irreversible "Confirm" step, a human takes over the *same* live browser session, resolves it, and hands back. | `blocked` (why replay paused) → `escalation_raised` (screenshot + reason at the pause point) → `escalation_resumed`, ~4 minutes later per the timestamps, with the human's own `note: "manually confirmed sub-account creation"` and distinct before/after screenshots → `result: {status:"success"}`, proving replay resumed and completed in the same session rather than restarting. |
+| [`replay-hostile-tenant/`](replay-hostile-tenant/) | `replay --tenant tenant-c` of `member-lookup.json` against a deliberately hostile-DOM tenant (no ARIA roles, no `<label for>` association, no `<table>` for the balance — see [mock-app/README.md](../mock-app/README.md)). | Six `drift` entries, one per step — `step-01` through `step-05` show `expectedStrategy: "roleName"` → `actualStrategy: "textAnchor"` (every button/field lost its role/label but was still findable by its own visible text); `step-06` shows `expectedStrategy: "tableCell"` → `actualStrategy: "css"` (the balance has no table at all, so the chain bottoms out at the last-resort strategy). Ends `result: {status:"success"}` with the same `savingsBalance: "$4532.10"` as `replay-success/` — proof the ranked fallback chain, not the top strategy, is what makes replay work here. |
 
 ## Provenance
 
@@ -21,11 +22,11 @@ screenshots captured at each turn. Sensitive fields (passwords, etc.) are record
 - `escalation-handoff/` is a genuine manual `operator` run: `escalation_raised` and
   `escalation_resumed` are ~4 minutes apart, consistent with a person actually operating the
   browser, not the millisecond-scale automated escalation tests.
-- `replay-success/` and `replay-business-outcome/` were generated fresh via direct CLI
-  invocation (`npx tsx src/cli/index.ts replay ...`) specifically for this curation, so their
-  provenance is unambiguous — every other historical `replay` evidence folder was indistinguishable
-  from a `vitest` test run (both write through the same code path) and was deleted rather than
-  risk mislabeling test output as a demo artifact.
+- `replay-success/`, `replay-business-outcome/`, and `replay-hostile-tenant/` were each generated
+  fresh via direct CLI invocation (`npx tsx src/cli/index.ts replay ...`) specifically for this
+  curation, so their provenance is unambiguous — every other historical `replay` evidence folder
+  was indistinguishable from a `vitest` test run (both write through the same code path) and was
+  deleted rather than risk mislabeling test output as a demo artifact.
 - As of this curation, `vitest` runs can no longer write into this directory at all —
   `defaultEvidenceBaseDir()` (`src/evidence/recorder.ts`) routes test runs to the OS temp
   directory instead, detected via Vitest's own `process.env.VITEST` flag. Only real

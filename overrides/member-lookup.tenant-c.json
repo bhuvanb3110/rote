@@ -1,0 +1,63 @@
+{
+  "tenantId": "tenant-c",
+  "capabilityId": "member-lookup",
+  "entryUrl": "http://localhost:4100/tenant-c/",
+  "stepOverrides": {
+    "step-01": {
+      "describedAs": "User ID textbox",
+      "strategies": [
+        { "kind": "roleName", "role": "textbox", "name": "User ID", "confidence": 0.95 },
+        { "kind": "labelText", "labelText": "User ID", "confidence": 0.8 },
+        { "kind": "textAnchor", "anchorText": "User ID", "confidence": 0.6 }
+      ]
+    },
+    "step-02": {
+      "describedAs": "Password textbox",
+      "strategies": [
+        { "kind": "roleName", "role": "textbox", "name": "Password", "confidence": 0.95 },
+        { "kind": "labelText", "labelText": "Password", "confidence": 0.8 },
+        { "kind": "textAnchor", "anchorText": "Password", "confidence": 0.6 }
+      ]
+    },
+    "step-03": {
+      "describedAs": "Log In button",
+      "strategies": [
+        { "kind": "roleName", "role": "button", "name": "Log In", "confidence": 0.95 },
+        { "kind": "textAnchor", "anchorText": "Log In", "confidence": 0.6 }
+      ]
+    },
+    "step-04": {
+      "describedAs": "Member ID textbox",
+      "strategies": [
+        { "kind": "roleName", "role": "textbox", "name": "Member ID", "confidence": 0.95 },
+        { "kind": "labelText", "labelText": "Member ID", "confidence": 0.8 },
+        { "kind": "textAnchor", "anchorText": "Member ID", "confidence": 0.6 }
+      ]
+    },
+    "step-05": {
+      "describedAs": "Search button",
+      "strategies": [
+        { "kind": "roleName", "role": "button", "name": "Search", "confidence": 0.95 },
+        { "kind": "textAnchor", "anchorText": "Search", "confidence": 0.6 }
+      ]
+    },
+    "step-06": {
+      "describedAs": "Current Savings Balance value cell",
+      "strategies": [
+        { "kind": "tableCell", "rowLabel": "Current Savings Balance", "confidence": 0.9 },
+        { "kind": "textAnchor", "anchorText": "Current Savings Balance", "confidence": 0.6 },
+        { "kind": "css", "css": ".zk9bv", "confidence": 0.4 }
+      ]
+    }
+  },
+  "successCondition": {
+    "kind": "elementPresent",
+    "target": {
+      "describedAs": "Current Savings Balance value",
+      "strategies": [
+        { "kind": "tableCell", "rowLabel": "Current Savings Balance", "confidence": 0.85 },
+        { "kind": "css", "css": ".zk9bv", "confidence": 0.4 }
+      ]
+    }
+  }
+}
