@@ -1,0 +1,19 @@
+mock app:      http://localhost:4100
+catalog:       http://localhost:1478
+
+GET /capabilities -> 3 capabilities:
+  - member-lookup: Member Lookup -- Look up member 10001 and read their current savings balance.
+  - open-sub-account-confirmed: Open Sub-Account (Confirmed) -- Open a new sub-account for member 10001 and actually confirm it -- demo/test fixture for human-in-the-loop escalation on the risky final Confirm step.
+  - open-sub-account: Open Sub-Account -- Open a new sub-account for member 10001 and reach the confirmation screen.
+
+chosen tool: member-lookup
+inputSchema: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"username":{"type":"string","description":"Value typed into \"User ID textbox\"."},"password":{"type":"string","description":"Value typed into \"Password textbox\"."},"memberId":{"type":"string","description":"Value typed into \"Member ID textbox\"."}},"required":["username","password","memberId"],"additionalProperties":false}
+
+POST /capabilities/member-lookup/invoke -> status 200
+{
+  "status": "success",
+  "outputs": {
+    "savingsBalance": "$4532.10"
+  },
+  "evidenceRef": "evidence://evidence/member-lookup-2026-09-03T21-08-51-597Z-b471a085/run.jsonl"
+}
