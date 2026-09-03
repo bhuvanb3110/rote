@@ -12,6 +12,7 @@ import type { ExecutableAction, Observation } from "../surface/index.js";
 import { buildPolicyForOrigin, policyGate, redact } from "../safety/index.js";
 import { EvidenceRecorder, defaultEvidenceBaseDir } from "../evidence/index.js";
 import { ReplayResultSchema, type Capability, type ReplayResult, type Step } from "../artifact/index.js";
+import { checkApproval, computeRunConfidence, recordConfidenceRun, stepConfidence } from "../confidence/index.js";
 import type { EscalationController } from "../escalation/index.js";
 import { evaluateCheckpoint } from "./checkpoint.js";
 import { describeCheckpoint, findBusinessOutcome, findRecoverableRule, isSessionTimeoutState } from "./recognize.js";
@@ -99,10 +100,29 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   const evidence = await EvidenceRecorder.create(options.evidenceBaseDir ?? defaultEvidenceBaseDir(), runId);
   const evidenceRef = `evidence://${evidence.directory.replace(/\\/g, "/")}/run.jsonl`;
 
+  // Run-level approval gate, checked once before any browser launches -- mirrors policyGate's
+  // {allowed, reason} shape (src/safety/policy.ts) but at run granularity, not per-action: a
+  // capability that hasn't earned "approved" status is refused for unattended replay the same way
+  // an unapproved risky action already is. finish() isn't reusable here (it assumes a `surface` to
+  // close, and none has been launched yet), so this builds and validates the result by hand.
+  const approval = await checkApproval(capability.id, options);
+  if (!approval.allowed) {
+    await evidence.append({ turn: -1, kind: "blocked", detail: { reason: approval.reason } });
+    const gated = ReplayResultSchema.parse({
+      status: "needs_human",
+      reason: approval.reason,
+      atStepId: capability.steps[0]!.id,
+      contextRef: evidenceRef,
+    });
+    await evidence.append({ turn: -1, kind: "result", detail: { status: gated.status } });
+    return gated;
+  }
+
   const policy = buildPolicyForOrigin(options.entryUrl);
   const surface = await WebSurface.launch({ headless: options.headless ?? true });
   controller?.bind(surface, evidence);
   const outputsByStepId = new Map<string, string>();
+  const stepConfidenceScores: number[] = [];
 
   let closed = false;
   const closeSurface = async () => {
@@ -114,7 +134,11 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
 
   async function finish(result: ReplayResult): Promise<ReplayResult> {
     const validated = ReplayResultSchema.parse(result);
-    await evidence.append({ turn: -1, kind: "result", detail: { status: validated.status } });
+    const confidence = computeRunConfidence(stepConfidenceScores);
+    await evidence.append({ turn: -1, kind: "result", detail: { status: validated.status, confidence } });
+    if (validated.status === "success") {
+      await recordConfidenceRun(capability.id, confidence, runId, { statusDir: options.statusDir });
+    }
     await closeSurface();
     return validated;
   }
@@ -208,6 +232,9 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
             const entries = surface.provenance;
             const last = entries[entries.length - 1];
             const topChoice = executable.target.strategies[0]?.kind;
+            if (last) {
+              stepConfidenceScores.push(stepConfidence(executable.target.strategies, last.strategy));
+            }
             if (last && topChoice && last.strategy !== topChoice) {
               await evidence.append({
                 turn: stepIndex,

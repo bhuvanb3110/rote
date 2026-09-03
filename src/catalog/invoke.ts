@@ -20,6 +20,7 @@ export interface InvokeCapabilityOptions {
   overridesDir?: string;
   headless?: boolean;
   approveRisky?: boolean;
+  approveUnattended?: boolean;
 }
 
 export async function invokeCapability(options: InvokeCapabilityOptions): Promise<ReplayResult> {
@@ -48,5 +49,6 @@ export async function invokeCapability(options: InvokeCapabilityOptions): Promis
     entryUrl,
     headless: options.headless ?? true,
     approveRisky: options.approveRisky ?? false,
+    approveUnattended: options.approveUnattended ?? false,
   });
 }

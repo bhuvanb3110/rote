@@ -5,6 +5,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { deserializeCapability, type Capability } from "../artifact/index.js";
 import { resolveTenant, DEFAULT_OVERRIDES_DIR } from "../tenant/index.js";
+import { readCapabilityStatus } from "../confidence/index.js";
 import { capabilityToJsonSchema, type CatalogEntry } from "./schema.js";
 
 export const DEFAULT_ARTIFACTS_DIR = "artifacts";
@@ -40,11 +41,13 @@ export async function listCapabilities(options: ListCapabilitiesOptions = {}): P
   const capabilities = await loadCapabilities(options.artifactsDir);
   return Promise.all(
     capabilities.map(async (capability) => {
+      const status = await readCapabilityStatus(capability.id);
       const entry: CatalogEntry = {
         id: capability.id,
         name: capability.name,
         description: capability.description,
         version: capability.version,
+        approvalStatus: status.approvalStatus,
         ...capabilityToJsonSchema(capability),
       };
       if (!options.tenant) return entry;

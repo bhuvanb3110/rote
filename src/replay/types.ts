@@ -26,4 +26,14 @@ export interface ReplayOptions {
    * behavior -- needs_human/failure remain normal terminal outcomes, exactly as before.
    */
   controller?: EscalationController;
+  /**
+   * Defaults to false, same polarity as approveRisky. A capability whose accumulated confidence
+   * history hasn't yet earned it "approved" status is refused before any browser launches unless
+   * this is explicitly true -- see src/confidence/approval.ts. This is how a draft capability's
+   * history gets to accumulate in the first place: a human opts individual runs in one at a time
+   * until enough consecutive high-confidence runs auto-promote it.
+   */
+  approveUnattended?: boolean;
+  /** Defaults to "status" -- where per-capability approval/confidence sidecar files live. */
+  statusDir?: string;
 }

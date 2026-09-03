@@ -24,6 +24,7 @@ export function createCatalogApp(): Express {
       tenant?: string;
       entryUrl?: string;
       approveRisky?: boolean;
+      approveUnattended?: boolean;
     };
     try {
       const result = await invokeCapability({
@@ -32,6 +33,7 @@ export function createCatalogApp(): Express {
         tenant: body.tenant,
         entryUrl: body.entryUrl,
         approveRisky: body.approveRisky,
+        approveUnattended: body.approveUnattended,
       });
       res.json(result);
     } catch (err) {

@@ -9,6 +9,7 @@ import { deserializeCapability, type Capability } from "../artifact/index.js";
 import { EscalationController, createOperatorConsole } from "../escalation/index.js";
 import { resolveTenant } from "../tenant/index.js";
 import { createCatalogApp, invokeCapability, listCapabilities, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
+import { approveCapability, readRunConfidence } from "../confidence/index.js";
 
 const logger = pino();
 const program = new Command();
@@ -72,6 +73,13 @@ program
       "without this, replay stops at needs_human instead",
     false,
   )
+  .option(
+    "--approve-unattended",
+    "replay a draft (not yet approved) capability unattended anyway; without this, an " +
+      "unapproved capability is refused before any browser launches -- see \"catalog approve\"",
+    false,
+  )
+  .option("--show-confidence", "print the run's confidence score, read back from its evidence log", false)
   .action(
     async (opts: {
       artifact: string;
@@ -80,6 +88,8 @@ program
       tenant?: string;
       headed: boolean;
       approveRisky: boolean;
+      approveUnattended: boolean;
+      showConfidence: boolean;
     }) => {
       const baseCapability = deserializeCapability(await readFile(opts.artifact, "utf8"));
       let params: Record<string, unknown>;
@@ -111,11 +121,15 @@ program
         entryUrl,
         headless: !opts.headed,
         approveRisky: opts.approveRisky,
+        approveUnattended: opts.approveUnattended,
       });
+      const confidence = opts.showConfidence
+        ? await readRunConfidence(result.status === "needs_human" ? result.contextRef : result.evidenceRef)
+        : undefined;
       if (result.status === "success") {
-        logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef }, "replay: success");
+        logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef, confidence }, "replay: success");
       } else {
-        logger.warn(result, "replay: did not succeed");
+        logger.warn({ ...result, confidence }, "replay: did not succeed");
         process.exitCode = 1;
       }
     },
@@ -143,6 +157,12 @@ program
     "allow a risky/irreversible step to execute without pausing for a human at all",
     false,
   )
+  .option(
+    "--approve-unattended",
+    "run a draft (not yet approved) capability anyway; without this, an unapproved capability " +
+      "is refused before any browser launches, even under operator -- see \"catalog approve\"",
+    false,
+  )
   .action(
     async (opts: {
       artifact: string;
@@ -151,6 +171,7 @@ program
       tenant?: string;
       port: number;
       approveRisky: boolean;
+      approveUnattended: boolean;
     }) => {
       const baseCapability = deserializeCapability(await readFile(opts.artifact, "utf8"));
       let params: Record<string, unknown>;
@@ -189,6 +210,7 @@ program
         entryUrl,
         headless: false, // a human must be able to see and click the SAME window
         approveRisky: opts.approveRisky,
+        approveUnattended: opts.approveUnattended,
         controller,
       });
 
@@ -236,10 +258,25 @@ catalogCommand
       "without this, invoke stops at needs_human instead",
     false,
   )
+  .option(
+    "--approve-unattended",
+    "invoke a draft (not yet approved) capability anyway; without this, an unapproved " +
+      "capability is refused before any browser launches -- see \"catalog approve\"",
+    false,
+  )
+  .option("--show-confidence", "print the run's confidence score, read back from its evidence log", false)
   .action(
     async (
       id: string,
-      opts: { params: string; tenant?: string; url: string; headed: boolean; approveRisky: boolean },
+      opts: {
+        params: string;
+        tenant?: string;
+        url: string;
+        headed: boolean;
+        approveRisky: boolean;
+        approveUnattended: boolean;
+        showConfidence: boolean;
+      },
     ) => {
       let params: Record<string, unknown>;
       try {
@@ -259,6 +296,7 @@ catalogCommand
           entryUrl: opts.url,
           headless: !opts.headed,
           approveRisky: opts.approveRisky,
+          approveUnattended: opts.approveUnattended,
         });
       } catch (err) {
         logger.error({ err, id, tenant: opts.tenant }, "catalog invoke: failed before replay started");
@@ -266,14 +304,37 @@ catalogCommand
         return;
       }
 
+      const confidence = opts.showConfidence
+        ? await readRunConfidence(result.status === "needs_human" ? result.contextRef : result.evidenceRef)
+        : undefined;
       if (result.status === "success") {
-        logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef }, "catalog invoke: success");
+        logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef, confidence }, "catalog invoke: success");
       } else {
-        logger.warn(result, "catalog invoke: did not succeed");
+        logger.warn({ ...result, confidence }, "catalog invoke: did not succeed");
         process.exitCode = 1;
       }
     },
   );
+
+catalogCommand
+  .command("approve <id>")
+  .description(
+    "Promote a capability draft -> approved: auto-promotes if its confidence history already " +
+      "qualifies, or force-approves with --reason as a human override",
+  )
+  .option("--reason <text>", "human override reason -- force-approves regardless of history")
+  .action(async (id: string, opts: { reason?: string }) => {
+    try {
+      const status = await approveCapability(id, { reason: opts.reason });
+      logger.info(
+        { capabilityId: status.capabilityId, approvedAt: status.approvedAt, reason: status.approvedReason },
+        "catalog approve: approved",
+      );
+    } catch (err) {
+      logger.error({ err, id }, "catalog approve: does not yet qualify");
+      process.exitCode = 1;
+    }
+  });
 
 catalogCommand
   .command("serve")

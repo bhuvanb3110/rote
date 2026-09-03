@@ -45,6 +45,8 @@ export interface CatalogEntry {
   /** Only present when a --tenant/?tenant= was requested AND an override exists for it. */
   tenant?: string;
   entryUrl?: string;
+  /** "draft" refuses unattended invoke without approveUnattended -- see src/confidence/. */
+  approvalStatus: "draft" | "approved";
 }
 
 export function capabilityToJsonSchema(

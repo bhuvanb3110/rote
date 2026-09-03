@@ -128,6 +128,31 @@ Replaying the *unmodified* base artifact (no override, so only its own recorded 
 strategies) against the same hostile surface fails outright at the very first step — the fallback
 chain, not the top strategy, is what makes the hostile case work at all.
 
+**Confidence & approval gating, built on that same signal.** Every resolved strategy used to be
+accepted equally regardless of how far down its own ranked list it was — tenant-c's six `drift`
+entries carried no extra scrutiny even though `textAnchor`/`css` are the least-confident strategies
+in their chains. `src/confidence/score.ts` closes that gap by scoring the exact same comparison:
+`stepConfidence` is 1.0 when the winning strategy is index 0, degrading linearly to 0.0 at the last
+index (or 0.0 outright if nothing authored resolved at all — the guaranteed `"visual"` fallback).
+Averaged per run, the numbers land exactly where the drift story predicts: tenant-a (zero drift)
+computes **1.0**; the tenant-c hostile run above computes **0.0** — every one of its six steps
+resolves at the last index of its strategies list. This is stored in the evidence run's own
+`result` entry (`src/replay/replay.ts`'s `finish()`), never in the artifact — confidence is a
+property of one run against one surface, not of the capability.
+
+That score feeds a run-level approval gate, `src/confidence/approval.ts`, structurally mirroring
+`policyGate`'s `{allowed, reason}` decision from §6: checked once, before any browser launches, it
+refuses **unattended** replay of a capability still in `draft` status with a `needs_human` result,
+the same shape an unapproved risky action already produces. A capability earns `approved` status
+(a small JSON sidecar per capability under `status/`, never the artifact) automatically once its
+confidence history has `N` consecutive runs at or above a threshold — a run below threshold breaks
+the streak rather than counting toward it, so a single hostile-surface run can't accidentally
+promote a capability it should instead be raising scrutiny on — or a human can force it with
+`catalog approve <id> --reason "..."`. The three artifacts recorded before this gate existed
+(`member-lookup`, `open-sub-account`, `open-sub-account-confirmed`) are grandfathered `approved`
+this same way, keyed purely by capability id, which is why every existing test, the catalog demo,
+and the README's replay commands keep working unattended with no changes at all.
+
 `waitFor` polls, it doesn't sleep: `waitForDescriptor`
 ([src/surface/webSurface.ts](src/surface/webSurface.ts)) re-resolves the target descriptor every
 150ms against a deadline, and the schema requires `waitFor` to carry a real `target` — there is
@@ -304,10 +329,10 @@ Stated plainly, not glossed over:
   exercised by any required test.
 
 What I'd build next, in order: extending `TenantOverride` to cover `knownOutcomes`/`recoverables`
-recognizers, not just step targets and `successCondition` (the real gap noted above); confidence/
-approval gating on low-ranked locator matches (today every resolved strategy is accepted equally
-at replay time, regardless of how far down its own ranked list it was — tenant-c's six `drift`
-entries all resolve via `textAnchor`/`css` with zero extra scrutiny even though they're the least
-confident strategies in their chains); and an actual `DesktopSurface`, now that the locator
-vocabulary itself has been proven to survive hostile HTML (§3) — the remaining open question is
-the driver, not the descriptor design.
+recognizers, not just step targets and `successCondition` (the real gap noted above); a real file
+lock (or single-writer queue) under `src/confidence/store.ts`'s sidecar writes — today a concurrent
+replay of the same capability across processes can't corrupt the file (writes are atomic via
+temp-file + rename) but two writers racing on a read-modify-write can still drop one history entry,
+a documented limit rather than the scaling infra CLAUDE.md says not to build here; and an actual
+`DesktopSurface`, now that the locator vocabulary itself has been proven to survive hostile HTML
+(§3) — the remaining open question is the driver, not the descriptor design.
