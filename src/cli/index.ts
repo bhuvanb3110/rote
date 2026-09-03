@@ -1,37 +1,17 @@
 #!/usr/bin/env node
 import "dotenv/config";
 import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { Command } from "commander";
 import pino from "pino";
 import { runDiscovery } from "../agent/index.js";
 import { runReplay } from "../replay/index.js";
 import { deserializeCapability, type Capability } from "../artifact/index.js";
 import { EscalationController, createOperatorConsole } from "../escalation/index.js";
-import { applyTenantOverride, deserializeTenantOverride } from "../tenant/index.js";
+import { resolveTenant } from "../tenant/index.js";
+import { createCatalogApp, invokeCapability, listCapabilities, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
 
 const logger = pino();
 const program = new Command();
-
-const DEFAULT_OVERRIDES_DIR = "overrides";
-
-/**
- * When --tenant is given, loads overrides/<capabilityId>.<tenantId>.json (convention-based, no
- * separate lookup step needed) and applies it, returning the effective Capability AND the
- * entry URL to replay against -- the override's own entryUrl, not the CLI's --url default,
- * since the whole point of --tenant is that the caller shouldn't have to also know each
- * tenant's URL by hand. Without --tenant, this is a no-op: same capability, same --url.
- */
-async function applyTenantIfRequested(
-  capability: Capability,
-  tenantId: string | undefined,
-  fallbackUrl: string,
-): Promise<{ capability: Capability; entryUrl: string }> {
-  if (!tenantId) return { capability, entryUrl: fallbackUrl };
-  const overridePath = path.join(DEFAULT_OVERRIDES_DIR, `${capability.id}.${tenantId}.json`);
-  const override = deserializeTenantOverride(await readFile(overridePath, "utf8"));
-  return { capability: applyTenantOverride(capability, override), entryUrl: override.entryUrl };
-}
 
 program
   .name("rote")
@@ -114,7 +94,7 @@ program
       let capability: Capability;
       let entryUrl: string;
       try {
-        ({ capability, entryUrl } = await applyTenantIfRequested(baseCapability, opts.tenant, opts.url));
+        ({ capability, entryUrl } = await resolveTenant(baseCapability, opts.tenant, opts.url));
       } catch (err) {
         logger.error({ err, tenant: opts.tenant }, "replay: failed to load/apply tenant override");
         process.exitCode = 1;
@@ -185,7 +165,7 @@ program
       let capability: Capability;
       let entryUrl: string;
       try {
-        ({ capability, entryUrl } = await applyTenantIfRequested(baseCapability, opts.tenant, opts.url));
+        ({ capability, entryUrl } = await resolveTenant(baseCapability, opts.tenant, opts.url));
       } catch (err) {
         logger.error({ err, tenant: opts.tenant }, "operator: failed to load/apply tenant override");
         process.exitCode = 1;
@@ -222,5 +202,88 @@ program
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   );
+
+const DEFAULT_CATALOG_PORT = 4300;
+
+const catalogCommand = program
+  .command("catalog")
+  .description("Agent-facing capability discovery and invocation over the existing replay path");
+
+catalogCommand
+  .command("list")
+  .description("List every capability with a JSON-Schema-shaped view of its typed inputs/outputs")
+  .option("--tenant <id>", "include the resolved entry URL where a per-tenant override exists")
+  .option("-a, --artifacts-dir <dir>", "directory of Capability artifacts", DEFAULT_ARTIFACTS_DIR)
+  .action(async (opts: { tenant?: string; artifactsDir: string }) => {
+    const entries = await listCapabilities({ tenant: opts.tenant, artifactsDir: opts.artifactsDir });
+    console.log(JSON.stringify(entries, null, 2));
+  });
+
+catalogCommand
+  .command("invoke <id>")
+  .description("Invoke a capability by id: validates params, then replays via the existing runReplay path")
+  .option("-p, --params <json>", "JSON object of input params", "{}")
+  .option(
+    "--tenant <id>",
+    "apply this tenant's override (overrides/<capabilityId>.<tenant>.json) before invoking, " +
+      "including its own entry URL",
+  )
+  .option("-u, --url <url>", "entry URL to invoke against (ignored if --tenant is given)", DEFAULT_URL)
+  .option("--headed", "run the browser headed instead of headless", false)
+  .option(
+    "--approve-risky",
+    "allow a risky/irreversible step (e.g. a final Confirm) to actually execute; " +
+      "without this, invoke stops at needs_human instead",
+    false,
+  )
+  .action(
+    async (
+      id: string,
+      opts: { params: string; tenant?: string; url: string; headed: boolean; approveRisky: boolean },
+    ) => {
+      let params: Record<string, unknown>;
+      try {
+        params = JSON.parse(opts.params) as Record<string, unknown>;
+      } catch (err) {
+        logger.error({ err }, "catalog invoke: --params is not valid JSON");
+        process.exitCode = 1;
+        return;
+      }
+
+      let result;
+      try {
+        result = await invokeCapability({
+          id,
+          params,
+          tenant: opts.tenant,
+          entryUrl: opts.url,
+          headless: !opts.headed,
+          approveRisky: opts.approveRisky,
+        });
+      } catch (err) {
+        logger.error({ err, id, tenant: opts.tenant }, "catalog invoke: failed before replay started");
+        process.exitCode = 1;
+        return;
+      }
+
+      if (result.status === "success") {
+        logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef }, "catalog invoke: success");
+      } else {
+        logger.warn(result, "catalog invoke: did not succeed");
+        process.exitCode = 1;
+      }
+    },
+  );
+
+catalogCommand
+  .command("serve")
+  .description("Host the catalog's HTTP endpoint (GET /capabilities, POST /capabilities/:id/invoke)")
+  .option("--port <n>", "catalog server port", (v) => Number(v), DEFAULT_CATALOG_PORT)
+  .action((opts: { port: number }) => {
+    const app = createCatalogApp();
+    app.listen(opts.port, () => {
+      logger.info({ port: opts.port }, `catalog: serving on http://localhost:${opts.port}`);
+    });
+  });
 
 program.parse();

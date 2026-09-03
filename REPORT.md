@@ -6,7 +6,24 @@ Modules: `surface/` (perceive/act/locate abstraction + the Playwright implementa
 `agent/` (LLM discovery loop), `artifact/` (the Capability schema — the project's focal point),
 `replay/` (deterministic, LLM-free execution), `safety/` (the one policy gate + redaction),
 `escalation/` (control-transfer state machine + operator console), `evidence/` (append-only
-JSONL + screenshot capture), `catalog/` (stub — see §7), `cli/`, `mock-app/`.
+JSONL + screenshot capture), `catalog/` (agent-facing capability discovery/invocation — see
+below), `cli/`, `mock-app/`.
+
+**Agent-facing surface.** `catalog/` is the literal payoff of treating a Capability as a callable
+tool, not just a recorded flow: `listCapabilities()` scans `artifacts/` and returns each
+capability's id/name/description plus a JSON-Schema-shaped `inputSchema`/`outputSchema`, and
+`invokeCapability(id, params, tenant?)` validates `params` against that same schema, resolves an
+optional tenant override, and calls the existing `runReplay` — the same `ReplayResult` contract
+every other caller gets. Neither piece is a second, hand-authored schema: both are derived at call
+time from each artifact's own declared `inputs`/`outputs` (via `z.toJSONSchema`, native to the
+already-installed Zod v4), so the schema an agent is shown and the schema invoke actually enforces
+can never drift apart — see [src/catalog/schema.ts](src/catalog/schema.ts). This is exposed three
+ways over the identical underlying functions: `catalog list`/`catalog invoke`/`catalog serve`
+(CLI, [src/cli/index.ts](src/cli/index.ts)), `GET /capabilities` / `POST /capabilities/:id/invoke`
+(Express, [src/catalog/http.ts](src/catalog/http.ts)), and
+[examples/agent-demo.ts](examples/agent-demo.ts) — a runnable, self-contained script that does the
+real HTTP round trip an LLM tool-caller would: list, pick a capability by name, POST typed args,
+get back a live `ReplayResult`.
 
 The seam that makes this decomposition work is `Surface`
 (`perceive(): Observation`, `act(action)`, `locate(descriptor): Handle | null`,
@@ -265,8 +282,6 @@ recognize, can still slip through.
 
 Stated plainly, not glossed over:
 
-- **`src/catalog/`** is a one-line stub (`export {}`) — no capability registry/lookup exists.
-  Artifacts today are found by file path only.
 - **The operator console is intentionally minimal** — server-rendered HTML, inline CSS, no
   client-side JS, a `<meta refresh>` for polling instead of push updates. It proves the handoff
   mechanism is real (§5); it is not a production operator UI.

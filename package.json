@@ -12,7 +12,9 @@
     "discover": "tsx src/cli/index.ts discover",
     "replay": "tsx src/cli/index.ts replay",
     "operator": "tsx src/cli/index.ts operator",
+    "catalog": "tsx src/cli/index.ts catalog",
     "mock": "tsx mock-app/index.ts",
+    "demo:agent": "tsx examples/agent-demo.ts",
     "test": "vitest run"
   },
   "license": "ISC",
