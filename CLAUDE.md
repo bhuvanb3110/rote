@@ -27,8 +27,30 @@ session when stuck -> stay inside safety guardrails.
   The mock app uses fake data so evidence is safe to commit; redaction is still implemented.
 - Escalation: an explicit control-transfer state machine with an owner token
   (automation|human). The human operates the SAME live browser session, then hands back.
-- Do NOT build scaling infra (queues, clusters, multi-tenant plumbing). Single process.
-  Multi-tenant and desktop are DESIGN-ONLY, addressed in REPORT.md.
+- Scope: a SINGLE-MACHINE fleet, specified in docs/FLEET_BRIEF.md: Postgres job queue
+  (`SELECT … FOR UPDATE SKIP LOCKED`), worker processes, leases and fencing tokens, Docker
+  Compose. Multi-machine (Kubernetes, autoscaling, distributed anything) stays OUT of scope, as
+  do desktop surfaces; those remain DESIGN-ONLY, addressed in REPORT.md. (Reverses the earlier
+  "single process, no queues" rule for the fleet only -- see docs/DECISIONS.md D1.)
 
 ## Repo layout
 surface/ agent/ artifact/ replay/ safety/ escalation/ evidence/ catalog/ cli/ mock-app/
+
+## Fleet build — working agreement
+Applies to all work under docs/FLEET_BRIEF.md. Repo facts live in docs/REPO_NOTES.md.
+- Plan before coding. Present the plan for review; build only after it is approved.
+- Small commits, each with passing tests.
+- All existing tests (83 at last count) must pass after every step. Run `npm test` before
+  committing. A known flake exists (screenshot, see REPO_NOTES.md); rerun to confirm, never hide it.
+- Every design choice goes in docs/DECISIONS.md (Decision, Alternatives considered, Why, Date).
+- Never claim a result without a script-checked run saved under evidence/. "Zero duplicates"
+  means a script read the mock bank's ledger and the output is committed.
+- Extend replay; never fork it. New behavior enters `runReplay` as optional, additive options so
+  every existing call site keeps working unchanged.
+- Never cut (from the brief): leases, check-before-retry, the crash-after-submit test, the ledger
+  check, and the evidence runs. If time runs short, cut in the brief's order: Grafana, circuit
+  breaker, per-bank cap, load test reduced to 1 and 4 workers, bank-slow scenario.
+- Don't run `npm audit fix`. Dependency upgrades get their own reviewed step.
+- End every step with the handoff report: Summary / Commits (hash + message) / Tests (command,
+  passed/failed/skipped) / REPO_NOTES verification / Docker check / Decisions added / Open
+  questions for the reviewer / Plan for next step.
