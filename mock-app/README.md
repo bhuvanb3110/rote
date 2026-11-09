@@ -62,7 +62,10 @@ for exactly which fallback strategy each hostile control needs, and the root
 Each tenant has its own session cookie (`sid`, `sid_tenant_b`, `sid_tenant_c`), so visiting all
 three in the same browser doesn't cross-contaminate sessions. The failure-injection controls
 below are global (shared across all tenants) except `/control/session-timeout`, which only ever
-clears tenant-a's session (unchanged from before multi-tenancy).
+clears tenant-a's session (unchanged from before multi-tenancy). Every `/control/*` route is
+registered before the tenant routers, so it works **without** a session cookie (until Step 3 of
+the fleet build, these three were registered after tenant-a and a cookie-less call was silently
+redirected to `/login` without toggling anything).
 
 ## Routes
 

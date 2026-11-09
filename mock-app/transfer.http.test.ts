@@ -402,3 +402,57 @@ describe("control endpoints", () => {
     expect(Date.now() - t1).toBeLessThan(150);
   });
 });
+
+describe("older controls work without a session cookie (registered before the tenants)", () => {
+  it("a cookie-less GET /control/transient/off (and /on) answers 200 and takes effect", async () => {
+    const off = await fetch(`${base}/control/transient/off`, { redirect: "manual" });
+    expect(off.status).toBe(200);
+    expect(await off.text()).toBe("transient interstitial: off");
+
+    const c = await Client.login(TENANTS[0]!);
+    const on = await fetch(`${base}/control/transient/on`, { redirect: "manual" });
+    expect(on.status).toBe(200);
+    try {
+      // ~30% per request; 60 requests without one interstitial would be ~1e-9.
+      let sawInterstitial = false;
+      for (let i = 0; i < 60 && !sawInterstitial; i += 1) {
+        sawInterstitial = (await (await c.get("/member/10001")).text()).includes("System temporarily unavailable");
+      }
+      expect(sawInterstitial).toBe(true);
+    } finally {
+      await fetch(`${base}/control/transient/off`);
+    }
+    for (let i = 0; i < 20; i += 1) {
+      expect(await (await c.get("/member/10001")).text()).not.toContain("System temporarily unavailable");
+    }
+  });
+
+  it("cookie-less GET /control/unexpected-dialog/off answers 200", async () => {
+    const res = await fetch(`${base}/control/unexpected-dialog/off`, { redirect: "manual" });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("unexpected dialog: off");
+  });
+
+  it("/control/session-timeout still ends tenant-a's session from the request cookie, and only tenant-a's", async () => {
+    const a = await Client.login(TENANTS[0]!);
+    const b = await Client.login(TENANTS[1]!);
+    const cookieA = (a as unknown as { cookie: string }).cookie;
+    const cookieB = (b as unknown as { cookie: string }).cookie;
+    const res = await fetch(`${base}/control/session-timeout`, {
+      headers: { cookie: `${cookieA}; ${cookieB}` },
+      redirect: "manual",
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.getSetCookie().join(";")).toMatch(/^sid=;/);
+
+    const afterA = await a.get("/");
+    expect(afterA.status).toBe(302);
+    expect(afterA.headers.get("location")).toBe("/login");
+    expect((await b.get("/")).status).toBe(200);
+
+    // Cookie-less: no session to end, but it answers instead of bouncing to /login.
+    const bare = await fetch(`${base}/control/session-timeout`, { redirect: "manual" });
+    expect(bare.status).toBe(302);
+    expect(bare.headers.get("location")).toBe("/");
+  });
+});

@@ -304,8 +304,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Fleet/test controls are registered BEFORE the tenants on purpose: tenant-a is mounted at "/", so
 // its auth gate would otherwise redirect a cookie-less script (the fleet's chaos and ledger-check
-// scripts have no session) to /login. (The older session-timeout/transient/unexpected-dialog
-// controls below are unchanged and still need a session cookie.)
+// scripts have no session) to /login. Every /control/* route lives here.
 // Test oracle: ALL ledger rows, every tenant. Fleet workers must never call this.
 app.get("/control/ledger", (_req, res) => {
   res.json({ memoMaxLength: MEMO_MAX_LENGTH, entries: allLedgerEntries() });
@@ -336,22 +335,10 @@ app.get("/control/errors/:mode", (req, res) => {
   res.type("text/plain").send(`errors: ${errorMode}`);
 });
 
-// Path-PREFIXED tenants must be mounted before the unprefixed one: app.use(router) with no path
-// runs its middleware for every request (including /tenant-b/*), so if it were registered
-// first, its own auth-gate would intercept and redirect /tenant-b/* requests before Express ever
-// got to try tenant-b's router at all. Mounting prefixed tenants first means Express only falls
-// through to the unprefixed (default) tenant for paths that don't match any prefix.
-const prefixedTenants = TENANTS.filter((tenant) => tenant.pathPrefix);
-const unprefixedTenants = TENANTS.filter((tenant) => !tenant.pathPrefix);
-for (const tenant of prefixedTenants) {
-  app.use(tenant.pathPrefix, createTenantRouter(tenant));
-}
-for (const tenant of unprefixedTenants) {
-  app.use(createTenantRouter(tenant));
-}
-
-// Failure-injection controls: unprefixed, shared across tenants. session-timeout clears
-// TENANT_A's cookie specifically (matching this route's original, pre-multi-tenant behavior).
+// Older failure-injection controls, shared across tenants. Until Step 3 they were registered AFTER
+// the tenants, so tenant-a's auth gate redirected any cookie-less call (e.g. a test's plain
+// fetch) to /login and the toggle silently never happened. session-timeout still clears
+// TENANT_A's cookie specifically (its original, pre-multi-tenant behavior), read from the request.
 app.get("/control/session-timeout", (req, res) => {
   const token = parseCookies(req.headers.cookie)[TENANT_A.cookieName];
   deleteSession(token);
@@ -368,5 +355,19 @@ app.get("/control/unexpected-dialog/:state", (req, res) => {
   unexpectedDialogEnabled = req.params.state === "on";
   res.type("text/plain").send(`unexpected dialog: ${unexpectedDialogEnabled ? "on" : "off"}`);
 });
+
+// Path-PREFIXED tenants must be mounted before the unprefixed one: app.use(router) with no path
+// runs its middleware for every request (including /tenant-b/*), so if it were registered
+// first, its own auth-gate would intercept and redirect /tenant-b/* requests before Express ever
+// got to try tenant-b's router at all. Mounting prefixed tenants first means Express only falls
+// through to the unprefixed (default) tenant for paths that don't match any prefix.
+const prefixedTenants = TENANTS.filter((tenant) => tenant.pathPrefix);
+const unprefixedTenants = TENANTS.filter((tenant) => !tenant.pathPrefix);
+for (const tenant of prefixedTenants) {
+  app.use(tenant.pathPrefix, createTenantRouter(tenant));
+}
+for (const tenant of unprefixedTenants) {
+  app.use(createTenantRouter(tenant));
+}
 
 export default app;
