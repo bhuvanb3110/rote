@@ -20,6 +20,13 @@ const MAX_LANDMARKS = 40;
 const WAIT_FOR_POLL_MS = 150;
 const DEFAULT_WAIT_FOR_TIMEOUT_MS = 5000;
 
+// Chromium under CPU load sometimes drops a Page.captureScreenshot call with this exact message
+// (docs/REPO_NOTES.md "Known flake", docs/DECISIONS.md D8). Only that message is retried; any
+// other error, or a failure on the last attempt, throws exactly as before.
+const SCREENSHOT_MAX_ATTEMPTS = 3;
+const SCREENSHOT_BACKOFF_MS = 100;
+const TRANSIENT_SCREENSHOT_ERROR = /Unable to capture screenshot/;
+
 function truncate(value: string, maxChars: number): string {
   return value.length > maxChars ? `${value.slice(0, maxChars)}...[truncated]` : value;
 }
@@ -66,6 +73,7 @@ export class WebSurface implements Surface {
   private readonly page: Page;
   private readonly provenanceLog: LocatorProvenanceEntry[] = [];
   private lastReadTextValue: string | null = null;
+  private screenshotRetryCount = 0;
 
   private constructor(browser: Browser, context: BrowserContext, page: Page) {
     this.browser = browser;
@@ -98,13 +106,18 @@ export class WebSurface implements Surface {
     return this.lastReadTextValue;
   }
 
+  /** How many screenshot captures were retried on this surface (a fleet metric later). */
+  get screenshotRetries(): number {
+    return this.screenshotRetryCount;
+  }
+
   async close(): Promise<void> {
     await this.browser.close();
   }
 
   async perceive(): Promise<Observation> {
     const url = this.page.url();
-    const screenshot = await this.page.screenshot();
+    const screenshot = await this.captureScreenshot();
     const body = this.page.locator("body");
     const [ariaSnapshotRaw, visibleTextRaw, landmarkTexts] = await Promise.all([
       body.ariaSnapshot(),
@@ -122,6 +135,19 @@ export class WebSurface implements Surface {
       landmarks,
       screenshot,
     };
+  }
+
+  private async captureScreenshot(): Promise<Buffer> {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await this.page.screenshot();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (attempt >= SCREENSHOT_MAX_ATTEMPTS || !TRANSIENT_SCREENSHOT_ERROR.test(message)) throw err;
+        this.screenshotRetryCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, SCREENSHOT_BACKOFF_MS * attempt));
+      }
+    }
   }
 
   async locate(descriptor: ElementDescriptor): Promise<Handle | null> {

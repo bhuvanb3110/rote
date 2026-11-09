@@ -28,9 +28,27 @@ headless Chromium, and a busy machine drops a `Page.captureScreenshot` call.
 (`replay.ts:248`, inside the act loop), and a screenshot failure is not handled anywhere — it
 throws out of `runReplay`. A fleet runs many browsers at once, so this will not be rare. For a job
 that throws mid-run it is harmless before the commit intent, but a throw *after* the irreversible
-click would look like a crash at the worst moment. **Not fixed in this step.** Decide later
-(retry/degrade the screenshot in `perceive`, or catch it in the worker) and log it in
-`docs/DECISIONS.md`.
+click would look like a crash at the worst moment.
+
+**Measured and fixed (Step 3, 2026-11-09).** By then the suite was 125 tests and the flake had
+spread beyond test (e):
+
+| | Full runs | Result |
+| --- | --- | --- |
+| Before, unpatched (reviewer's runs) | 4 | **4 of 4 failed**, 2–5 tests each, every one `page.screenshot: Protocol error (Page.captureScreenshot): Unable to capture screenshot` |
+| Reviewer's trial patch with a retry | 6 | 6 of 6 passed 125/125; 1–3 retries per run, every one succeeded on its first retry |
+| After, this fix (`npm test` ×10 back to back) | 10 | **10 of 10 passed**, 16 files, 128/128 each (125 + 3 new unit tests); `evidence/screenshot-flake-fix/npm-test-x10.txt` |
+
+The retry counter is not yet logged anywhere, so these 10 runs show the suite is green but not how
+many retries fired in them; the fleet's metrics will expose `screenshotRetries`.
+
+**Cause:** a transient Chromium hiccup under CPU load. vitest runs test files in parallel, each
+with its own headless Chromium, and a loaded machine occasionally drops a `Page.captureScreenshot`
+call. Pre-existing; not caused by Step 2. **Fix:** `WebSurface.perceive()` retries
+`page.screenshot()` up to 3 attempts in total, only when the message matches
+`/Unable to capture screenshot/`, with 100 ms × attempt backoff; any other error, or a third
+failure, throws as before. Retries are counted on the surface (`screenshotRetries`) so the fleet can
+report them as a metric. Unit tests: `src/surface/webSurface.test.ts`. Rationale: D8.
 
 ## The seven questions
 

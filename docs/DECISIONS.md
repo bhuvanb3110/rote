@@ -141,3 +141,30 @@ capabilities are never written, so concurrent workers share no mutable file stat
 artifacts are approved by hand with a recorded reason (Step 3) before any worker runs them.
 
 **Date.** 2026-11-09
+
+## D8: Retry the transient screenshot failure inside `WebSurface.perceive()`
+
+**Decision.** `perceive()` retries `page.screenshot()` up to 3 attempts in total, only when the
+error message matches `/Unable to capture screenshot/`, with a 100 ms × attempt backoff. Any other
+error, or the third failure, throws exactly as before. Each retry increments a public read-only
+`screenshotRetries` counter on the surface, which the fleet will report as a metric.
+
+**Alternatives considered.**
+- **Cap test parallelism** (vitest `maxWorkers`/`fileParallelism: false`) — makes the test suite
+  green by making the machine less busy. It only hides the problem in tests: the fleet runs many
+  browsers on one machine *by design*, so production would hit the same failure with nothing to
+  absorb it.
+- **Catch it in the fleet worker** — the worker would see a throw from `runReplay` and would have
+  to decide whether to retry the whole job. After the irreversible click that is exactly the wrong
+  moment to throw, and the worker cannot tell a screenshot hiccup from a real crash. It also leaves
+  every non-fleet caller (CLI, catalog HTTP, tests) unprotected.
+- **Degrade: return an empty screenshot on failure** — keeps replay going but silently loses
+  evidence, and a failure that is not transient would never surface.
+
+**Why.** The failure is a transient Chromium hiccup under CPU load (measured: 4 of 4 unpatched full
+runs failed; with a retry, 6 of 6 passed and every retry succeeded on its first attempt). The fleet
+creates exactly that load on purpose, so the fix belongs at the lowest layer that sees it, where it
+protects every caller. The narrow message match and the attempt cap keep real errors loud, and the
+counter keeps the retries visible instead of hidden.
+
+**Date.** 2026-11-09
