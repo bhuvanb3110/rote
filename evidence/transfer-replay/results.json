@@ -1,0 +1,98 @@
+[
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer",
+    "params": {
+      "memberId": "10001",
+      "toMemberId": "10002",
+      "amount": "12.34",
+      "memo": "rote-evidence-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000001"
+      },
+      "evidenceRef": "evidence://evidence/transfer-replay/runs/01-transfer-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer-history-lookup",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "1"
+      },
+      "evidenceRef": "evidence://evidence/transfer-replay/runs/02-lookup-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-b",
+    "capability": "transfer",
+    "params": {
+      "memberId": "10001",
+      "toMemberId": "10002",
+      "amount": "12.34",
+      "memo": "rote-evidence-tenant-b"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000002"
+      },
+      "evidenceRef": "evidence://evidence/transfer-replay/runs/03-transfer-tenant-b/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-b",
+    "capability": "transfer-history-lookup",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-tenant-b"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "1"
+      },
+      "evidenceRef": "evidence://evidence/transfer-replay/runs/04-lookup-tenant-b/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-c",
+    "capability": "transfer",
+    "params": {
+      "memberId": "10001",
+      "toMemberId": "10002",
+      "amount": "12.34",
+      "memo": "rote-evidence-tenant-c"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000003"
+      },
+      "evidenceRef": "evidence://evidence/transfer-replay/runs/05-transfer-tenant-c/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-c",
+    "capability": "transfer-history-lookup",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-tenant-c"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "1"
+      },
+      "evidenceRef": "evidence://evidence/transfer-replay/runs/06-lookup-tenant-c/run.jsonl"
+    }
+  }
+]

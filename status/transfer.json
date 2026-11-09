@@ -1,0 +1,7 @@
+{
+  "capabilityId": "transfer",
+  "approvalStatus": "approved",
+  "history": [],
+  "approvedAt": "2026-11-09T23:38:32.272Z",
+  "approvedReason": "Hand-authored (docs/DECISIONS.md D3), approved in fleet Step 3 (docs/plans/step-03.md). Basis: src/replay/transfer.test.ts passed (success on tenants a/b/c with confirmationRef equal to the ledger row id; needs_human and 0 rows without approveRisky; all eight known outcomes with an empty ledger; write-then-error leaves exactly 1 row; errors/on writes nothing; transient retries; live gate risky only on step-11 on every tenant). Evidence: evidence/transfer-replay/ - unattended replay under this approval on all three tenants, ledger-checked by script."
+}

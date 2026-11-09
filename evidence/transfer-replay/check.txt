@@ -1,0 +1,16 @@
+PASS  ledger has exactly 3 rows (got 3)
+PASS  no duplicate memo in the ledger
+PASS  tenant-a: transfer status is success (got success)
+PASS  tenant-a: exactly one ledger row with memo "rote-evidence-tenant-a" (got 1)
+PASS  tenant-a: confirmationRef TXN-000001 == ledger row id TXN-000001
+PASS  tenant-a: lookup status success and matchingCount "1" (got 1)
+PASS  tenant-b: transfer status is success (got success)
+PASS  tenant-b: exactly one ledger row with memo "rote-evidence-tenant-b" (got 1)
+PASS  tenant-b: confirmationRef TXN-000002 == ledger row id TXN-000002
+PASS  tenant-b: lookup status success and matchingCount "1" (got 1)
+PASS  tenant-c: transfer status is success (got success)
+PASS  tenant-c: exactly one ledger row with memo "rote-evidence-tenant-c" (got 1)
+PASS  tenant-c: confirmationRef TXN-000003 == ledger row id TXN-000003
+PASS  tenant-c: lookup status success and matchingCount "1" (got 1)
+
+RESULT: PASS
