@@ -3,7 +3,7 @@
 // data-testid attributes. Real <label>/<input id> pairs and real button text are kept so
 // semantic locators (role + accessible name, label anchors) are POSSIBLE, just not handed
 // over as a convenient hook.
-import type { Member, SubAccountDraft } from "./data.js";
+import type { LedgerEntry, Member, SubAccountDraft, TransferDraft } from "./data.js";
 import { tenantUrl, type TenantConfig } from "./tenants.js";
 
 function escapeHtml(value: string): string {
@@ -158,6 +158,12 @@ export function renderMemberDetail(tenant: TenantConfig, member: Member): string
 </table>
 <form method="get" action="${tenantUrl(tenant, `/member/${encodeURIComponent(member.id)}/sub-account`)}">
   <p>${actionControl(tenant, "Open Sub-Account")}</p>
+</form>
+<form method="get" action="${tenantUrl(tenant, `/member/${encodeURIComponent(member.id)}/transfer`)}">
+  <p>${actionControl(tenant, "Transfer")}</p>
+</form>
+<form method="get" action="${tenantUrl(tenant, `/member/${encodeURIComponent(member.id)}/history`)}">
+  <p>${actionControl(tenant, "History")}</p>
 </form>`,
   );
 }
@@ -268,5 +274,111 @@ export function renderNoPendingSubAccount(tenant: TenantConfig, memberId: string
     `
 <div class="msg1 err">No pending sub-account request for Member ${escapeHtml(memberId)}.</div>
 <p><a href="${tenantUrl(tenant, `/member/${encodeURIComponent(memberId)}/sub-account`)}">Start Open Sub-Account</a></p>`,
+  );
+}
+
+export function renderTransferForm(tenant: TenantConfig, memberId: string, error?: string): string {
+  const errBlock = error ? `<div class="msg1 err">${escapeHtml(error)}</div>` : "";
+  const idAttr = (id: string) => (tenant.hostile ? "" : ` id="${id}"`);
+  const fields = [
+    field(tenant, "To Member ID", `<input name="toMemberId" type="text"${idAttr("f-tomember")} />`, "f-tomember"),
+    field(tenant, "Amount", `<input name="amount" type="text"${idAttr("f-amount")} />`, "f-amount"),
+    field(tenant, "Memo", `<input name="memo" type="text"${idAttr("f-memo")} />`, "f-memo"),
+  ].join("");
+  const fieldsBlock = tenant.hostile ? fields : `<table class="grid1">${fields}</table>`;
+  return layout(
+    tenant,
+    "Transfer",
+    `
+<h3>Transfer &mdash; Member ${escapeHtml(memberId)}</h3>
+${errBlock}
+<form method="post" action="${tenantUrl(tenant, `/member/${encodeURIComponent(memberId)}/transfer`)}">
+  ${fieldsBlock}
+  <p>${actionControl(tenant, "Continue")}</p>
+</form>`,
+  );
+}
+
+export function renderTransferConfirm(tenant: TenantConfig, memberId: string, draft: TransferDraft): string {
+  return layout(
+    tenant,
+    "Confirm Transfer",
+    `
+<h3>Confirm Transfer &mdash; Member ${escapeHtml(memberId)}</h3>
+<table class="grid1">
+  <tr><th>To Member ID</th><td>${escapeHtml(draft.toMemberId)}</td></tr>
+  <tr><th>Amount</th><td>$${escapeHtml(draft.amount)}</td></tr>
+  <tr><th>Memo</th><td>${escapeHtml(draft.memo)}</td></tr>
+</table>
+<form method="post" action="${tenantUrl(tenant, `/member/${encodeURIComponent(memberId)}/transfer/confirm`)}">
+  <p>${actionControl(tenant, "Submit")}</p>
+</form>`,
+  );
+}
+
+export function renderTransferSubmitted(tenant: TenantConfig, memberId: string, entry: LedgerEntry): string {
+  return layout(
+    tenant,
+    "Transfer Submitted",
+    `
+<div class="msg1 ok">Transfer Submitted</div>
+<p>Reference ${escapeHtml(entry.id)}</p>
+<p><a href="${tenantUrl(tenant, `/member/${encodeURIComponent(memberId)}`)}">Return to Member ${escapeHtml(memberId)}</a></p>`,
+  );
+}
+
+export function renderNoPendingTransfer(tenant: TenantConfig, memberId: string): string {
+  return layout(
+    tenant,
+    "Confirm Transfer",
+    `
+<div class="msg1 err">No pending transfer for Member ${escapeHtml(memberId)}.</div>
+<p><a href="${tenantUrl(tenant, `/member/${encodeURIComponent(memberId)}/transfer`)}">Start Transfer</a></p>`,
+  );
+}
+
+/** The 503 page. Deliberately NOT the transient interstitial's wording ("temporarily unavailable"). */
+export function renderSystemUnavailable(tenant: TenantConfig): string {
+  return layout(
+    tenant,
+    "System Unavailable",
+    `
+<div class="msg1 err">System unavailable. Please try again later.</div>`,
+  );
+}
+
+export function renderTransferHistory(
+  tenant: TenantConfig,
+  memberId: string,
+  memoFilter: string,
+  rows: LedgerEntry[],
+): string {
+  const filterField = field(
+    tenant,
+    "Memo",
+    `<input name="memo" type="text" value="${escapeHtml(memoFilter)}"${tenant.hostile ? "" : ' id="f-memofilter"'} />`,
+    "f-memofilter",
+  );
+  const filterBlock = tenant.hostile ? filterField : `<table class="grid1">${filterField}</table>`;
+  const body = rows
+    .map(
+      (r) =>
+        `<tr><td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.at)}</td><td>${escapeHtml(r.fromMemberId)}</td><td>${escapeHtml(r.toMemberId)}</td><td>$${r.amount.toFixed(2)}</td><td>${escapeHtml(r.memo)}</td></tr>`,
+    )
+    .join("\n  ");
+  return layout(
+    tenant,
+    `Transfer History ${memberId}`,
+    `
+<h3>Transfer History &mdash; Member ${escapeHtml(memberId)}</h3>
+<form method="get" action="${tenantUrl(tenant, `/member/${encodeURIComponent(memberId)}/history`)}">
+  ${filterBlock}
+  <p>${actionControl(tenant, "Filter")}</p>
+</form>
+${balanceBlock(tenant, "Matching transfers", String(rows.length))}
+<table class="grid1">
+  <tr><th>Reference</th><th>Date</th><th>From</th><th>To</th><th>Amount</th><th>Memo</th></tr>
+  ${body}
+</table>`,
   );
 }
