@@ -85,3 +85,59 @@ Compose v5.7.0. Cost: containers need ~4 GB of Docker VM memory to host many Chr
 (see the open question about memory).
 
 **Date.** 2026-11-09
+
+## D5: The mock bank truncates memos at 64 characters; the fleet writes a job-derived key
+
+**Decision.** The mock bank silently truncates the memo to 64 characters when a transfer is
+submitted, and stores and shows the truncated value (the confirm page still shows what was typed).
+Consequence: the fleet writes a **job-derived key, `rote-<job uuid>` (41 characters)**, into the
+memo, never the raw client `Idempotency-Key`, which can be any length. The two are equivalent for
+our purpose because each idempotency key maps to exactly one job, so finding the job's key in the
+history finds that client request's transfer.
+
+**Alternatives considered.**
+- Put the client's `Idempotency-Key` into the memo — breaks silently for keys over 64 characters:
+  the stored memo is cut, and the history lookup for the full key finds nothing, which looks like
+  "not committed" and invites a duplicate.
+- Reject over-long memos in the bank — unlike real banks, and it would hide the hazard instead of
+  testing for it.
+- Hash the client key to a fixed length — works, but the job uuid already exists and is unique.
+
+**Why.** Real banks truncate free-text fields without telling the operator. Making the mock do the
+same forces the fleet's key to fit, and the 41-character key fits with room to spare.
+
+**Date.** 2026-11-09
+
+## D6: A write-then-error bank mode (`/control/errors/after-write`)
+
+**Decision.** Besides `errors/on` (503 before any write), the mock bank has `errors/after-write`:
+on `POST /member/:id/transfer/confirm` it appends the ledger row and then returns the 503 "System
+unavailable" page. `errors/off` clears both. The fleet must treat any error observed **after the
+commit intent** as "unknown, verify via history", never as "failed, retry".
+
+**Alternatives considered.**
+- Only the before-write error — a retry-on-error policy would pass every test, hiding the bug.
+- Make the bank fail randomly after writing — harder to reproduce and to assert; a deterministic
+  mode gives a test that fails if the fleet ever retries blindly.
+
+**Why.** This is the realistic duplicate trap: the bank commits, then the worker sees an error
+(timeout, 5xx, dropped connection). It is the same situation as a crash after submit, reached by a
+different route. A test with this mode leaves exactly one ledger row while the page shows an error.
+
+**Date.** 2026-11-09
+
+## D7: Fleet workers run only approved capabilities; never pass `approveUnattended`
+
+**Decision.** Fleet workers run only capabilities whose status is `approved`. They never pass
+`approveUnattended` to `runReplay`/`invokeCapability`.
+
+**Alternatives considered.**
+- Let workers run draft capabilities unattended via `approveUnattended` so they accrue confidence
+  runs — that is exactly the path that writes `status/<id>.json` after a run.
+
+**Why.** `recordConfidenceRun` writes the status file only for draft capabilities, and its
+read-modify-write has a documented lost-update race (`src/confidence/store.ts`). Approved
+capabilities are never written, so concurrent workers share no mutable file state. The two transfer
+artifacts are approved by hand with a recorded reason (Step 3) before any worker runs them.
+
+**Date.** 2026-11-09
