@@ -1,0 +1,499 @@
+{
+  "schemaVersion": 1,
+  "id": "transfer",
+  "name": "Transfer",
+  "description": "Transfer an amount from one member to another, with a memo, and submit it. Step 11 (Submit) is irreversible: it appends a row to the bank's ledger.",
+  "version": "1.0.0",
+  "target": {
+    "appId": "great-plains-cu-backoffice",
+    "entryUrlPattern": "^http://localhost:4100/",
+    "surfaceType": "web"
+  },
+  "inputs": [
+    {
+      "name": "username",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"User ID textbox\".",
+      "redact": true
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"Password textbox\".",
+      "redact": true
+    },
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"Member ID textbox\"; the member whose record is opened.",
+      "redact": false
+    },
+    {
+      "name": "toMemberId",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"To Member ID textbox\"; the recipient member.",
+      "redact": false
+    },
+    {
+      "name": "amount",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"Amount textbox\"; a positive dollar amount, at most two decimals.",
+      "redact": false
+    },
+    {
+      "name": "memo",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"Memo textbox\". The bank silently truncates it to 64 characters (D5).",
+      "redact": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "confirmationRef",
+      "type": "string",
+      "shape": "The bank's transfer reference, e.g. TXN-000001",
+      "producedByStepId": "step-12"
+    }
+  ],
+  "steps": [
+    {
+      "id": "step-01",
+      "intent": "Enter the operator username to log in.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "User ID textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "User ID",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "User ID",
+            "confidence": 0.8
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "User ID",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "username",
+        "redact": true
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-02",
+      "intent": "Enter the operator password to log in.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "Password textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "Password",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "Password",
+            "confidence": 0.8
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Password",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "password",
+        "redact": true
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-03",
+      "intent": "Submit credentials to enter the back office.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Log In button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Log In",
+            "confidence": 0.95
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Log In",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-04",
+      "intent": "Enter the source member's ID in Member Lookup.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "Member ID textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "Member ID",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "Member ID",
+            "confidence": 0.8
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Member ID",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "memberId",
+        "redact": false
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-05",
+      "intent": "Search for the member to open their record.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Search button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Search",
+            "confidence": 0.95
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Search",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-06",
+      "intent": "Open the transfer form for this member.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Transfer button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Transfer",
+            "confidence": 0.95
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Transfer",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-07",
+      "intent": "Enter the recipient's member ID.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "To Member ID textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "To Member ID",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "To Member ID",
+            "confidence": 0.8
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "To Member ID",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "toMemberId",
+        "redact": false
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-08",
+      "intent": "Enter the amount to transfer.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "Amount textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "Amount",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "Amount",
+            "confidence": 0.8
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Amount",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "amount",
+        "redact": false
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-09",
+      "intent": "Enter the memo that identifies this transfer in the history.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "Memo textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "Memo",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "Memo",
+            "confidence": 0.8
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Memo",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "memo",
+        "redact": false
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-10",
+      "intent": "Continue to the confirmation screen; the bank validates the transfer here.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Continue button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Continue",
+            "confidence": 0.95
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Continue",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-11",
+      "intent": "Submit the transfer. Irreversible: the bank records it in its ledger.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Submit button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Submit",
+            "confidence": 0.95
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Submit",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "risk": "risky"
+    },
+    {
+      "id": "step-12",
+      "intent": "Read the bank's reference for the submitted transfer.",
+      "action": {
+        "kind": "readText"
+      },
+      "target": {
+        "describedAs": "Transfer reference value",
+        "strategies": [
+          {
+            "kind": "tableCell",
+            "rowLabel": "Reference",
+            "confidence": 0.9
+          },
+          {
+            "kind": "css",
+            "css": ".zk9bv",
+            "confidence": 0.4
+          }
+        ]
+      },
+      "risk": "safe"
+    }
+  ],
+  "successCondition": {
+    "kind": "textPresent",
+    "text": "Transfer Submitted"
+  },
+  "knownOutcomes": [
+    {
+      "code": "NO_SUCH_MEMBER",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "Record not found"
+      },
+      "detail": "No member exists with the given ID."
+    },
+    {
+      "code": "PERMISSION_DENIED",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "do not have permission"
+      },
+      "detail": "The current operator is not permitted to view this member."
+    },
+    {
+      "code": "SOURCE_CLOSED",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "Source member"
+      },
+      "detail": "The source member's account is closed (\"Source member ... is closed.\")."
+    },
+    {
+      "code": "NO_SUCH_RECIPIENT",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "Recipient not found"
+      },
+      "detail": "No member exists with the given recipient ID."
+    },
+    {
+      "code": "RECIPIENT_CLOSED",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "is closed."
+      },
+      "detail": "The recipient member's account is closed (\"Recipient ... is closed.\"). Checked after SOURCE_CLOSED, which shares the suffix."
+    },
+    {
+      "code": "SAME_MEMBER",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "Cannot transfer to the same member"
+      },
+      "detail": "The recipient is the source member."
+    },
+    {
+      "code": "INSUFFICIENT_FUNDS",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "Insufficient funds"
+      },
+      "detail": "The amount exceeds the source member's balance."
+    },
+    {
+      "code": "INVALID_AMOUNT",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "Amount must be a positive dollar amount"
+      },
+      "detail": "The amount is not a positive dollar amount with at most two decimals."
+    }
+  ],
+  "recoverables": [
+    {
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "System temporarily unavailable"
+      },
+      "action": "retry",
+      "maxAttempts": 3,
+      "backoffMs": 500
+    }
+  ],
+  "provenance": {
+    "recordedAt": "2026-11-09T12:00:00.000Z",
+    "model": "none (hand-authored; docs/DECISIONS.md D3)",
+    "transcriptRef": "docs/plans/step-03.md"
+  }
+}

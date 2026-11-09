@@ -18,7 +18,15 @@ describe("catalog list() derives typed contracts from the real artifacts on disk
   it("lists all saved capabilities with schema-accurate inputSchema/outputSchema", async () => {
     const entries = await listCapabilities({ artifactsDir: "artifacts" });
     const ids = entries.map((entry) => entry.id).sort();
-    expect(ids).toEqual(["member-lookup", "open-sub-account", "open-sub-account-confirmed"].sort());
+    expect(ids).toEqual(
+      [
+        "member-lookup",
+        "open-sub-account",
+        "open-sub-account-confirmed",
+        "transfer",
+        "transfer-history-lookup",
+      ].sort(),
+    );
 
     const memberLookup = entries.find((entry) => entry.id === "member-lookup")!;
     expect(memberLookup.name).toBe("Member Lookup");

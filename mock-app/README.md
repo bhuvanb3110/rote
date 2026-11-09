@@ -127,7 +127,9 @@ tenant-c's hostile variant applies. Button labels are identical on all tenants: 
 **Continue**, **Submit**, **History**, **Filter**.
 
 1. `/member/:id` → Transfer → `/member/:id/transfer` (To Member ID, Amount, Memo) → Continue.
-2. `/member/:id/transfer/confirm` → summary → **Submit** → "Transfer Submitted" (`Reference TXN-nnnnnn`).
+2. `/member/:id/transfer/confirm` → summary → **Submit** → "Transfer Submitted", with a
+   "Reference" label/value row holding `TXN-nnnnnn` (a table row on tenants a/b; on tenant-c the
+   value is the page's only `.zk9bv`).
 3. `/member/:id/history[?memo=text]` → this tenant's transfers involving the member, with a
    "Matching transfers" row (the count of rows shown; `?memo=` keeps rows whose memo contains the text).
 

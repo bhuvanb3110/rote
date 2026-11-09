@@ -316,13 +316,17 @@ export function renderTransferConfirm(tenant: TenantConfig, memberId: string, dr
   );
 }
 
+/**
+ * The reference sits in its own label/value element (a table row, or hostile sibling divs) so a
+ * capability's readText can return exactly the TXN id -- see docs/plans/step-03.md, build note 1.
+ */
 export function renderTransferSubmitted(tenant: TenantConfig, memberId: string, entry: LedgerEntry): string {
   return layout(
     tenant,
     "Transfer Submitted",
     `
 <div class="msg1 ok">Transfer Submitted</div>
-<p>Reference ${escapeHtml(entry.id)}</p>
+${balanceBlock(tenant, "Reference", entry.id)}
 <p><a href="${tenantUrl(tenant, `/member/${encodeURIComponent(memberId)}`)}">Return to Member ${escapeHtml(memberId)}</a></p>`,
   );
 }

@@ -1,0 +1,359 @@
+{
+  "schemaVersion": 1,
+  "id": "transfer-history-lookup",
+  "name": "Transfer History Lookup",
+  "description": "Read-only: count a member's transfers whose memo contains the given text, from the bank's transfer history page. Used to check whether a transfer was already committed.",
+  "version": "1.0.0",
+  "target": {
+    "appId": "great-plains-cu-backoffice",
+    "entryUrlPattern": "^http://localhost:4100/",
+    "surfaceType": "web"
+  },
+  "inputs": [
+    {
+      "name": "username",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"User ID textbox\".",
+      "redact": true
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"Password textbox\".",
+      "redact": true
+    },
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into \"Member ID textbox\"; the member whose record is opened.",
+      "redact": false
+    },
+    {
+      "name": "memo",
+      "type": "string",
+      "required": true,
+      "description": "Value typed into the history page's \"Memo textbox\" filter; matches memos that contain it.",
+      "redact": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "matchingCount",
+      "type": "string",
+      "shape": "Number of matching transfers as shown, e.g. \"1\"",
+      "producedByStepId": "step-09"
+    }
+  ],
+  "steps": [
+    {
+      "id": "step-01",
+      "intent": "Enter the operator username to log in.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "User ID textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "User ID",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "User ID",
+            "confidence": 0.8
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "User ID",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "username",
+        "redact": true
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-02",
+      "intent": "Enter the operator password to log in.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "Password textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "Password",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "Password",
+            "confidence": 0.8
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Password",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "password",
+        "redact": true
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-03",
+      "intent": "Submit credentials to enter the back office.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Log In button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Log In",
+            "confidence": 0.95
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Log In",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-04",
+      "intent": "Enter the source member's ID in Member Lookup.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "Member ID textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "Member ID",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "Member ID",
+            "confidence": 0.8
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Member ID",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "memberId",
+        "redact": false
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-05",
+      "intent": "Search for the member to open their record.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Search button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Search",
+            "confidence": 0.95
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Search",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-06",
+      "intent": "Open the member's transfer history.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "History button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "History",
+            "confidence": 0.95
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "History",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-07",
+      "intent": "Enter the memo to filter the history by.",
+      "action": {
+        "kind": "type"
+      },
+      "target": {
+        "describedAs": "Memo textbox",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "textbox",
+            "name": "Memo",
+            "confidence": 0.95
+          },
+          {
+            "kind": "labelText",
+            "labelText": "Memo",
+            "confidence": 0.8
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Memo",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "value": {
+        "kind": "paramRef",
+        "paramName": "memo",
+        "redact": false
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-08",
+      "intent": "Apply the memo filter.",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "describedAs": "Filter button",
+        "strategies": [
+          {
+            "kind": "roleName",
+            "role": "button",
+            "name": "Filter",
+            "confidence": 0.95
+          },
+          {
+            "kind": "textAnchor",
+            "anchorText": "Filter",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "risk": "safe"
+    },
+    {
+      "id": "step-09",
+      "intent": "Read how many transfers match the memo.",
+      "action": {
+        "kind": "readText"
+      },
+      "target": {
+        "describedAs": "Matching transfers count",
+        "strategies": [
+          {
+            "kind": "tableCell",
+            "rowLabel": "Matching transfers",
+            "confidence": 0.9
+          },
+          {
+            "kind": "css",
+            "css": ".zk9bv",
+            "confidence": 0.4
+          }
+        ]
+      },
+      "risk": "safe"
+    }
+  ],
+  "successCondition": {
+    "kind": "elementPresent",
+    "target": {
+      "describedAs": "Matching transfers count",
+      "strategies": [
+        {
+          "kind": "tableCell",
+          "rowLabel": "Matching transfers",
+          "confidence": 0.9
+        },
+        {
+          "kind": "css",
+          "css": ".zk9bv",
+          "confidence": 0.4
+        }
+      ]
+    }
+  },
+  "knownOutcomes": [
+    {
+      "code": "NO_SUCH_MEMBER",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "Record not found"
+      },
+      "detail": "No member exists with the given ID."
+    },
+    {
+      "code": "PERMISSION_DENIED",
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "do not have permission"
+      },
+      "detail": "The current operator is not permitted to view this member."
+    }
+  ],
+  "recoverables": [
+    {
+      "recognizer": {
+        "kind": "textPresent",
+        "text": "System temporarily unavailable"
+      },
+      "action": "retry",
+      "maxAttempts": 3,
+      "backoffMs": 500
+    }
+  ],
+  "provenance": {
+    "recordedAt": "2026-11-09T12:00:00.000Z",
+    "model": "none (hand-authored; docs/DECISIONS.md D3)",
+    "transcriptRef": "docs/plans/step-03.md"
+  }
+}
