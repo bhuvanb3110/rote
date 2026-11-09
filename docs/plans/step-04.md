@@ -242,3 +242,63 @@ No randomness, and they work across processes (Docker chaos as well as in-proces
    conservative: the bank's re-validation on the confirm POST means no write in the mock, but a real
    bank might commit and then show an error.
 4. `headless` is ignored when `browser` is passed. Alternatively, throw if both are given.
+
+## Reviewer decisions (2026-11-09)
+
+The reviewer **approved** this plan with the changes below. Where they differ from the sections
+above, these win. Everything not mentioned here stands as written: context-only close, the
+hardening rule with evidence of which source said risky, `irreversibleAttempted` set before `act`,
+`after()` in a `finally`, thrown-after-attempt errors becoming `failure`/`unknown` with the marker,
+the marker added centrally in `finish()`, the operator-mode `retry` → `needs_human` conversion, the
+abort semantics, every listed test, and D10/D11.
+
+1. **`commitUncertain` as an optional field, not a fifth status:** approved as planned.
+2. **Abort and hook errors reject** (never return a `ReplayResult`): approved.
+3. **`business_outcome` after the attempt carries `commitUncertain`:** approved. Fleet rule, recorded
+   here and **built on Day 2, not in this step**: `business_outcome` + `commitUncertain` → verify via
+   the history lookup. **1 match** → the job succeeded. **0 matches** → record the business outcome
+   as **final, with no retry**. Never loop a bank refusal until `max_attempts`.
+4. **`headless` + `browser`: do not throw.** `invokeCapability` always passes `headless`, so throwing
+   would break the fleet's own call. When `browser` is given, `headless` is ignored; the option's doc
+   comment says so.
+5. **Addition: `invokeCapability` pass-through.** `invokeCapability` (`src/catalog/invoke.ts`) passes
+   `browser`, `onIrreversible`, `signal`, `evidenceBaseDir` and `statusDir` through to `runReplay`.
+   Workers call `invokeCapability` (it resolves tenant overrides), never `runReplay` directly. The
+   pass-through is tested; existing callers are unchanged.
+6. **Commit order fix.** Section 6's deterministic tests arm `/control/transient/next` and
+   `/control/errors/*` from inside `onIrreversible.before()`, so the hooks must exist before the
+   post-irreversible rules. New order (replaces section 7):
+   1. browser reuse
+   2. irreversibility hardening
+   3. `commitUncertain` schema + CLI warning
+   4. `/control/transient/next`
+   5. `onIrreversible` hooks
+   6. post-irreversible rules + the failing-first "transient after Submit" test + the 503 tests
+   7. `signal`
+   8. `invokeCapability` pass-through
+   9. docs
+7. **`after()` timing change.** `after()` runs once the bank has *answered* the click, not merely
+   when the click was dispatched. After the irreversible click, replay waits (bounded, 10 s) for the
+   page's resulting navigation to reach `load`. A timeout or error in that wait does **not** throw;
+   it is noted in evidence and `after()` still runs. Only then is `after()` called. This makes the
+   crash-after-submit test deterministic: when `after()` fires, the bank has processed the POST, so
+   the ledger has exactly 1 row. This is the hook's documented contract.
+
+Small items added to this step:
+
+8. Add a `REQUIRED_FIELD_MISSING` known outcome to the transfer artifact (matching "is required.").
+   If the artifact input schema already supports a non-empty/min-length constraint, also mark
+   `toMemberId`, `amount` and `memberId` non-empty so bad input fails before any browser launches.
+   Don't change the schema to add it.
+9. Recognizer false positive (a memo containing an outcome's text): check whether the existing
+   `knownOutcomes` schema can scope a recognizer to a specific element (e.g. the form's error-message
+   element) instead of whole-page text. If it can without schema changes, scope the transfer outcomes
+   that way and add a test with a memo containing "Insufficient funds" that still submits normally.
+   If it can't, record the limitation in REPO_NOTES with the reason, and don't change the schema.
+10. Record in REPO_NOTES under "Known limitations": screenshots show "Signed in as <username>".
+    Planned fix on Day 4: Playwright screenshot `mask` for elements that display credential values.
+
+Test discipline: the "transient right after Submit" test is written first, run against the
+unpatched rules, and its failure (reload re-posted, 1 row, "success") is recorded in that commit's
+message before the fix makes it pass. `npm test` before every commit; never commit or push on red.
+The full suite runs 3 times at the end and all three result lines are reported.
