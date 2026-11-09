@@ -168,3 +168,23 @@ protects every caller. The narrow message match and the attempt cap keep real er
 counter keeps the retries visible instead of hidden.
 
 **Date.** 2026-11-09
+
+## D9: Chaos at 4 workers; load test at 1, 2, 4 and 6 workers
+
+**Decision.** Chaos runs use 4 workers. The load test runs 1, 2, 4 and 6 workers (not the brief's
+1, 2, 4 and 8) and reports where throughput stops growing and why.
+
+**Alternatives considered.**
+- Keep the brief's 8 workers — with ~4 GB for Docker, 8 Chromium workers plus Postgres, the mock
+  bank, the API and the telemetry stack would likely run out of memory, and an OOM-killed worker
+  in a chaos run is indistinguishable from a chaos kill, which corrupts the result.
+- Raise Docker's memory allocation — the laptop has 8 GB in total; giving Docker more starves the
+  Windows host that runs the tests and the IDE.
+- Run workers on the host instead of in Docker — gives up real `docker pause`/`kill` (D4).
+
+**Why.** The builder's laptop has 8 GB RAM and Docker gets about 4 GB (`docker info`, REPO_NOTES
+Q7). 4 workers leaves headroom so chaos kills are the only kills. Stepping the load test to 6 finds
+the real memory ceiling instead of assuming it, and the brief itself prefers an honest "it flattens
+at N workers because each context needs X MB" to a big number.
+
+**Date.** 2026-11-09

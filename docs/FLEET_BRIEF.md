@@ -269,3 +269,24 @@ The one limit to state openly is the zombie-worker window: no system can make a 
 5. Bank-slow scenario
 
 Never cut: leases, check-before-retry, the crash-after-submit test, the ledger check, or the evidence runs.
+
+## Amendments (2026-11-09)
+
+Added after the original brief; the text above is unchanged. Where they disagree, these amendments win.
+
+1. **No cut list.** Quality over schedule; every deliverable above gets built. The "Cut order" and
+   the "follow the cut order" instruction no longer apply.
+2. **Memory limit.** The builder's laptop has 8 GB RAM and Docker gets about 4 GB. So:
+   - chaos runs use **4 workers** (not 4–8);
+   - the load test runs **1, 2, 4 and 6 workers** (not 1, 2, 4 and 8) to find the memory limit, and
+     the README reports where it is, honestly.
+3. **Extra proof beyond the brief:**
+   - a **crash-point matrix** that kills a worker at every step boundary of the transfer and checks
+     the ledger each time;
+   - **20+ random-kill chaos seeds** instead of 5;
+   - **fast-check property tests** that drive the job state machine through random sequences of
+     crashes, lease expiries and retries, and assert no duplicate and no lost job;
+   - **GitHub Actions CI** running the unit and crash integration tests against a Postgres service on
+     every push;
+   - **hardened risky-click classification:** a step counts as irreversible if `policyGate` says so
+     **or** the artifact step has `risk: "risky"`.

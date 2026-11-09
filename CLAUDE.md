@@ -40,16 +40,17 @@ surface/ agent/ artifact/ replay/ safety/ escalation/ evidence/ catalog/ cli/ mo
 Applies to all work under docs/FLEET_BRIEF.md. Repo facts live in docs/REPO_NOTES.md.
 - Plan before coding. Present the plan for review; build only after it is approved.
 - Small commits, each with passing tests.
-- All existing tests (83 at last count) must pass after every step. Run `npm test` before
-  committing. A known flake exists (screenshot, see REPO_NOTES.md); rerun to confirm, never hide it.
+- All existing tests must pass after every step. Run `npm test` before committing. The old
+  screenshot flake is fixed (D8); if any test flakes, rerun to confirm and report it, never hide it.
+- Never push on a red test run.
+- Each step's plan is saved to docs/plans/step-NN.md and committed; the next step reads it.
 - Every design choice goes in docs/DECISIONS.md (Decision, Alternatives considered, Why, Date).
 - Never claim a result without a script-checked run saved under evidence/. "Zero duplicates"
   means a script read the mock bank's ledger and the output is committed.
 - Extend replay; never fork it. New behavior enters `runReplay` as optional, additive options so
   every existing call site keeps working unchanged.
-- Never cut (from the brief): leases, check-before-retry, the crash-after-submit test, the ledger
-  check, and the evidence runs. If time runs short, cut in the brief's order: Grafana, circuit
-  breaker, per-bank cap, load test reduced to 1 and 4 workers, bank-slow scenario.
+- No cuts. Quality over schedule; every deliverable gets built. (See the 2026-11-09 amendments at
+  the end of docs/FLEET_BRIEF.md.)
 - Don't run `npm audit fix`. Dependency upgrades get their own reviewed step.
 - End every step with the handoff report: Summary / Commits (hash + message) / Tests (command,
   passed/failed/skipped) / REPO_NOTES verification / Docker check / Decisions added / Open
