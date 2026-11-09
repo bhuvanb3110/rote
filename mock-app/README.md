@@ -116,3 +116,37 @@ Routes below are shown unprefixed (tenant-a); tenant-b and tenant-c serve the id
 4. `/member/10001/sub-account` → pick an account type, enter a deposit, Continue.
 5. `/member/10001/sub-account/confirm` → review the summary, Confirm.
 6. "Created" flash page.
+
+## Transfers, ledger and history (fleet build)
+
+Every tenant has a transfer flow; the markup goes through `field()`/`actionControl()`, so
+tenant-c's hostile variant applies. Button labels are identical on all tenants: **Transfer**,
+**Continue**, **Submit**, **History**, **Filter**.
+
+1. `/member/:id` → Transfer → `/member/:id/transfer` (To Member ID, Amount, Memo) → Continue.
+2. `/member/:id/transfer/confirm` → summary → **Submit** → "Transfer Submitted" (`Reference TXN-nnnnnn`).
+3. `/member/:id/history[?memo=text]` → this tenant's transfers involving the member, with a
+   "Matching transfers" row (the count of rows shown; `?memo=` keeps rows whose memo contains the text).
+
+Rules: Source and recipient must be Active; the recipient must exist and differ from the source;
+the amount is a positive dollar amount with at most two decimals and may not exceed the source's
+**seeded** balance (balances are never debited). The bank **silently truncates memos to 64
+characters on submit** and stores/shows the truncated value. Validation messages: `Recipient not
+found`, `... is closed`, `Cannot transfer to the same member`, `Insufficient funds`, `Amount ...`.
+
+The ledger is one global in-memory list; each row has a `tenantId`, and history pages show only the
+viewing tenant's rows. It is lost when the process restarts.
+
+Controls (registered before the tenants, so they work **without** a session cookie):
+
+| Route | Effect |
+| --- | --- |
+| `GET /control/ledger` | JSON `{memoMaxLength, entries[]}`, all tenants. Test oracle only; workers never call it. |
+| `GET /control/ledger/reset` | Empty the ledger, restart ids at `TXN-000001`. |
+| `GET /control/latency/:ms` | Delay every tenant route (except `/login`) by `ms` (0..60000). `0` clears. |
+| `GET /control/errors/on` | Every tenant route (except `/login`) returns **503 "System unavailable"** before any write. |
+| `GET /control/errors/after-write` | `POST .../transfer/confirm` appends the ledger row **then** returns the 503. Everything else is normal. |
+| `GET /control/errors/off` | Clears both error modes. |
+
+The 503 page text is "System unavailable", deliberately different from the transient interstitial's
+"System temporarily unavailable, please retry".
