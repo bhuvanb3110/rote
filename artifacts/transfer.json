@@ -3,7 +3,7 @@
   "id": "transfer",
   "name": "Transfer",
   "description": "Transfer an amount from one member to another, with a memo, and submit it. Step 11 (Submit) is irreversible: it appends a row to the bank's ledger.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "target": {
     "appId": "great-plains-cu-backoffice",
     "entryUrlPattern": "^http://localhost:4100/",
@@ -418,64 +418,153 @@
     {
       "code": "NO_SUCH_MEMBER",
       "recognizer": {
-        "kind": "textPresent",
-        "text": "Record not found"
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"Record not found\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"Record not found\")",
+              "confidence": 0.7
+            }
+          ]
+        }
       },
       "detail": "No member exists with the given ID."
     },
     {
       "code": "PERMISSION_DENIED",
       "recognizer": {
-        "kind": "textPresent",
-        "text": "do not have permission"
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"do not have permission\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"do not have permission\")",
+              "confidence": 0.7
+            }
+          ]
+        }
       },
       "detail": "The current operator is not permitted to view this member."
     },
     {
       "code": "SOURCE_CLOSED",
       "recognizer": {
-        "kind": "textPresent",
-        "text": "Source member"
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"Source member\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"Source member\")",
+              "confidence": 0.7
+            }
+          ]
+        }
       },
       "detail": "The source member's account is closed (\"Source member ... is closed.\")."
     },
     {
       "code": "NO_SUCH_RECIPIENT",
       "recognizer": {
-        "kind": "textPresent",
-        "text": "Recipient not found"
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"Recipient not found\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"Recipient not found\")",
+              "confidence": 0.7
+            }
+          ]
+        }
       },
       "detail": "No member exists with the given recipient ID."
     },
     {
       "code": "RECIPIENT_CLOSED",
       "recognizer": {
-        "kind": "textPresent",
-        "text": "is closed."
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"Recipient\" and \"is closed.\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"Recipient\"):has-text(\"is closed.\")",
+              "confidence": 0.7
+            }
+          ]
+        }
       },
-      "detail": "The recipient member's account is closed (\"Recipient ... is closed.\"). Checked after SOURCE_CLOSED, which shares the suffix."
+      "detail": "The recipient member's account is closed (\"Recipient ... is closed.\"). Requires both \"Recipient\" and \"is closed.\" in the error message, so SOURCE_CLOSED's \"Source member ... is closed.\" never matches it; still listed after SOURCE_CLOSED."
     },
     {
       "code": "SAME_MEMBER",
       "recognizer": {
-        "kind": "textPresent",
-        "text": "Cannot transfer to the same member"
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"Cannot transfer to the same member\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"Cannot transfer to the same member\")",
+              "confidence": 0.7
+            }
+          ]
+        }
       },
       "detail": "The recipient is the source member."
     },
     {
       "code": "INSUFFICIENT_FUNDS",
       "recognizer": {
-        "kind": "textPresent",
-        "text": "Insufficient funds"
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"Insufficient funds\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"Insufficient funds\")",
+              "confidence": 0.7
+            }
+          ]
+        }
       },
       "detail": "The amount exceeds the source member's balance."
     },
     {
+      "code": "REQUIRED_FIELD_MISSING",
+      "recognizer": {
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"is required.\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"is required.\")",
+              "confidence": 0.7
+            }
+          ]
+        }
+      },
+      "detail": "A required transfer field (To Member ID or Amount) was empty (\"... is required.\")."
+    },
+    {
       "code": "INVALID_AMOUNT",
       "recognizer": {
-        "kind": "textPresent",
-        "text": "Amount must be a positive dollar amount"
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"Amount must be a positive dollar amount\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"Amount must be a positive dollar amount\")",
+              "confidence": 0.7
+            }
+          ]
+        }
       },
       "detail": "The amount is not a positive dollar amount with at most two decimals."
     }

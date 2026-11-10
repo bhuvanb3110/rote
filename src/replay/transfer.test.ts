@@ -248,6 +248,28 @@ describe("transfer artifacts: replay against the mock bank", () => {
     }, 60_000);
   }
 
+  it("a memo containing outcome text is not mistaken for that outcome (recognizers scoped to the error message)", async () => {
+    // The confirm page and the history page both show the memo. Whole-page textPresent recognizers
+    // read it as INSUFFICIENT_FUNDS / NO_SUCH_MEMBER; scoped to the error element, they don't.
+    const memo = "rote-Insufficient funds-Record not found";
+    const result = await transfer(TENANT_A, { memo });
+    expect(result.status, JSON.stringify(result)).toBe("success");
+    expect((await ledger()).map((r) => r.memo)).toEqual([memo]);
+    expect(await matchingCount(TENANT_A, memo)).toBe("1");
+    // ...and the real outcome is still recognized on the hostile tenant.
+    const refused = await transfer(TENANT_C, { memo, amount: "999999.00" });
+    expect(refused).toMatchObject({ status: "business_outcome", code: "INSUFFICIENT_FUNDS" });
+    expect(await ledger()).toHaveLength(1);
+  }, 90_000);
+
+  it("an empty To Member ID or Amount is REQUIRED_FIELD_MISSING (the input schema can't reject it earlier)", async () => {
+    for (const fields of [{ toMemberId: "" }, { amount: "" }]) {
+      const result = await transfer(TENANT_B, { memo: "rote-s4-required", ...fields });
+      expect(result, JSON.stringify(result)).toMatchObject({ status: "business_outcome", code: "REQUIRED_FIELD_MISSING" });
+    }
+    expect(await ledger()).toEqual([]);
+  }, 60_000);
+
   it("lookup business outcomes: NO_SUCH_MEMBER and PERMISSION_DENIED", async () => {
     expect(await lookup(TENANT_A, "x", "99999")).toMatchObject({ status: "business_outcome", code: "NO_SUCH_MEMBER" });
     expect(await lookup(TENANT_A, "x", "40404")).toMatchObject({ status: "business_outcome", code: "PERMISSION_DENIED" });

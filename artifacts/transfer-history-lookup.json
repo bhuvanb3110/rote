@@ -3,7 +3,7 @@
   "id": "transfer-history-lookup",
   "name": "Transfer History Lookup",
   "description": "Read-only: count a member's transfers whose memo contains the given text, from the bank's transfer history page. Used to check whether a transfer was already committed.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "target": {
     "appId": "great-plains-cu-backoffice",
     "entryUrlPattern": "^http://localhost:4100/",
@@ -326,16 +326,34 @@
     {
       "code": "NO_SUCH_MEMBER",
       "recognizer": {
-        "kind": "textPresent",
-        "text": "Record not found"
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"Record not found\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"Record not found\")",
+              "confidence": 0.7
+            }
+          ]
+        }
       },
       "detail": "No member exists with the given ID."
     },
     {
       "code": "PERMISSION_DENIED",
       "recognizer": {
-        "kind": "textPresent",
-        "text": "do not have permission"
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"do not have permission\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"do not have permission\")",
+              "confidence": 0.7
+            }
+          ]
+        }
       },
       "detail": "The current operator is not permitted to view this member."
     }
