@@ -1,0 +1,39 @@
+Day-1 exit run, started 2026-11-10T05:06:09.563Z
+jobs: 100, workers: 4, tenants: tenant-a, tenant-b, tenant-c, capability: transfer
+database: postgres://rote:***@127.0.0.1:55432/rote
+reset: queue tables truncated; bank ledger rows before the run: 0
+stack healthy: rote-api-1=healthy, rote-bank-1=healthy, rote-postgres-1=healthy, rote-worker-1=healthy, rote-worker-2=healthy, rote-worker-3=healthy, rote-worker-4=healthy
+POST x100: 100 x 201 in 2302 ms
+replayed POST x100: 100 x 200 with the same job id; jobs in table: 100
+drain: 96294 ms (timeout 600000 ms)
+job states: succeeded=100
+PASS  100 jobs in the table (found 100)
+PASS  every job terminal (not terminal: 0)
+PASS  every job succeeded (not succeeded: 0)
+PASS  every job on attempt 1 (retried: 0)
+PASS  bank ledger has exactly 100 rows (found 100)
+PASS  0 duplicates: no job's memo_key on 2+ ledger rows (duplicated: 0)
+PASS  every succeeded job has its ledger row (missing: 0)
+PASS  0 lost: no job left non-terminal after the drain (lost: 0)
+PASS  0 ledger rows whose memo matches no job (orphans: 0)
+PASS  each succeeded job's confirmationRef equals its ledger row id (mismatched: 0)
+PASS  each ledger row belongs to its job's tenant (mismatched: 0)
+PASS  4 distinct workers ran attempts (found 4: 4f846d17309a-7-1133=25, 4030bdf5ae02-7-62d3=25, 02d7d6d736a4-7-19f9=25, 647ecaa34a9e-7-ade1=25)
+PASS  100 attempt rows, one per job (found 100)
+PASS  per-tenant cap held: max active per tenant 2 <= 2 over 488 samples
+PASS  all 4 workers still running, none OOM-killed (/rote-worker-1:running, /rote-worker-2:running, /rote-worker-3:running, /rote-worker-4:running)
+PASS  no credential value in jobs, job_attempts, API responses or container logs
+docker stats, peak memory per container during the run:
+  rote-api-1: 229.5 MiB (limit 3.828GiB)
+  rote-bank-1: 43.4 MiB (limit 3.828GiB)
+  rote-postgres-1: 71.6 MiB (limit 3.828GiB)
+  rote-worker-1: 264.8 MiB (limit 700MiB)
+  rote-worker-2: 260.4 MiB (limit 700MiB)
+  rote-worker-3: 259.1 MiB (limit 700MiB)
+  rote-worker-4: 228.6 MiB (limit 700MiB)
+throughput: 100 jobs from first enqueue to last completion in 102.6 s
+per-worker split: 4f846d17309a-7-1133=25, 4030bdf5ae02-7-62d3=25, 02d7d6d736a4-7-19f9=25, 647ecaa34a9e-7-ade1=25
+docker compose stop worker: 2016 ms; rote-worker-1:exited(0), rote-worker-2:exited(0), rote-worker-3:exited(0), rote-worker-4:exited(0)
+PASS  workers exit 0 on SIGTERM (graceful shutdown)
+
+RESULT: PASS

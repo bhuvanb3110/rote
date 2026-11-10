@@ -17,6 +17,8 @@
     "demo:agent": "tsx examples/agent-demo.ts",
     "evidence:transfer": "tsx scripts/evidence-transfer-replay.ts",
     "evidence:queue": "tsx scripts/evidence-queue.ts",
+    "evidence:day1": "tsx scripts/evidence-day1-exit.ts",
+    "worker": "tsx src/worker/main.ts",
     "db:migrate": "tsx src/cli/index.ts db migrate",
     "test": "vitest run",
     "test:unit": "vitest run --exclude \"**/*.db.test.ts\""
