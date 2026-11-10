@@ -3,5 +3,6 @@
   "approvalStatus": "approved",
   "history": [],
   "approvedAt": "2026-11-09T23:38:34.312Z",
-  "approvedReason": "Hand-authored (docs/DECISIONS.md D3), read-only (every step safe), approved in fleet Step 3 (docs/plans/step-03.md). Basis: src/replay/transfer.test.ts passed (counts 2/1/0 across tenants incl. tenant isolation; 100-char memo lookup 0; count 1 after write-then-error; NO_SUCH_MEMBER and PERMISSION_DENIED; transient retries). Evidence: evidence/transfer-replay/ - unattended replay under this approval on all three tenants, ledger-checked by script."
+  "approvedReason": "Hand-authored (docs/DECISIONS.md D3), read-only (every step safe), approved in fleet Step 3 (docs/plans/step-03.md). Basis: src/replay/transfer.test.ts passed (counts 2/1/0 across tenants incl. tenant isolation; 100-char memo lookup 0; count 1 after write-then-error; NO_SUCH_MEMBER and PERMISSION_DENIED; transient retries). Evidence: evidence/transfer-replay/ - unattended replay under this approval on all three tenants, ledger-checked by script.",
+  "approvedVersion": "1.0.0"
 }

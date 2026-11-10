@@ -325,3 +325,44 @@ in a `failure` at the Submit step (no Submit button on the re-shown form) instea
 proper fix in a reviewed schema step.
 
 **Date.** 2026-11-09
+
+## D15: Approvals are bound to the artifact version; all five committed approvals backfilled
+
+**Decision.** Every approval (auto-promotion and `catalog approve`, with or without a reason) records
+`approvedVersion` in `status/<id>.json`. `checkApproval(id, version, …)` refuses an approved status
+whose `approvedVersion` differs from the artifact's `version` ("approved for 1.0.0, artifact is
+1.1.0; re-approve"), in either direction (an upgrade or a downgrade). A status with no
+`approvedVersion` still parses and is still allowed, and the gate's reason says it is grandfathered.
+Runs record their version too, and the auto-promotion streak counts only runs of the version being
+promoted. The catalog lists a stale approval as `draft`.
+
+The five committed status files were **backfilled** with `approvedVersion: "1.0.0"`, leaving
+`approvedAt` and `approvedReason` untouched:
+- `member-lookup`, `open-sub-account`, `open-sub-account-confirmed`: each artifact has exactly one
+  commit in git history (034faf1 / 0a3b247, 2026-08-13), always at 1.0.0, never edited; they were
+  approved on 2026-09-03 (d05edca). So "approved for 1.0.0" is a fact, not a guess.
+- `transfer`, `transfer-history-lookup`: approved in Step 3 (f1f2e8b) when both were 1.0.0 (776c86b),
+  then bumped to 1.1.0 in Step 4 (b9ecaa2) with no re-approval, which is exactly the gap. After the
+  backfill, both are **refused** at 1.1.0 until re-approved on the basis of a new 1.1.0 evidence run
+  (`evidence/transfer-replay-1.1.0/`).
+
+**Alternatives considered.**
+- *Leave the three grandfathered files without a version* (allowed forever with a "grandfathered"
+  reason). That keeps the gap open for exactly those three: anyone could edit `member-lookup.json`,
+  bump it, and it would still run unattended. The history needed to backfill honestly exists, so
+  there is no reason to keep the hole.
+- *Leave the transfer pair without a version, then re-approve.* The 1.1.0 evidence run would then
+  run under an approval that really covered 1.0.0, labelled "grandfathered", which is untrue.
+- *Store a content hash instead of (or as well as) the version.* Catches an edit that forgets to bump
+  the version, which the version alone does not. But artifacts are hand-edited JSON (CRLF/LF and
+  formatting changes would invalidate approvals for no behavioral change), and the schema already
+  says the version is bumped when the flow changes. Noted as a possible later hardening; not done.
+- *Flip a stale approval back to `draft` on disk.* The file would stop recording what was actually
+  approved. The gate already refuses it; the catalog shows it as draft.
+
+**Why.** An approval is a claim about specific, tested behavior. An artifact edit changes the
+behavior (Step 4 changed every business-outcome recognizer of `transfer`), so the claim must not
+carry over silently. The missing-version path stays for files written before this change (and for
+any outside this repo), but no committed file uses it any more; it is tested, not relied on.
+
+**Date.** 2026-11-09
