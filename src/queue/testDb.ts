@@ -8,6 +8,7 @@
 import { randomBytes } from "node:crypto";
 import pg from "pg";
 import { createPool, quoteIdent, redactDatabaseUrl, sqlState, type Pool } from "./db.js";
+import { migrate } from "./migrate.js";
 
 export const DEFAULT_TEST_DATABASE_URL = "postgres://rote:rote_dev_only@127.0.0.1:55432/rote_test";
 
@@ -87,12 +88,13 @@ export interface TestSchema {
 }
 
 /**
- * A fresh schema `t_<tag>_<random>` in the test database and a pool pointed at it. `setup` runs
- * once on that pool (the migration runner, from commit 3 on).
+ * A fresh schema `t_<tag>_<random>` in the test database and a pool pointed at it. By default the
+ * REAL migration runner applies db/migrations/ into it, so every DB test file also exercises the
+ * migrations; `migrate: false` leaves it empty (the migration runner's own tests).
  */
 export async function createTestSchema(
   tag: string,
-  options: { max?: number; setup?: (pool: Pool) => Promise<void> } = {},
+  options: { max?: number; migrate?: boolean } = {},
 ): Promise<TestSchema> {
   const url = testDatabaseUrl();
   await ensureTestDatabase(url);
@@ -107,7 +109,7 @@ export async function createTestSchema(
 
   const pool = createPool({ connectionString: url, max: options.max ?? 24, searchPath: schema });
   try {
-    await options.setup?.(pool);
+    if (options.migrate ?? true) await migrate(pool);
   } catch (err) {
     await pool.end().catch(() => undefined);
     throw err;
@@ -120,4 +122,20 @@ export async function createTestSchema(
       await pool.end();
     },
   };
+}
+
+/** The dev tenant seed from 0001_init.sql. */
+export const SEED_TENANTS = [
+  { id: "tenant-a", maxConcurrent: 2 },
+  { id: "tenant-b", maxConcurrent: 2 },
+  { id: "tenant-c", maxConcurrent: 2 },
+] as const;
+
+/** beforeEach: empty every queue table and re-seed the three tenants at max_concurrent 2. */
+export async function resetQueueTables(pool: Pool): Promise<void> {
+  await pool.query("TRUNCATE jobs, job_attempts, breakers, tenants RESTART IDENTITY CASCADE");
+  await pool.query(
+    `INSERT INTO tenants (id, max_concurrent) SELECT * FROM unnest($1::text[], $2::int[])`,
+    [SEED_TENANTS.map((t) => t.id), SEED_TENANTS.map((t) => t.maxConcurrent)],
+  );
 }
