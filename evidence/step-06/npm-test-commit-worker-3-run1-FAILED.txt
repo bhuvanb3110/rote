@@ -1,0 +1,372 @@
+
+> rote@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.10 C:/Users/hp/Downloads/rote
+
+
+
+#
+# Fatal process out of memory: Zone
+#
+----- Native stack trace -----
+
+
+<--- Last few GCs --->
+
+[9204:00000242CBBD0000]     2652 ms: Mark-Compact 41.8 (59.4) -> 39.9 (58.7) MB, pooled: 0.8 MB, 55.49 / 0.01 ms (+ 36.4 ms in 1 steps since start of marking, biggest step 36.4 ms, walltime since start of marking 130 ms) (average mu = 0.976, current mu = [9204:00000242CBBD0000]     3948 ms: Scavenge 71.6 (73.4) -> 54.6 (81.7) MB, pooled: 0.0 MB, 15.78 / 0.03 ms (average mu = 0.976, current mu = 0.964) task; 
+
+FATAL ERROR: Zone Allocation failed - process out of memory
+----- Native stack trace -----
+
+ 1: 00007FF6FC2B75CD 
+ 2: 00007FF6FD725E46 
+ 3: 00007FF6FCF09415 
+ 4: 00007FF6FC8C8883 
+ 5: 00007FF6FDA60E5C 
+ 6: 00007FF6FDD56175 
+ 7: 00007FF6FDD59AB1 
+ 8: 00007FF6FDD5768D 
+ 9: 00007FF6FDD8C6C0 
+10: 00007FF6FDD53250 
+11: 00007FF6FDD52B9C 
+ 1: 00007FF6FC369706 
+ 2: 00007FF6FCF094C7 
+ 3: 00007FF6FC8C8883 
+ 4: 00007FF6FC7682D1 
+ 5: 00007FF6FD73304B 
+ 6: 00007FF6FC703E01 
+ 7: 00007FF6FC704504 
+ 8: 00007FF6FC703310 
+ 9: 00007FF6FC713572 
+10: 00007FF6FC744FDB 
+11: 00007FF6FC79DCFE 
+12: 00007FF6FC79BD87 
+13: 00007FF6FCE96DBF 
+14: 00007FF6FC79D732 
+15: 00007FF6FD78CA2F 
+16: 00007FF6FC2B33EE 
+17: 00007FF6FCF5FE16 
+18: 00007FF6FE4CAFB3 
+19: 00007FFE897ADDA7 
+20: 00007FFE8B0F9C5C 
+ ❯ src/replay/fleet.test.ts (25 tests | 15 failed) 54764ms
+     × no hooks for an all-safe capability, nor for a transfer without approveRisky 303ms
+     × no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs 1156ms
+     × transient interstitial right after Submit: no reload (no re-POST), non-success with commitUncertain, 0 rows 24ms
+     × transient interstitial BEFORE Submit still recovers (the rules apply only after the attempt) 26ms
+     × 503 right after Submit, before the write (errors/on armed in before()): failure + commitUncertain, 0 rows 72ms
+     × 503 right after Submit, after the write (errors/after-write): failure + commitUncertain, 1 row, lookup finds 1 21ms
+     × a business_outcome after the attempt carries commitUncertain too 34ms
+     × business outcomes BEFORE the attempt carry no marker (a blind retry is safe) 31ms
+     × a throw after the attempt becomes failure/unknown with the marker (not an exception) 45ms
+     × operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click 20072ms
+     × already aborted: rejects with signal.reason before any evidence, browser or context 34ms
+     × abort during a slow step (bank latency 3 s): AbortError well under 3 s, shared browser up with 0 contexts, 0 rows 36ms
+     × abort inside after() (the click happened): still rejects with AbortError, 1 row, aborted entry names step-11 40ms
+     × abort without a shared browser closes the browser replay launched, and still rejects 2735ms
+     × the abort listener is removed when the run ends (no leak on a long-lived worker) 24ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/replay/fleet.test.ts > onIrreversible hooks > no hooks for an all-safe capability, nor for a transfer without approveRisky
+Error: page.goto: net::ERR_INSUFFICIENT_RESOURCES at http://localhost:56914/
+Call log:
+[2m  - navigating to "http://localhost:56914/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:238:19
+ ❯ src/replay/fleet.test.ts:349:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > onIrreversible hooks > no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs
+Error: browserContext.newPage: Target crashed 
+ ❯ WebSurface.launch src/surface/webSurface.ts:105:36
+    103|       const context = await options.browser.newContext();
+    104|       try {
+    105|         const page = await context.newPage();
+       |                                    ^
+    106|         return new WebSurface(options.browser, context, page, false);
+    107|       } catch (err) {
+ ❯ runReplay src/replay/replay.ts:136:19
+ ❯ src/replay/fleet.test.ts:363:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > onIrreversible hooks > no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > transient interstitial right after Submit: no reload (no re-POST), non-success with commitUncertain, 0 rows
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > transient interstitial BEFORE Submit still recovers (the rules apply only after the attempt)
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > 503 right after Submit, before the write (errors/on armed in before()): failure + commitUncertain, 0 rows
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > 503 right after Submit, after the write (errors/after-write): failure + commitUncertain, 1 row, lookup finds 1
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > a business_outcome after the attempt carries commitUncertain too
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > business outcomes BEFORE the attempt carry no marker (a blind retry is safe)
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > a throw after the attempt becomes failure/unknown with the marker (not an exception)
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click
+ FAIL  src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > already aborted: rejects with signal.reason before any evidence, browser or context
+ FAIL  src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort during a slow step (bank latency 3 s): AbortError well under 3 s, shared browser up with 0 contexts, 0 rows
+ FAIL  src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort inside after() (the click happened): still rejects with AbortError, 1 row, aborted entry names step-11
+ FAIL  src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort without a shared browser closes the browser replay launched, and still rejects
+ FAIL  src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > the abort listener is removed when the run ends (no leak on a long-lived worker)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/replay/fleet.test.ts:201:33
+    199|   await control("ledger/reset");
+    200|   // Every test must leave the shared browser as it found it: connecte…
+    201|   expect(browser.isConnected()).toBe(true);
+       |                                 ^
+    202|   expect(browser.contexts()).toHaveLength(0);
+    203| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > transient interstitial right after Submit: no reload (no re-POST), non-success with commitUncertain, 0 rows
+Error: browser.newContext: Target page, context or browser has been closed
+ ❯ WebSurface.launch src/surface/webSurface.ts:103:23
+    101|   static async launch(options: WebSurfaceOptions = {}): Promise<WebSur…
+    102|     if (options.browser) {
+    103|       const context = await options.browser.newContext();
+       |                       ^
+    104|       try {
+    105|         const page = await context.newPage();
+ ❯ runReplay src/replay/replay.ts:136:19
+ ❯ src/replay/fleet.test.ts:380:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > transient interstitial BEFORE Submit still recovers (the rules apply only after the attempt)
+Error: browser.newContext: Target page, context or browser has been closed
+ ❯ WebSurface.launch src/surface/webSurface.ts:103:23
+    101|   static async launch(options: WebSurfaceOptions = {}): Promise<WebSur…
+    102|     if (options.browser) {
+    103|       const context = await options.browser.newContext();
+       |                       ^
+    104|       try {
+    105|         const page = await context.newPage();
+ ❯ runReplay src/replay/replay.ts:136:19
+ ❯ src/replay/fleet.test.ts:395:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > 503 right after Submit, before the write (errors/on armed in before()): failure + commitUncertain, 0 rows
+Error: browser.newContext: Target page, context or browser has been closed
+ ❯ WebSurface.launch src/surface/webSurface.ts:103:23
+    101|   static async launch(options: WebSurfaceOptions = {}): Promise<WebSur…
+    102|     if (options.browser) {
+    103|       const context = await options.browser.newContext();
+       |                       ^
+    104|       try {
+    105|         const page = await context.newPage();
+ ❯ runReplay src/replay/replay.ts:136:19
+ ❯ src/replay/fleet.test.ts:404:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > 503 right after Submit, after the write (errors/after-write): failure + commitUncertain, 1 row, lookup finds 1
+Error: browser.newContext: Target page, context or browser has been closed
+ ❯ WebSurface.launch src/surface/webSurface.ts:103:23
+    101|   static async launch(options: WebSurfaceOptions = {}): Promise<WebSur…
+    102|     if (options.browser) {
+    103|       const context = await options.browser.newContext();
+       |                       ^
+    104|       try {
+    105|         const page = await context.newPage();
+ ❯ runReplay src/replay/replay.ts:136:19
+ ❯ src/replay/fleet.test.ts:412:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > a business_outcome after the attempt carries commitUncertain too
+Error: browser.newContext: Target page, context or browser has been closed
+ ❯ WebSurface.launch src/surface/webSurface.ts:103:23
+    101|   static async launch(options: WebSurfaceOptions = {}): Promise<WebSur…
+    102|     if (options.browser) {
+    103|       const context = await options.browser.newContext();
+       |                       ^
+    104|       try {
+    105|         const page = await context.newPage();
+ ❯ runReplay src/replay/replay.ts:136:19
+ ❯ src/replay/fleet.test.ts:428:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > business outcomes BEFORE the attempt carry no marker (a blind retry is safe)
+Error: browser.newContext: Target page, context or browser has been closed
+ ❯ WebSurface.launch src/surface/webSurface.ts:103:23
+    101|   static async launch(options: WebSurfaceOptions = {}): Promise<WebSur…
+    102|     if (options.browser) {
+    103|       const context = await options.browser.newContext();
+       |                       ^
+    104|       try {
+    105|         const page = await context.newPage();
+ ❯ runReplay src/replay/replay.ts:136:19
+ ❯ src/replay/fleet.test.ts:442:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > a throw after the attempt becomes failure/unknown with the marker (not an exception)
+Error: browser.newContext: Target page, context or browser has been closed
+ ❯ WebSurface.launch src/surface/webSurface.ts:103:23
+    101|   static async launch(options: WebSurfaceOptions = {}): Promise<WebSur…
+    102|     if (options.browser) {
+    103|       const context = await options.browser.newContext();
+       |                       ^
+    104|       try {
+    105|         const page = await context.newPage();
+ ❯ runReplay src/replay/replay.ts:136:19
+ ❯ src/replay/fleet.test.ts:455:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > after an irreversible action has been attempted > operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click
+Error: no intervention request within 20000ms
+ ❯ waitForPendingRequest src/replay/fleet.test.ts:166:9
+    164|     await new Promise((resolve) => setTimeout(resolve, 50));
+    165|   }
+    166|   throw new Error(`no intervention request within ${timeoutMs}ms`);
+       |         ^
+    167| }
+    168|
+ ❯ src/replay/fleet.test.ts:482:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort during a slow step (bank latency 3 s): AbortError well under 3 s, shared browser up with 0 contexts, 0 rows
+AssertionError: expected 'Error' to be 'AbortError' // Object.is equality
+
+Expected: "AbortError"
+Received: "Error"
+
+ ❯ src/replay/fleet.test.ts:530:44
+    528|       );
+    529|       const elapsed = Date.now() - started;
+    530|       expect((error as DOMException).name).toBe("AbortError");
+       |                                            ^
+    531|       expect(elapsed).toBeLessThan(2_500);
+    532|       const log = await onlyRunLog(evidenceBaseDir);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort inside after() (the click happened): still rejects with AbortError, 1 row, aborted entry names step-11
+AssertionError: expected Error: browser.newContext: Target page, c… { log: [] } to match object { name: 'AbortError' }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "name": "AbortError",
++ TargetClosedError2 {
++   "message": "browser.newContext: Target page, context or browser has been closed",
++   "log": [],
+  }
+
+ ❯ src/replay/fleet.test.ts:551:8
+    549|       await expect(
+    550|         transfer({ memo: "rote-s4-abort-after" }, { signal: ac.signal,…
+    551|       ).rejects.toMatchObject({ name: "AbortError" });
+       |        ^
+    552|       expect(calls.map((c) => c.hook)).toEqual(["before", "after"]);
+    553|       expect(await ledger()).toHaveLength(1); // the verifier's job, n…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/27]⎯
+
+ FAIL  src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > the abort listener is removed when the run ends (no leak on a long-lived worker)
+Error: browser.newContext: Target page, context or browser has been closed
+ ❯ WebSurface.launch src/surface/webSurface.ts:103:23
+    101|   static async launch(options: WebSurfaceOptions = {}): Promise<WebSur…
+    102|     if (options.browser) {
+    103|       const context = await options.browser.newContext();
+       |                       ^
+    104|       try {
+    105|         const page = await context.newPage();
+ ❯ runReplay src/replay/replay.ts:136:19
+ ❯ src/replay/fleet.test.ts:585:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/27]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 4 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: Assertion error
+ ❯ assert node_modules/playwright-core/lib/coreBundle.js:463:11
+ ❯ _CRSession._onMessage node_modules/playwright-core/lib/coreBundle.js:34801:11
+ ❯ CRConnection._onMessage node_modules/playwright-core/lib/coreBundle.js:34738:20
+ ❯ Immediate.<anonymous> node_modules/playwright-core/lib/coreBundle.js:39185:28
+ ❯ processImmediate node:internal/timers:504:21
+
+This error originated in "src/replay/fleet.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: Assertion error
+ ❯ assert node_modules/playwright-core/lib/coreBundle.js:463:11
+ ❯ _CRSession._onMessage node_modules/playwright-core/lib/coreBundle.js:34801:11
+ ❯ CRConnection._onMessage node_modules/playwright-core/lib/coreBundle.js:34738:20
+ ❯ Immediate.<anonymous> node_modules/playwright-core/lib/coreBundle.js:39193:30
+ ❯ processImmediate node:internal/timers:504:21
+
+This error originated in "src/replay/fleet.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: browser.newContext: Target page, context or browser has been closed
+ ❯ WebSurface.launch src/surface/webSurface.ts:103:23
+    101|   static async launch(options: WebSurfaceOptions = {}): Promise<WebSur…
+    102|     if (options.browser) {
+    103|       const context = await options.browser.newContext();
+       |                       ^
+    104|       try {
+    105|         const page = await context.newPage();
+ ❯ runReplay src/replay/replay.ts:136:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { log: [] }
+This error originated in "src/replay/fleet.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: [vitest-pool]: Worker forks emitted error.
+ ❯ EventEmitter.onTaskError node_modules/vitest/dist/chunks/cli-api.BK8pd4xc.js:3459:21
+ ❯ EventEmitter.emit node:events:509:20
+ ❯ ChildProcess.emitUnexpectedExit node_modules/vitest/dist/chunks/cli-api.BK8pd4xc.js:3025:22
+ ❯ ChildProcess.emit node:events:509:20
+ ❯ Process.ChildProcess._handle.onexit node:internal/child_process:294:12
+
+Caused by: Error: Worker exited unexpectedly
+ ❯ ChildProcess.emitUnexpectedExit node_modules/vitest/dist/chunks/cli-api.BK8pd4xc.js:3023:33
+ ❯ ChildProcess.emit node:events:509:20
+ ❯ Process.ChildProcess._handle.onexit node:internal/child_process:294:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 failed | 34 passed (36)
+      Tests  15 failed | 318 passed (338)
+     Errors  4 errors
+   Start at  22:56:41
+   Duration  91.05s (transform 3.26s, setup 0ms, import 35.37s, tests 411.63s, environment 14ms)
+
+exit=1

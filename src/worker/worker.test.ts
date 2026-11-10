@@ -11,6 +11,8 @@ import {
   redactInputNames,
 } from "./credentials.js";
 import { isTransientDbError } from "./dbErrors.js";
+import { checkPlaywrightVersion, installedPlaywrightVersion } from "./playwrightVersion.js";
+import { buildJobParams, InvalidJobError } from "./runJob.js";
 
 describe("createBackoff (full jitter)", () => {
   it("draws in [0, min(cap, base * 2^n)] and the ceiling doubles up to the cap", () => {
@@ -130,5 +132,43 @@ describe("isTransientDbError", () => {
     expect(isTransientDbError(new Error("something else"))).toBe(false);
     expect(isTransientDbError("string")).toBe(false);
     expect(isTransientDbError(null)).toBe(false);
+  });
+});
+
+describe("buildJobParams", () => {
+  const input = (name: string, redact = false) => ({ name, type: "string", required: true, redact, description: name });
+  const transferLike = {
+    id: "transfer",
+    inputs: [input("username", true), input("password", true), input("memberId"), input("memo")],
+    steps: [{ risk: "risky" }],
+  } as never;
+  const lookupLike = { id: "lookup", inputs: [input("username", true), input("password", true), input("memo")], steps: [{ risk: "safe" }] } as never;
+  const creds = new Map([["tenant-a", { username: "fleet-op-a", password: "pw-a-secret" }]]);
+  const job = { tenant_id: "tenant-a", params: { memberId: "10001" }, memo_key: "rote-00000000-0000-4000-8000-000000000001" };
+
+  it("injects this tenant's credentials and memo = memo_key for an irreversible capability; job params untouched", () => {
+    const params = buildJobParams(transferLike, job, creds);
+    expect(params).toEqual({ memberId: "10001", username: "fleet-op-a", password: "pw-a-secret", memo: job.memo_key });
+    expect(job.params).toEqual({ memberId: "10001" });
+  });
+
+  it("a read-only capability keeps its memo param (the history lookup searches for it)", () => {
+    const params = buildJobParams(lookupLike, { ...job, params: { memo: "rote-search-me" } }, creds);
+    expect(params.memo).toBe("rote-search-me");
+  });
+
+  it("a tenant without credentials is an invalid job, naming the input, not a value", () => {
+    expect(() => buildJobParams(transferLike, { ...job, tenant_id: "tenant-z" }, creds)).toThrow(InvalidJobError);
+    expect(() => buildJobParams(transferLike, { ...job, tenant_id: "tenant-z" }, creds)).toThrow(/no credential "username" configured for tenant "tenant-z"/);
+  });
+});
+
+describe("checkPlaywrightVersion", () => {
+  it("passes when equal or unset, refuses a mismatch with the rebuild hint", () => {
+    const installed = installedPlaywrightVersion();
+    expect(installed).toMatch(/^\d+\.\d+\.\d+/);
+    expect(checkPlaywrightVersion(undefined)).toBe(installed);
+    expect(checkPlaywrightVersion(installed)).toBe(installed);
+    expect(() => checkPlaywrightVersion("1.0.0", "1.62.1")).toThrow(/rebuild the image with --build-arg PLAYWRIGHT_VERSION=1.62.1/);
   });
 });
