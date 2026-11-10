@@ -458,3 +458,85 @@ able to say so without parsing `result`.
 4. **`verifying` counts toward `max_concurrent`** (it uses the bank's UI). The brief lists only
    `running` and `committing`.
 5. **Postgres 17 vs 18** for the pinned major (§1).
+
+## Reviewer decisions (2026-11-09)
+
+The reviewer **approved** this plan with the changes below. Where they differ from the sections
+above, these win. Everything not mentioned here stands as written: Compose, the `pg` driver,
+migrations with line-ending-insensitive checksums and `.gitattributes`, the schema (with the changes
+below), the `ON CONFLICT DO UPDATE` enqueue with the forced-interleaving and `DO NOTHING`
+counter-example tests, the `SKIP LOCKED` dequeue under the tenant row lock with all listed tests,
+schema-per-test-file isolation, loud failure without Postgres, the evidence script, and D15–D20
+(adjusted for decisions 3, 6 and 7).
+
+### Part A, built first: approvals bound to the artifact version
+
+The gap: `status/*.json` approvals don't record which artifact version was approved, so an edited
+artifact silently inherits approval. This already happened once: `transfer` and
+`transfer-history-lookup` were approved at 1.0.0 in Step 3 (commit f1f2e8b) and bumped to 1.1.0 in
+Step 4 (commit b9ecaa2) with no re-approval.
+
+A1. Every approval (auto-promotion and manual) records `approvedVersion` in the capability status.
+    Old status files without it still parse.
+A2. `checkApproval` takes the capability's version. An approved status whose `approvedVersion`
+    differs from the artifact's version → not allowed, with a clear reason ("approved for 1.0.0,
+    artifact is 1.1.0; re-approve"). A status with no `approvedVersion` (the three grandfathered
+    artifacts) stays allowed, and the reason says so. Decide whether to backfill their
+    `approvedVersion` now, and record the decision in a D-entry.
+A3. Tests: match, mismatch, missing (grandfathered), and auto-promotion recording the version.
+A4. Re-run the transfer evidence script for 1.1.0 into a **new** folder
+    (`evidence/transfer-replay-1.1.0/`; `evidence/transfer-replay/` stays as the 1.0.0 history), then
+    re-approve both transfer artifacts for 1.1.0 with a reason citing it.
+
+### Part B: Step 5 as planned, with these changes
+
+1. **Open question 1: credentials NEVER in `jobs.params`.** Enqueue rejects params containing any
+   input the capability marks `redact: true` (typed error, tested). `request_hash` covers only
+   non-secret params. The worker (Step 6) injects credentials per tenant from env.
+2. **Open question 2: `business_outcome` is an 8th terminal job state.** Approved.
+3. **Open question 3, CHANGED: idempotency keys are unique PER TENANT.** `unique (tenant_id,
+   idempotency_key)` and `ON CONFLICT (tenant_id, idempotency_key)`. Reason: a global key lets
+   tenant B learn that tenant A used a key (B gets a 409 on A's key), a cross-tenant leak. Test: the
+   same key in two tenants → two different jobs.
+4. **Open question 4: `verifying` counts toward `max_concurrent`.** Approved.
+5. **Open question 5: `postgres:17`.** Approved.
+6. **BUG FIX, tenant starvation.** Dequeue step (1) claims a tenant with ANY queued job, but step (3)
+   only picks `attempt < max_attempts`, so a tenant whose queued jobs are all exhausted is claimed,
+   yields nothing, and dequeue returns `null` while other tenants have work.
+   - Add `CHECK (state <> 'queued' OR attempt < max_attempts)` to `jobs`. **Day-2 recovery must move
+     an exhausted job to `failed`, never to `queued`** (the constraint would reject it anyway).
+   - If step (3) finds no job for the claimed tenant (e.g. its rows are briefly locked by another
+     transaction), roll back that tenant's claim and continue with step (1) excluding it, bounded by
+     the tenant count. Never return `null` while another eligible tenant has work.
+   - Tests: an exhausted job cannot be set to `queued`; and with tenant-a's queued job row locked by
+     another open transaction, a dequeue still returns tenant-b's job.
+7. **RULE: every lease-time comparison uses the database clock (`now()`), never a worker's clock.**
+   Recorded in a D-entry and in the Day-2 notes below.
+8. **NOTE for Day 2:** a dead worker's job holds its tenant slot until recovery runs. With
+   `max_concurrent` 2, two dead workers block a tenant entirely, so recovery of expired leases must
+   run **inside the dequeue loop**, not only on a separate timer.
+9. **Optional, recommended: `npm run test:unit`** runs everything except the DB tests, so pure code
+   changes can be checked without Docker. `npm test` stays the full suite and fails loudly without
+   Postgres.
+
+Also: report the Docker image digest and `docker compose ps` output; `npm test` before every commit,
+never commit or push on red; full suite 3 times at the end with all three result lines; push at the
+end; then write (don't build) `docs/plans/step-06.md`.
+
+### Notes carried to Day 2 (from decisions 6, 7 and 8)
+
+- Recovery moves an exhausted job (`attempt >= max_attempts`) to `failed`, never to `queued`.
+- Every lease comparison (`lease_expires_at < now()`, heartbeat extension, the commit-intent token
+  check) is computed in SQL against the database's `now()`. A worker never sends a timestamp it
+  computed, so clock skew between containers can't make a live lease look expired or a dead one
+  look alive.
+- Expired-lease recovery runs inside the dequeue loop (before or as part of each dequeue), so a
+  tenant whose slots are held by dead workers is unblocked by the next poll, not by a timer.
+
+### D-entry numbering
+
+Part A lands first and its decision takes the next free number, **D15**. The six entries drafted in
+§10 therefore land one number later than drafted: plan D15 (`pg`) → **D16**, D16 (migrations) →
+**D17**, D17 (tenant lock) → **D18**, D18 (enqueue) → **D19**, D19 (test isolation) → **D20**, D20
+(states) → **D21**. New entries from the decisions above follow: **D22** (database clock, decision 7)
+and **D23** (credentials never in `jobs.params`, decision 1).
