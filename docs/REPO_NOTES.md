@@ -97,6 +97,29 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
+## Fleet Step 6: worker, async API, Docker stack (2026-11-10)
+
+- `src/worker/`: `main.ts` (entrypoint), `loop.ts` (poll loop, graceful stop), `runJob.ts`
+  (preflight + `invokeCapability` with `approveRisky`), `outcome.ts` (`jobOutcomeFor`, D25),
+  `complete.ts` (fenced completion), `credentials.ts` (`ROTE_CRED_<TENANT>_<INPUT>` + redactor),
+  `bankForward.ts` (D26), `backoff.ts`. Transient-vs-fatal DB errors: `src/queue/transient.ts`.
+- `catalog serve --queue` adds `?mode=async`, `GET /jobs/:id?tenant=` and `GET /healthz` (D27).
+  `?tenant=` is scoping, **not authentication** (none exists, by scope).
+- `docker compose up -d --build` runs postgres, bank (one), api (:8080) and `ROTE_WORKERS` (4)
+  workers from one image `rote-fleet:local` (D28): first build 283 s cold, 3.58 GB
+  (`evidence/step-06/docker/`). `docker compose up -d postgres` alone still needs no credentials.
+- The Docker VM: 8 CPUs, ~3.8 GiB RAM, plus 8 GB swap (`.wslconfig`, set by the builder on
+  2026-11-10 after the Docker engine stopped responding mid-build). The 100-job run peaked at
+  ~260 MiB per worker.
+- Day-1 exit: `npm run evidence:day1` → `evidence/fleet-day1-exit/check.txt`, `RESULT: PASS`.
+- **Known flake (Step 6):** `net::ERR_INSUFFICIENT_RESOURCES` from Chromium in
+  `src/replay/fleet.test.ts` once under the full parallel suite; the rerun passed
+  (`evidence/step-06/flakes.md`). Not mitigated; open question.
+- Test files under `mock-app/` have two pre-existing TypeScript errors (`transfer.browser.test.ts`
+  lines 89 and 121, `Object is of type 'unknown'`). They are invisible to `npm run build` because
+  `tsconfig.json` excludes `*.test.ts`, and vitest does not typecheck. Present on HEAD before Step 6;
+  not fixed here.
+
 ## Fleet Step 5: Postgres is required (2026-11-09)
 
 - `docker compose up -d postgres` starts `postgres:17` (resolved digest
@@ -264,7 +287,7 @@ Jaeger, Prometheus and Grafana — see the open question in the Day-1 handoff. I
    are stale: `REPORT.md` (~line 39 "a single process is the simpler… choice", ~line 336
    "scaling infra CLAUDE.md says not to build") and the comment above `writeCapabilityStatus`
    in `src/confidence/store.ts:43-47`. Not edited in this step; fix when the fleet README lands.
-   *(The `store.ts` comment was fixed in Step 5 Part A; `REPORT.md` still waits for the fleet README.)*
+   *(The `store.ts` comment was fixed in Step 5 Part A; `REPORT.md` was updated in Step 6, when the fleet README section landed.)*
 8. **Mock-bank state is per-process and in memory** (`mock-app/data.ts`, `app.ts` module-level
    flags like `transientEnabled`). Under Compose the bank is one container; a restart wipes
    sessions *and* the ledger, so chaos scripts must never restart it mid-run.

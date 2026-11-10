@@ -165,6 +165,14 @@ silently inherits its old approval. `catalog approve <id>` takes the version fro
 disk. A status file with no `approvedVersion` (written before this rule) is still allowed and the
 gate says it is grandfathered; all committed status files now name their version.
 
+**…and to the artifact's content** (D24). Every approval also records `approvedDigest`, the
+SHA-256 of the artifact's canonical JSON (keys sorted, no whitespace, after schema validation). An
+artifact edited without a version bump is refused too ("artifact content changed since approval;
+re-approve"), while re-indenting the file or switching CRLF/LF changes nothing. A status file
+with no digest falls back to the version check, and the gate's reason says so. All committed
+status files carry a digest, and `src/catalog/committedApprovals.test.ts` fails if any committed
+artifact no longer matches its approval.
+
 ```
 npx tsx src/cli/index.ts replay --artifact artifacts/member-lookup.json --params '{\"username\":\"operator\",\"password\":\"operator\",\"memberId\":\"10001\"}' --approve-unattended
 npx tsx src/cli/index.ts replay --artifact artifacts/member-lookup.json --params '{\"username\":\"operator\",\"password\":\"operator\",\"memberId\":\"10001\"}' --show-confidence
@@ -183,6 +191,50 @@ npx tsx src/cli/index.ts catalog approve member-lookup --reason "manually verifi
 A saved run of the full sequence — refused while `draft`, promoted after qualifying runs, then
 replaying unattended with no flag at all — is committed at
 [evidence/confidence-approval-gate/](evidence/confidence-approval-gate/).
+
+## Fleet (Day 1): a job queue, workers and an async API
+
+Single machine, Docker Compose (docs/FLEET_BRIEF.md; design in docs/plans/step-05.md and
+step-06.md). Postgres holds the jobs; each worker container runs one Chromium and pulls jobs with
+`SELECT … FOR UPDATE SKIP LOCKED`, at most 2 at a time per tenant; one mock-bank container is the
+source of truth (its in-memory ledger).
+
+```
+cp .env.example .env              # once; fake per-tenant bank credentials (ROTE_CRED_*)
+docker compose up -d --build      # postgres, bank, api (:8080), 4 workers (ROTE_WORKERS)
+npm run evidence:day1             # the Day-1 exit: 100 jobs, ledger-checked (evidence/fleet-day1-exit/)
+```
+
+**Async invoke** (the synchronous `POST /capabilities/:id/invoke` is unchanged):
+
+```
+curl -X POST "http://127.0.0.1:8080/capabilities/transfer/invoke?mode=async" \
+  -H "Idempotency-Key: order-42" -H "content-type: application/json" \
+  -d '{"tenant":"tenant-a","params":{"memberId":"10001","toMemberId":"10002","amount":"1.00"}}'
+# 201 {"jobId":…,"state":"queued","memoKey":"rote-<jobId>","links":{"self":"/jobs/<jobId>?tenant=tenant-a"}}
+curl "http://127.0.0.1:8080/jobs/<jobId>?tenant=tenant-a"
+```
+
+- The same tenant + key + request returns the same job (200); the same key with a different
+  request is 409. The body is `tenant` + `params` only: credentials are injected per tenant by the
+  worker and never stored, the transfer's memo is the job's `memoKey`, and run-time approvals are
+  never taken from a client (400). A capability not approved for its current version and content is
+  422 at enqueue; the worker checks again at run time.
+- **`?tenant=` is NOT authentication.** This project has no authentication, by scope. The tenant is
+  whatever the caller says; scoping `GET /jobs/:id` by it only stops one tenant from reading
+  another's job by id (another tenant's job is a 404, same as a missing one). Every port is bound to
+  127.0.0.1.
+- A job ends `succeeded`, `business_outcome` (the bank refused: final, never retried), `failed`, or
+  `needs_human`. `outcome: "commit_uncertain"` means the Submit may have gone through: it is never
+  retried, and someone must check the bank's history for the `memoKey` (Day 2 automates this).
+- **Day-1 limits, on purpose:** leases are taken but not heartbeated, and nothing recovers a dead
+  worker's job yet. A worker killed with SIGKILL (or OOM) leaves its job `running`. `docker compose
+  stop` is graceful: the in-flight job gets 30 s, then is aborted and recorded. Day 2 adds heartbeats,
+  recovery and the commit intent.
+
+Measured (evidence/fleet-day1-exit/check.txt, `RESULT: PASS`): 100 transfer jobs on 4 workers in
+102.6 s, all succeeded on the first attempt, exactly one ledger row per job, 0 duplicates, 0 lost.
+Peak memory per worker was about 260 MiB.
 
 ## Saved demonstration runs
 

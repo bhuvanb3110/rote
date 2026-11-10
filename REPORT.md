@@ -40,6 +40,11 @@ human handoff), a single process is the simpler and more correct choice, not mer
 one: splitting perception/action across processes would mean shipping page state or reconnecting
 a live Playwright session across a process boundary for no benefit at this scale.
 
+*Update (fleet build, 2026-11): one replay still runs inside one process, holding its own browser
+context, for exactly the reason above. What changed is around it: a single-machine fleet (Postgres
+job queue, N worker processes, Docker Compose) now runs many such replays in parallel, each worker
+owning one Chromium and one job at a time. See README "Fleet (Day 1)" and docs/DECISIONS.md D1.*
+
 **Why the mock credit-union app, and not something else.** Two alternatives considered: a public
 website, and a real desktop application. A public site can't be given controllable failure
 injection — you can't make it show a session timeout or a transient error on demand — so
@@ -344,6 +349,6 @@ recognizers, not just step targets and `successCondition` (the real gap noted ab
 lock (or single-writer queue) under `src/confidence/store.ts`'s sidecar writes — today a concurrent
 replay of the same capability across processes can't corrupt the file (writes are atomic via
 temp-file + rename) but two writers racing on a read-modify-write can still drop one history entry,
-a documented limit rather than the scaling infra CLAUDE.md says not to build here; and an actual
+a documented limit (fleet workers never write these files: they run only approved capabilities, D7); and an actual
 `DesktopSurface`, now that the locator vocabulary itself has been proven to survive hostile HTML
 (§3) — the remaining open question is the driver, not the descriptor design.

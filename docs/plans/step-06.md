@@ -396,3 +396,47 @@ A5. A D-entry; REPO_NOTES known limitation 6 marked fixed.
   the seeded chaos harness (expected to fail until Day 2, its failing output saved as "before"
   evidence), the crash-point matrix mechanism, GitHub Actions CI with a `postgres:17` service and a
   README badge, and what stays red until Day 2.
+
+## Built (2026-11-09 / 2026-11-10)
+
+Built in the planned order, Part A first. Decisions: D24 (Part A), D25-D29 (Part B). Evidence:
+`evidence/step-06/` (every full `npm test` log, unfiltered; the digest backfill; Docker build) and
+`evidence/fleet-day1-exit/` (`RESULT: PASS`). Where the build went beyond or differed from the text
+above:
+
+**Part A.**
+- `canonicalJson` already existed (the queue's `request_hash`); it moved to
+  `src/artifact/canonical.ts`. The digest is taken over the **schema-validated** artifact, so it
+  covers exactly what replay executes.
+- `checkApproval` now takes the artifact and computes the digest itself. Because the approval is
+  about the base artifact and replay runs the tenant-merged copy, `ReplayOptions` gained the additive
+  `approvalArtifact`; `invokeCapability` and the CLI's `replay`/`operator` pass the base (without it,
+  `replay --tenant` would have been refused).
+- Runs record their digest; the promotion streak counts only same-version, same-digest runs.
+- Backfill by `scripts/backfill-approval-digests.ts`, which refuses unless git shows each artifact
+  unchanged since its approval.
+- Five existing browser test files had been replaying **port-relaxed copies** of the artifacts against
+  the committed `status/`, passing only because approval ignored content. They now approve exactly
+  what they replay in a temp `statusDir`.
+
+**Part B.**
+- `isTransientDbError` lives in `src/queue/transient.ts` (the API uses it too), not `src/worker/`.
+- `runJob` runs a **preflight** (capability, params with credentials injected, override, entry URL),
+  so deterministic problems fail as `invalid_job` without a browser.
+- `needs_human` carrying `commitUncertain` maps to `commit_uncertain` (defensive; D25).
+- The async body is strict: only `tenant` and `params`; `entryUrl` is refused too. `?mode=async`
+  without a queue is 501, not a silent synchronous run. `GET /healthz` added for the Compose health
+  check.
+- Credentials must be at least 4 characters (so redaction cannot eat ordinary text). Compose passes
+  them with empty defaults, so `docker compose up -d postgres` works without them; the worker refuses
+  to start instead.
+- Worker health check: the loop touches a file; healthy if touched within 120 s.
+- The Day-1 exit script truncates the dev database's queue tables before the run, stops the workers
+  gracefully at the end, and checks the exit codes (all 0).
+- **Docker incident:** the first image build died mid-pull when Docker Desktop's engine stopped
+  answering (HTTP 500 on every API call). The builder restarted Docker with 8 GB of swap; the build
+  was redone from cold: 283 s, image 3.58 GB. Both logs are kept.
+- **Day-1 exit attempt 1** passed every fleet check, then the script crashed parsing `docker inspect`
+  output; fixed and rerun from scratch (attempt 1 kept, with a README).
+- **Flake:** `net::ERR_INSUFFICIENT_RESOURCES` in `src/replay/fleet.test.ts` in one full run; the
+  rerun passed (`evidence/step-06/flakes.md`).

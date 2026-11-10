@@ -614,3 +614,131 @@ bump; this catches an edit without one, which is the easier mistake to make with
 it does so without punishing formatting.
 
 **Date.** 2026-11-09
+
+## D25: How a run maps to a job state; anything that may have committed is parked, never retried
+
+(Step 6, plan section 2; reviewer decisions B2 and B3.)
+
+**Decision.** One pure function, `jobOutcomeFor` (`src/worker/outcome.ts`), maps how a run ended to
+the job's next state. A preflight in `runJob` first checks that the job can run at all (capability
+exists, params valid with the tenant's credentials injected, tenant override readable, entry URL
+allowed); a refusal is `failed` / `invalid_job` at once, without a browser and without spending
+retries. Then: `success` → `succeeded`; `business_outcome` → `business_outcome`, never retried
+(D21); `needs_human` (including the run-time approval gate's refusal) → `needs_human`; `failure`
+without `commitUncertain` → `queued` again while attempts are left (lease cleared, attempt counted),
+else `failed`; a throw or shutdown abort before `onIrreversible.before` ran → the same retry rule
+(`aborted` when exhausted by aborts). **Any result carrying `commitUncertain`, and any throw or
+abort after `onIrreversible.before` ran, → `needs_human` with `outcome = 'commit_uncertain'`, never
+retried.** That includes a `needs_human` carrying `commitUncertain` (not producible without an
+escalation controller today; handled defensively so Day 2's sweep of `outcome = 'commit_uncertain'`
+finds every such job). Completion is one fenced transaction (`src/worker/complete.ts`); 0 rows →
+nothing is written to `jobs` and the attempt is marked `lease_lost`.
+
+**Alternatives considered.** For `commit_uncertain`: retry (the one thing that can duplicate a
+transfer); leave the job `running` for Day-2 recovery (it would hold its tenant slot and look like a
+hung worker to the Day-1 exit check); `failed` (says "didn't happen", which may be false);
+`business_outcome` (says "the bank refused", which may be false after a write-then-error). For
+invalid jobs: let them fail through replay and burn three attempts.
+
+**Why.** `needs_human` is terminal, frees the slot, and says what is true: someone (or Day 2's
+verify, reading the bank's history by `memo_key`) must decide. Tested row by row
+(`outcome.test.ts`) and end to end (`faults.db.test.ts`: `errors/after-write` → 1 ledger row,
+attempt 1, `commit_uncertain`, no second attempt).
+
+**Date.** 2026-11-09
+
+## D26: In Docker, workers reach the bank through an in-container TCP forwarder
+
+(Reviewer decision B1, plan open question 1.)
+
+**Decision.** With `ROTE_BANK_FORWARD=bank:4100`, the worker entrypoint (`src/worker/main.ts`)
+starts `startTcpForwarder` (`src/worker/bankForward.ts`, `node:net` only, half-close aware) on
+`127.0.0.1:4100` → `bank:4100` **before** the worker. Chromium keeps talking to
+`http://localhost:4100`, so every artifact, override, approval (version and digest) and the policy
+allowlist stay byte-identical. Tested: 1 MiB both ways with a half-close, HTTP bodies intact, an
+unreachable target closes the client, `close()` drops open connections.
+
+**Alternatives considered.** `network_mode: "service:bank"` (no code, but every worker shares the
+bank's network namespace, so Day-3 per-worker metrics ports would collide, and a bank restart breaks
+every worker); making the bank origin configurable in the artifacts (edits all five artifacts:
+version bumps, re-approvals, a looser allowlist anchor); socat (an extra package in the image).
+
+**Why.** It is the only option that changes nothing that was approved. **In a real deployment the bank
+origin would be per-environment configuration** (`entryUrlPattern` plus the per-tenant overrides'
+`entryUrl`, approved per environment), not a forwarder; the forwarder exists to keep this demo's
+approved artifacts byte-identical. A side effect Day 2 can use: pausing a worker container also
+pauses its path to the bank.
+
+**Date.** 2026-11-09
+
+## D27: The async API: strict body, approval at enqueue and at run time, tenant-scoped reads (not auth)
+
+(Plan section 4; reviewer decisions B4, B5, B7.)
+
+**Decision.** `POST /capabilities/:id/invoke?mode=async` with `Idempotency-Key` (1..255) and a body
+of exactly `{tenant, params}`: any other key (`approveRisky`, `approveUnattended`, `entryUrl`, ...)
+is 400, because async jobs never take run-time approvals or targets from the client. Order: 404
+unknown capability → 400 params (credentials named, never echoed; reserved memo; strict schema) →
+**422 if the capability is not approved for its current version and content** → enqueue: 201 new
+(with `Location`), 200 same tenant + key + request, 409 same key with a different request, 404
+unknown tenant (FK), 503 + `Retry-After: 2` when Postgres is unreachable. The worker's run-time check
+stays the authoritative one (an approval can change between enqueue and run). `GET
+/jobs/:id?tenant=` requires the tenant and answers 404 for another tenant's job, exactly as for a
+missing one. `?mode=async` on an app without a queue is 501, never silently run synchronously. Sync
+mode is unchanged.
+
+**Alternatives considered.** Run-time approval check only (a job certain to end `needs_human` would be
+accepted); ignoring unknown body keys (a client could believe `approveRisky: false` was honored);
+`GET /jobs/:id` without scoping (any caller could read any job by id).
+
+**Why.** Fail fast where the answer is already known, and keep every authority decision on the server.
+**The `?tenant=` scoping is not authentication**: the tenant is whatever the caller says. The project
+has no auth, by scope; the scoping only stops one tenant reading another's job by id (stated in the
+README).
+
+**Date.** 2026-11-09
+
+## D28: One image for worker, API and bank; compiled JS; pinned Playwright; one bank container
+
+(Plan section 5; reviewer decision B6.)
+
+**Decision.** A multi-stage `Dockerfile` on `mcr.microsoft.com/playwright:v1.62.1-noble` (the repo's
+Playwright version, `ARG PLAYWRIGHT_VERSION`, re-checked by the worker at startup), building `dist/`
+with `tsc`, installing production dependencies only in the runtime stage, running as `pwuser`.
+Compose runs the same image as `bank` (exactly one container, never scaled, `restart: "no"`: its
+in-memory ledger is the source of truth), `api` (`catalog serve --queue`, migrates at startup under
+the advisory lock) and `worker` (`replicas: ${ROTE_WORKERS:-4}`, `init: true`, `stop_grace_period:
+45s`, `mem_limit: 700m`, `restart: "no"`). Every published port is bound to 127.0.0.1. Credentials
+come in through the environment with empty defaults, so `docker compose up -d postgres` never needs
+them; the worker refuses to start, naming the missing variable.
+
+**Alternatives considered.** Separate images per service (three builds of the same code); `tsx` at
+runtime (a dev dependency, slower start); `restart: on-failure` for workers in Step 6 (would hide a
+dead worker; the reviewer asked for dead workers to show up as lost jobs).
+
+**Why.** One build, one set of dependencies, and the browser in the image matches the npm package by
+construction. `mem_limit` makes an out-of-memory kill visible as `OOMKilled: true` instead of being
+mistaken for a chaos kill (D9).
+
+**Date.** 2026-11-09
+
+## D29: Workers run with approveRisky, on the authority of the capability's approval
+
+(Reviewer decision B2.)
+
+**Decision.** `runJob` calls `invokeCapability` with `approveRisky: true` and never sets
+`approveUnattended`. The authority for clicking Submit unattended is the capability's approval for its
+exact version and content (D15, D24), which `runReplay` re-checks on every run and refuses with
+`needs_human` otherwise (tested: a stale approval → `needs_human`, 0 ledger rows). Workers read
+credentials per tenant from `ROTE_CRED_<TENANT>_<INPUT>` (at least 4 characters, checked at startup
+for every tenant × every redact input of every committed capability), and every credential value is
+replaced by `[REDACTED]` in any error text the worker stores or logs.
+
+**Alternatives considered.** A per-job approval flag stored on the job (a client could set it); a
+separate allowlist of "fleet-runnable" capabilities (a second approval system next to `status/`).
+
+**Why.** One approval system. Until Day 2 there is no commit intent, so a worker that dies after
+Submit cannot be recovered: Step 6 runs no chaos, and a dead worker's job stays `running` and is
+reported as lost by the exit check, never papered over.
+
+**Date.** 2026-11-09

@@ -36,6 +36,7 @@ session when stuck -> stay inside safety guardrails.
 ## Repo layout
 surface/ agent/ artifact/ replay/ safety/ escalation/ evidence/ catalog/ cli/ mock-app/
 queue/ (src/queue: Postgres job queue) db/migrations/ (forward-only SQL, never edited once applied)
+worker/ (src/worker: fleet worker process) Dockerfile + docker-compose.yml (bank, api, workers)
 
 ## Fleet build — working agreement
 Applies to all work under docs/FLEET_BRIEF.md. Repo facts live in docs/REPO_NOTES.md.
