@@ -120,6 +120,27 @@ function gateRisk(capability: Capability, stepId: string): "safe" | "risky" {
   return policyGate({ kind: "click", target: step.target }, { policy: buildPolicyForOrigin(baseUrl), currentUrl: `${baseUrl}/` }).risk;
 }
 
+type HookCall = { hook: "before" | "after"; stepId: string; ledgerRows: number };
+
+/**
+ * onIrreversible hooks that record each call with the ledger size AT that moment, then run the
+ * optional extra behavior (arm a fault, throw, abort...).
+ */
+function recordingHooks(extra: { before?: () => Promise<void>; after?: () => Promise<void> } = {}) {
+  const calls: HookCall[] = [];
+  const hooks: NonNullable<ReplayOptions["onIrreversible"]> = {
+    before: async (step) => {
+      calls.push({ hook: "before", stepId: step.id, ledgerRows: (await ledger()).length });
+      await extra.before?.();
+    },
+    after: async (step) => {
+      calls.push({ hook: "after", stepId: step.id, ledgerRows: (await ledger()).length });
+      await extra.after?.();
+    },
+  };
+  return { calls, hooks };
+}
+
 /** Every entry of the run's evidence log. */
 async function evidenceLog(result: ReplayResult): Promise<Array<{ kind: string; detail: Record<string, unknown> }>> {
   const ref = result.status === "needs_human" ? result.contextRef : result.evidenceRef;
@@ -244,5 +265,79 @@ describe("irreversibility hardening: gate risky OR artifact risky", () => {
     const blocked = (await evidenceLog(result)).find((e) => e.kind === "blocked");
     expect(blocked?.detail.riskSources).toEqual({ gate: "risky", artifact: "safe" });
     expect(await ledger()).toEqual([]);
+  }, 60_000);
+
+  it("gate-blind Submit with approveRisky still goes through onIrreversible.before", async () => {
+    const { capability, entryUrl } = await transferWithGateBlindSubmit();
+    const { calls, hooks } = recordingHooks();
+    const result = await runReplay({
+      capability,
+      entryUrl,
+      params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", memo: "rote-s4-blind-hooks" },
+      statusDir,
+      browser,
+      approveRisky: true,
+      onIrreversible: hooks,
+    });
+    expect(result.status).toBe("success");
+    expect(calls.map((c) => [c.hook, c.stepId])).toEqual([["before", "step-11"], ["after", "step-11"]]);
+  }, 60_000);
+});
+
+describe("onIrreversible hooks", () => {
+  it("before then after, once each, on step-11; after() runs once the bank answered (ledger already has the row)", async () => {
+    const { calls, hooks } = recordingHooks();
+    const result = await transfer({ memo: "rote-s4-hooks" }, { onIrreversible: hooks });
+    expect(result.status, JSON.stringify(result)).toBe("success");
+    expect(calls).toEqual([
+      { hook: "before", stepId: "step-11", ledgerRows: 0 },
+      { hook: "after", stepId: "step-11", ledgerRows: 1 },
+    ]);
+    const settle = (await evidenceLog(result)).filter((e) => e.kind === "irreversible_settle");
+    expect(settle).toHaveLength(1);
+    expect(settle[0]!.detail).toMatchObject({ stepId: "step-11", loaded: true, timeoutMs: 10_000 });
+  }, 60_000);
+
+  it("before() throws: runReplay rejects with that same error, the click never happens, after() never runs", async () => {
+    const fencing = new Error("fencing token mismatch: lease lost");
+    const { calls, hooks } = recordingHooks({ before: async () => { throw fencing; } });
+    await expect(transfer({ memo: "rote-s4-before-throws" }, { onIrreversible: hooks })).rejects.toBe(fencing);
+    expect(calls.map((c) => c.hook)).toEqual(["before"]);
+    expect(await ledger()).toEqual([]);
+  }, 60_000);
+
+  it("after() throws: runReplay rejects with that error and the click happened (exactly 1 row)", async () => {
+    const crash = new Error("simulated crash after submit");
+    const { calls, hooks } = recordingHooks({ after: async () => { throw crash; } });
+    await expect(transfer({ memo: "rote-s4-after-throws" }, { onIrreversible: hooks })).rejects.toBe(crash);
+    expect(calls.map((c) => [c.hook, c.ledgerRows])).toEqual([["before", 0], ["after", 1]]);
+    expect((await ledger()).map((r) => r.memo)).toEqual(["rote-s4-after-throws"]);
+  }, 60_000);
+
+  it("no hooks for an all-safe capability, nor for a transfer without approveRisky", async () => {
+    const { calls, hooks } = recordingHooks();
+    const { capability, entryUrl } = await forTenant(lookupBase, TENANT_A);
+    const lookupResult = await runReplay({
+      capability, entryUrl, params: { ...CREDS, memberId: "10001", memo: "x" }, statusDir, browser, approveRisky: true, onIrreversible: hooks,
+    });
+    expect(lookupResult.status).toBe("success");
+    const unapproved = await transfer({ memo: "rote-s4-unapproved" }, { approveRisky: false, onIrreversible: hooks });
+    expect(unapproved).toMatchObject({ status: "needs_human", atStepId: "step-11" });
+    expect(calls).toEqual([]);
+    expect(await ledger()).toEqual([]);
+  }, 60_000);
+
+  it("no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs", async () => {
+    // A non-navigating step marked risky in the artifact (hardening makes it irreversible).
+    const capability = withStep(memberLookup, memberLookup.steps[0]!.id, (s) => ({ ...s, risk: "risky" }));
+    const { calls, hooks } = recordingHooks();
+    const result = await runReplay({
+      capability, entryUrl: baseUrl, params: { ...CREDS, memberId: "10001" }, statusDir, browser, approveRisky: true, onIrreversible: hooks,
+    });
+    expect(result.status, JSON.stringify(result)).toBe("success");
+    expect(calls.map((c) => c.hook)).toEqual(["before", "after"]);
+    const settle = (await evidenceLog(result)).find((e) => e.kind === "irreversible_settle");
+    expect(settle?.detail).toMatchObject({ loaded: false, timeoutMs: 10_000 });
+    expect(String(settle?.detail.reason)).toMatch(/Timeout/i);
   }, 60_000);
 });

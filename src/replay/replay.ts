@@ -19,6 +19,9 @@ import { describeCheckpoint, findBusinessOutcome, findRecoverableRule, isSession
 import { resolveStepValue, validateParams } from "./params.js";
 import type { ReplayOptions } from "./types.js";
 
+/** Upper bound on waiting for the bank's answer to the irreversible click (IrreversibleHooks.after). */
+const IRREVERSIBLE_SETTLE_TIMEOUT_MS = 10_000;
+
 function buildExecutableAction(step: Step, params: Record<string, unknown>): ExecutableAction {
   switch (step.action.kind) {
     case "navigate":
@@ -219,6 +222,9 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
           kind: "risk_approved",
           detail: { stepId: step.id, reason: riskReason, riskSources },
         });
+        // A throw here (the fleet's fencing check) prevents the click; the top-level catch closes
+        // the context and rethrows it unchanged.
+        await options.onIrreversible?.before(step);
       }
 
       let observation: Observation | null = null;
@@ -234,10 +240,30 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         // reloads the CURRENT page below, matching what the mock app's own "Retry" link does.
         if (isFirstAttempt) {
           isFirstAttempt = false;
-          try {
-            await surface.act(executable);
-          } catch (err) {
-            actionError = err as Error;
+          if (irreversible) {
+            // Only reachable with approveRisky (an unapproved irreversible step stopped above).
+            // Watch BEFORE the click so its navigation can't be missed; see IrreversibleHooks.after
+            // for the contract this wait implements.
+            const settle = surface.watchNextNavigation(IRREVERSIBLE_SETTLE_TIMEOUT_MS);
+            try {
+              await surface.act(executable);
+            } catch (err) {
+              actionError = err as Error;
+            } finally {
+              const settled = await settle;
+              await evidence.append({
+                turn: stepIndex,
+                kind: "irreversible_settle",
+                detail: { stepId: step.id, timeoutMs: IRREVERSIBLE_SETTLE_TIMEOUT_MS, ...settled },
+              });
+              await options.onIrreversible?.after(step);
+            }
+          } else {
+            try {
+              await surface.act(executable);
+            } catch (err) {
+              actionError = err as Error;
+            }
           }
 
           if (executable.target) {

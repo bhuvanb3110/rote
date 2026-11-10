@@ -36,6 +36,11 @@ const SCREENSHOT_MAX_ATTEMPTS = 3;
 const SCREENSHOT_BACKOFF_MS = 100;
 const TRANSIENT_SCREENSHOT_ERROR = /Unable to capture screenshot/;
 
+/** How waiting for an action's resulting navigation ended. Never an exception. */
+export type NavigationSettle =
+  | { loaded: true; ms: number; url: string }
+  | { loaded: false; ms: number; url: string; reason: string };
+
 function truncate(value: string, maxChars: number): string {
   return value.length > maxChars ? `${value.slice(0, maxChars)}...[truncated]` : value;
 }
@@ -162,6 +167,30 @@ export class WebSurface implements Surface {
       landmarks,
       screenshot,
     };
+  }
+
+  /**
+   * Watches for the main frame's NEXT navigation (one that starts after this call) and resolves
+   * once it reaches "load" -- i.e. the server has answered and the response page is loaded. If that
+   * doesn't happen within `timeoutMs`, or the page/context closes, it resolves with
+   * `loaded: false` and the reason; it never rejects. Call it BEFORE the action expected to
+   * navigate (so the navigation can't be missed), then await it after the action.
+   */
+  watchNextNavigation(timeoutMs: number): Promise<NavigationSettle> {
+    const startedAt = Date.now();
+    const mainFrame = this.page.mainFrame();
+    return this.page
+      .waitForEvent("framenavigated", { predicate: (frame) => frame === mainFrame, timeout: timeoutMs })
+      .then(() => this.page.waitForLoadState("load", { timeout: Math.max(1, timeoutMs - (Date.now() - startedAt)) }))
+      .then((): NavigationSettle => ({ loaded: true, ms: Date.now() - startedAt, url: this.page.url() }))
+      .catch(
+        (err: unknown): NavigationSettle => ({
+          loaded: false,
+          ms: Date.now() - startedAt,
+          url: this.page.isClosed() ? "(page closed)" : this.page.url(),
+          reason: err instanceof Error ? err.message.split("\n")[0]! : String(err),
+        }),
+      );
   }
 
   private async captureScreenshot(): Promise<Buffer> {

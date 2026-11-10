@@ -1,6 +1,32 @@
 import type { Browser } from "playwright";
-import type { Capability } from "../artifact/index.js";
+import type { Capability, Step } from "../artifact/index.js";
 import type { EscalationController } from "../escalation/index.js";
+
+/**
+ * Callbacks around the one irreversible action in a run (a step the live gate OR the artifact
+ * marks risky -- see replay.ts). They run only when that action is actually about to be executed
+ * by replay: never for safe steps, and never when approveRisky is false (replay stops first).
+ */
+export interface IrreversibleHooks {
+  /**
+   * Runs right before the irreversible click, after the approveRisky check. The fleet writes its
+   * commit intent here and throws if its fencing check fails (lease lost, token mismatch). A throw
+   * PREVENTS the click: runReplay closes its context and rejects with that same error, unwrapped.
+   * It never returns a ReplayResult for it.
+   */
+  before(step: Step): Promise<void>;
+  /**
+   * Contract: runs once the bank has ANSWERED the click, not merely when the click was dispatched.
+   * After the click, replay waits (bounded, 10 s) for the page's resulting navigation to reach
+   * "load", and only then calls after(). So when after() runs, the bank has processed the POST:
+   * if it committed, its ledger already has the row. If that wait times out or errors, it does not
+   * throw: it is recorded in evidence (`irreversible_settle`, `loaded: false`) and after() still
+   * runs. after() also runs if the click itself threw (it may still have been dispatched).
+   * Crash-after-submit fault injection fires here. A throw rejects runReplay with that same error
+   * (after closing the context); no ReplayResult is returned.
+   */
+  after(step: Step): Promise<void>;
+}
 
 export interface ReplayOptions {
   capability: Capability;
@@ -48,4 +74,6 @@ export interface ReplayOptions {
   approveUnattended?: boolean;
   /** Defaults to "status" -- where per-capability approval/confidence sidecar files live. */
   statusDir?: string;
+  /** Callbacks around the irreversible action (the fleet's commit intent / fault injection). */
+  onIrreversible?: IrreversibleHooks;
 }
