@@ -9,7 +9,7 @@
 // makes it impossible once attempts are exhausted (D21).
 import { withTransaction, type Pool } from "../queue/index.js";
 import { createBackoff, sleep } from "./backoff.js";
-import { isTransientDbError } from "./dbErrors.js";
+import { isTransientDbError } from "../queue/index.js";
 import type { JobOutcome } from "./outcome.js";
 
 export const COMPLETE_JOB_SQL = `

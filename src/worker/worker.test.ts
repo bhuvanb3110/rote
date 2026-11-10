@@ -10,7 +10,7 @@ import {
   redactDeep,
   redactInputNames,
 } from "./credentials.js";
-import { isTransientDbError } from "./dbErrors.js";
+import { isTransientDbError } from "../queue/index.js";
 import { checkPlaywrightVersion, installedPlaywrightVersion } from "./playwrightVersion.js";
 import { buildJobParams, InvalidJobError } from "./runJob.js";
 

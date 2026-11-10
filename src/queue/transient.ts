@@ -2,7 +2,7 @@
 // "Postgres is briefly unreachable or restarting": the worker logs it, backs off and tries again,
 // and never exits on it. Anything else (a constraint violation, a syntax error, a schema mismatch)
 // is a bug: the worker exits loudly instead of looping on it.
-import { sqlState } from "../queue/index.js";
+import { sqlState } from "./db.js";
 
 /** Node socket error codes that mean the connection itself failed. */
 const TRANSIENT_ERRNO = new Set(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EPIPE", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH"]);

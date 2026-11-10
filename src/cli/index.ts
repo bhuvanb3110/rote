@@ -369,11 +369,36 @@ catalogCommand
   .command("serve")
   .description("Host the catalog's HTTP endpoint (GET /capabilities, POST /capabilities/:id/invoke)")
   .option("--port <n>", "catalog server port", (v) => Number(v), DEFAULT_CATALOG_PORT)
-  .action((opts: { port: number }) => {
-    const app = createCatalogApp();
-    app.listen(opts.port, () => {
+  .option(
+    "--queue",
+    "also serve the fleet's async mode (?mode=async, GET /jobs/:id, GET /healthz) on ROTE_DATABASE_URL; runs migrations at startup",
+  )
+  .action(async (opts: { port: number; queue?: boolean }) => {
+    let app;
+    if (opts.queue) {
+      const url = databaseUrlFromEnv();
+      const pool = createPool({
+        connectionString: url,
+        onIdleError: (err) => logger.warn({ err: err.message }, "catalog: idle Postgres connection dropped"),
+      });
+      try {
+        await migrate(pool); // advisory lock: safe while workers migrate too (D17)
+      } catch (err) {
+        logger.error({ err, database: redactDatabaseUrl(url) }, "catalog: migrations failed; not serving");
+        process.exitCode = 1;
+        await pool.end();
+        return;
+      }
+      app = createCatalogApp({ queue: { pool } });
+      logger.info({ database: redactDatabaseUrl(url) }, "catalog: async mode enabled");
+    } else {
+      app = createCatalogApp();
+    }
+    const server = app.listen(opts.port, () => {
       logger.info({ port: opts.port }, `catalog: serving on http://localhost:${opts.port}`);
     });
+    // docker stop sends SIGTERM: stop accepting, let in-flight requests finish, exit.
+    process.once("SIGTERM", () => server.close(() => process.exit(0)));
   });
 
 const dbCommand = program.command("db").description("The fleet's Postgres job queue (docker compose up -d postgres)");

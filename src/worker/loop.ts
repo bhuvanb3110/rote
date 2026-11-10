@@ -15,7 +15,7 @@ import { dequeue, type JobRow, type Pool } from "../queue/index.js";
 import { createBackoff, sleep } from "./backoff.js";
 import { completeJobWithRetry } from "./complete.js";
 import { redactDeep, type Redactor } from "./credentials.js";
-import { isTransientDbError } from "./dbErrors.js";
+import { isTransientDbError } from "../queue/index.js";
 import { jobOutcomeFor, type JobOutcome } from "./outcome.js";
 import type { RunJobOptions, RunJobResult } from "./runJob.js";
 

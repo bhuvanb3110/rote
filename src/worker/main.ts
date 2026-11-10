@@ -27,7 +27,7 @@ import { createPool, databaseUrlFromEnv, migrate, redactDatabaseUrl, type Pool }
 import { createBackoff, sleep } from "./backoff.js";
 import { parseHostPort, startTcpForwarder, type Forwarder } from "./bankForward.js";
 import { createRedactor, loadTenantCredentials, redactInputNames } from "./credentials.js";
-import { isTransientDbError } from "./dbErrors.js";
+import { isTransientDbError } from "../queue/index.js";
 import { Worker } from "./loop.js";
 import { checkPlaywrightVersion } from "./playwrightVersion.js";
 import { runJob } from "./runJob.js";
