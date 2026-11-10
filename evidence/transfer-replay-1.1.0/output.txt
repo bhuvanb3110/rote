@@ -1,0 +1,28 @@
+# transfer 1.1.0 + transfer-history-lookup 1.1.0 on 3 tenants, 2026-11-10T01:51:33.367Z
+# bank http://localhost:4100, ledger reset; approveRisky for transfer only
+# approval: PRE-APPROVAL: approveUnattended on every run, throwaway statusDir (committed status/ neither read by the gate nor written)
+# gate (committed status/) transfer 1.1.0: allowed=false -- Capability "transfer" was approved for 1.0.0, artifact is 1.1.0; re-approve (see "catalog approve") before unattended replay.
+# gate (committed status/) transfer-history-lookup 1.1.0: allowed=false -- Capability "transfer-history-lookup" was approved for 1.0.0, artifact is 1.1.0; re-approve (see "catalog approve") before unattended replay.
+tenant-a transfer {"memberId":"10001","toMemberId":"10002","amount":"12.34","memo":"rote-evidence-tenant-a"} -> {"status":"success","outputs":{"confirmationRef":"TXN-000001"},"evidenceRef":"evidence://evidence/transfer-replay-1.1.0/runs/01-transfer-tenant-a/run.jsonl"}
+tenant-a lookup {"memberId":"10001","memo":"rote-evidence-tenant-a"} -> {"status":"success","outputs":{"matchingCount":"1"},"evidenceRef":"evidence://evidence/transfer-replay-1.1.0/runs/02-lookup-tenant-a/run.jsonl"}
+tenant-b transfer {"memberId":"10001","toMemberId":"10002","amount":"12.34","memo":"rote-evidence-tenant-b"} -> {"status":"success","outputs":{"confirmationRef":"TXN-000002"},"evidenceRef":"evidence://evidence/transfer-replay-1.1.0/runs/03-transfer-tenant-b/run.jsonl"}
+tenant-b lookup {"memberId":"10001","memo":"rote-evidence-tenant-b"} -> {"status":"success","outputs":{"matchingCount":"1"},"evidenceRef":"evidence://evidence/transfer-replay-1.1.0/runs/04-lookup-tenant-b/run.jsonl"}
+tenant-c transfer {"memberId":"10001","toMemberId":"10002","amount":"12.34","memo":"rote-evidence-tenant-c"} -> {"status":"success","outputs":{"confirmationRef":"TXN-000003"},"evidenceRef":"evidence://evidence/transfer-replay-1.1.0/runs/05-transfer-tenant-c/run.jsonl"}
+tenant-c lookup {"memberId":"10001","memo":"rote-evidence-tenant-c"} -> {"status":"success","outputs":{"matchingCount":"1"},"evidenceRef":"evidence://evidence/transfer-replay-1.1.0/runs/06-lookup-tenant-c/run.jsonl"}
+
+PASS  ledger has exactly 3 rows (got 3)
+PASS  no duplicate memo in the ledger
+PASS  tenant-a: transfer status is success (got success)
+PASS  tenant-a: exactly one ledger row with memo "rote-evidence-tenant-a" (got 1)
+PASS  tenant-a: confirmationRef TXN-000001 == ledger row id TXN-000001
+PASS  tenant-a: lookup status success and matchingCount "1" (got 1)
+PASS  tenant-b: transfer status is success (got success)
+PASS  tenant-b: exactly one ledger row with memo "rote-evidence-tenant-b" (got 1)
+PASS  tenant-b: confirmationRef TXN-000002 == ledger row id TXN-000002
+PASS  tenant-b: lookup status success and matchingCount "1" (got 1)
+PASS  tenant-c: transfer status is success (got success)
+PASS  tenant-c: exactly one ledger row with memo "rote-evidence-tenant-c" (got 1)
+PASS  tenant-c: confirmationRef TXN-000003 == ledger row id TXN-000003
+PASS  tenant-c: lookup status success and matchingCount "1" (got 1)
+
+RESULT: PASS

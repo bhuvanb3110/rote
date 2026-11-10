@@ -2,24 +2,37 @@
 // tenants, replay `transfer` once and then `transfer-history-lookup` for the same memo, through
 // invokeCapability -- the path fleet workers will use (param validation, tenant override from
 // overrides/, approval read from the committed status/ files, NO approveUnattended). Then read the
-// mock bank's ledger and CHECK it by script. Everything lands in evidence/transfer-replay/.
+// mock bank's ledger and CHECK it by script. Everything lands in evidence/transfer-replay-<version>/
+// (the artifact version; one folder per version, so older versions' evidence stays as history --
+// evidence/transfer-replay/ is the 1.0.0 run from Step 3).
 //
-//   npm run evidence:transfer        (needs port 4100 free: the overrides point at it)
+//   npm run evidence:transfer                   (needs port 4100 free: the overrides point at it)
+//   npm run evidence:transfer -- --pre-approval
+//
+// Approvals are bound to the artifact version (docs/DECISIONS.md D15). The script first records
+// what the gate says for both capabilities from the committed status/ (approval.txt). If both are
+// approved for these versions, it runs under that approval, as above. If not, it refuses -- unless
+// --pre-approval is given: the evidence run that an approval will cite necessarily happens BEFORE
+// the approval, so that mode passes approveUnattended (the per-run human opt-in) and a throwaway
+// statusDir, so the committed status/ files are never read for the gate nor written.
 //
 // Exits 1 if any check fails.
 import { createServer } from "node:http";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import app from "../mock-app/app.js";
 import { TENANTS } from "../mock-app/tenants.js";
-import { invokeCapability } from "../src/catalog/index.js";
+import { findCapability, invokeCapability } from "../src/catalog/index.js";
+import { checkApproval } from "../src/confidence/index.js";
 import type { ReplayResult } from "../src/artifact/index.js";
 
 const PORT = 4100;
 const BANK = `http://localhost:${PORT}`;
-const OUT = path.join("evidence", "transfer-replay");
-const RUNS = path.join(OUT, "runs");
 const CREDS = { username: "operator", password: "operator" };
+const PRE_APPROVAL = process.argv.includes("--pre-approval");
+let OUT = "";
+let RUNS = "";
 
 interface LedgerRow {
   id: string;
@@ -48,6 +61,31 @@ async function collect(result: ReplayResult, label: string): Promise<ReplayResul
 }
 
 async function main(): Promise<void> {
+  const transferCap = await findCapability("transfer");
+  const lookupCap = await findCapability("transfer-history-lookup");
+  if (!transferCap || !lookupCap) throw new Error("transfer / transfer-history-lookup artifacts not found");
+  if (transferCap.version !== lookupCap.version) {
+    throw new Error(`versions differ (transfer ${transferCap.version}, lookup ${lookupCap.version}); one folder per version`);
+  }
+  const version = transferCap.version;
+  OUT = path.join("evidence", `transfer-replay-${version}`);
+  RUNS = path.join(OUT, "runs");
+
+  // What the gate says from the committed status/ files, before anything runs.
+  const gate = [
+    { id: transferCap.id, version, decision: await checkApproval(transferCap.id, version, {}) },
+    { id: lookupCap.id, version, decision: await checkApproval(lookupCap.id, version, {}) },
+  ];
+  const approvedNow = gate.every((g) => g.decision.allowed);
+  if (!approvedNow && !PRE_APPROVAL) {
+    for (const g of gate) console.error(`${g.id} ${g.version}: ${g.decision.reason}`);
+    throw new Error("not approved for these versions; rerun with --pre-approval to produce the evidence an approval will cite");
+  }
+  const statusDir = approvedNow ? undefined : await mkdtemp(path.join(tmpdir(), "rote-evidence-preapproval-"));
+  const approvalMode = approvedNow
+    ? "approval read from the committed status/ (no approveUnattended)"
+    : "PRE-APPROVAL: approveUnattended on every run, throwaway statusDir (committed status/ neither read by the gate nor written)";
+
   const server = createServer(app);
   await new Promise<void>((resolve, reject) => {
     server.once("error", (err) => reject(new Error(`port ${PORT} is busy (stop \`npm run mock\`): ${err.message}`)));
@@ -57,8 +95,19 @@ async function main(): Promise<void> {
   await rm(OUT, { recursive: true, force: true });
   await mkdir(RUNS, { recursive: true });
   await fetch(`${BANK}/control/ledger/reset`);
-  log(`# transfer + transfer-history-lookup on ${TENANTS.length} tenants, ${new Date().toISOString()}`);
-  log(`# bank ${BANK}, ledger reset; approval from status/ (no approveUnattended); approveRisky for transfer only`);
+  log(`# transfer ${version} + transfer-history-lookup ${version} on ${TENANTS.length} tenants, ${new Date().toISOString()}`);
+  log(`# bank ${BANK}, ledger reset; approveRisky for transfer only`);
+  log(`# approval: ${approvalMode}`);
+  for (const g of gate) log(`# gate (committed status/) ${g.id} ${g.version}: allowed=${g.decision.allowed} -- ${g.decision.reason}`);
+  const approvalText = [
+    `artifact versions: transfer ${version}, transfer-history-lookup ${version}`,
+    `mode: ${approvalMode}`,
+    "",
+    "checkApproval from the committed status/ files, before the run:",
+    ...gate.map((g) => `  ${g.id} ${g.version}: allowed=${g.decision.allowed} -- ${g.decision.reason}`),
+  ].join("\n");
+  await writeFile(path.join(OUT, "approval.txt"), approvalText + "\n");
+  const runOpts = approvedNow ? {} : { approveUnattended: true, statusDir };
 
   const runs: Array<{ tenant: string; capability: string; params: Record<string, unknown>; result: ReplayResult }> = [];
   let n = 0;
@@ -72,6 +121,7 @@ async function main(): Promise<void> {
         tenant: tenant.id,
         params: { ...CREDS, ...transferParams },
         approveRisky: true,
+        ...runOpts,
       }),
       `${String(n).padStart(2, "0")}-transfer-${tenant.id}`,
     );
@@ -81,7 +131,12 @@ async function main(): Promise<void> {
     const lookupParams = { memberId: "10001", memo };
     n += 1;
     const lookup = await collect(
-      await invokeCapability({ id: "transfer-history-lookup", tenant: tenant.id, params: { ...CREDS, ...lookupParams } }),
+      await invokeCapability({
+        id: "transfer-history-lookup",
+        tenant: tenant.id,
+        params: { ...CREDS, ...lookupParams },
+        ...runOpts,
+      }),
       `${String(n).padStart(2, "0")}-lookup-${tenant.id}`,
     );
     runs.push({ tenant: tenant.id, capability: "transfer-history-lookup", params: lookupParams, result: lookup });
@@ -129,6 +184,7 @@ async function main(): Promise<void> {
   await writeFile(path.join(OUT, "results.json"), JSON.stringify(runs, null, 2) + "\n");
   await writeFile(path.join(OUT, "check.txt"), checkText + "\n");
   await writeFile(path.join(OUT, "output.txt"), transcript.join("\n") + "\n");
+  if (statusDir) await rm(statusDir, { recursive: true, force: true });
   if (!allPass) process.exitCode = 1;
 }
 
