@@ -1,0 +1,6 @@
+npx vitest run src/replay/fleet.test.ts -t "transient interstitial right after Submit"  (unpatched rules, after commit 627eeda)
+ FAIL  transient interstitial right after Submit: no reload (no re-POST), non-success with commitUncertain, 0 rows
+AssertionError: {"result":{"status":"success","outputs":{"confirmationRef":"TXN-000001"},...},"rows":1,
+"recover":[{"turn":10,"kind":"recover","detail":{"stepId":"step-11","action":"retry","attempt":1,"maxAttempts":3}}]}:
+expected 'success' not to be 'success'
+ Tests  1 failed | 12 skipped (13)
