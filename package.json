@@ -16,6 +16,8 @@
     "mock": "tsx mock-app/index.ts",
     "demo:agent": "tsx examples/agent-demo.ts",
     "evidence:transfer": "tsx scripts/evidence-transfer-replay.ts",
+    "evidence:queue": "tsx scripts/evidence-queue.ts",
+    "db:migrate": "tsx src/cli/index.ts db migrate",
     "test": "vitest run",
     "test:unit": "vitest run --exclude \"**/*.db.test.ts\""
   },

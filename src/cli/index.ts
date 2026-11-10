@@ -10,6 +10,7 @@ import { EscalationController, createOperatorConsole } from "../escalation/index
 import { resolveTenant } from "../tenant/index.js";
 import { createCatalogApp, findCapability, invokeCapability, listCapabilities, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
 import { approveCapability, readRunConfidence } from "../confidence/index.js";
+import { createPool, databaseUrlFromEnv, migrate, redactDatabaseUrl } from "../queue/index.js";
 
 const logger = pino();
 const program = new Command();
@@ -370,6 +371,25 @@ catalogCommand
     app.listen(opts.port, () => {
       logger.info({ port: opts.port }, `catalog: serving on http://localhost:${opts.port}`);
     });
+  });
+
+const dbCommand = program.command("db").description("The fleet's Postgres job queue (docker compose up -d postgres)");
+
+dbCommand
+  .command("migrate")
+  .description("Apply pending db/migrations/*.sql to ROTE_DATABASE_URL (safe to run concurrently)")
+  .action(async () => {
+    const url = databaseUrlFromEnv();
+    const pool = createPool({ connectionString: url, max: 1 });
+    try {
+      const result = await migrate(pool);
+      logger.info({ database: redactDatabaseUrl(url), ...result }, "db migrate: done");
+    } catch (err) {
+      logger.error({ err, database: redactDatabaseUrl(url) }, "db migrate: failed");
+      process.exitCode = 1;
+    } finally {
+      await pool.end();
+    }
   });
 
 program.parse();

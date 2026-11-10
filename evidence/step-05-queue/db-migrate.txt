@@ -1,0 +1,7 @@
+# npm run db:migrate on the dev database (ROTE_DATABASE_URL default), fleet Step 5 commit 7
+
+$ npm run db:migrate        # first run (line copied verbatim from the terminal)
+{"level":30,"time":1794277772909,"pid":19768,"hostname":"LAPTOP-ORITOK6N","database":"postgres://rote:***@127.0.0.1:55432/rote","applied":["0001_init"],"alreadyApplied":[],"msg":"db migrate: done"}
+
+$ npm run db:migrate        # re-run, captured to this file by the shell
+{"level":30,"time":1794277783738,"pid":19596,"hostname":"LAPTOP-ORITOK6N","database":"postgres://rote:***@127.0.0.1:55432/rote","applied":[],"alreadyApplied":["0001_init"],"msg":"db migrate: done"}
