@@ -471,3 +471,101 @@ describe("after an irreversible action has been attempted", () => {
     expect(await ledger()).toHaveLength(1);
   }, 60_000);
 });
+
+describe("signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry", () => {
+  /** Evidence of the single run written under `baseDir`. */
+  async function onlyRunLog(baseDir: string): Promise<Array<{ kind: string; detail: Record<string, unknown> }>> {
+    const runs = await readdir(baseDir);
+    expect(runs).toHaveLength(1);
+    const log = await readFile(path.join(baseDir, runs[0]!, "run.jsonl"), "utf8");
+    return log.trim().split("\n").map((line) => JSON.parse(line));
+  }
+
+  it("already aborted: rejects with signal.reason before any evidence, browser or context", async () => {
+    const evidenceBaseDir = await mkdtemp(path.join(tmpdir(), "rote-fleet-abort-"));
+    try {
+      const launch = vi.spyOn(WebSurface, "launch");
+      const ac = new AbortController();
+      const leaseLost = new Error("lease lost");
+      ac.abort(leaseLost);
+      await expect(transfer({ memo: "rote-s4-pre-aborted" }, { signal: ac.signal, evidenceBaseDir })).rejects.toBe(leaseLost);
+      expect(launch).not.toHaveBeenCalled();
+      expect(await readdir(evidenceBaseDir)).toEqual([]);
+    } finally {
+      await rm(evidenceBaseDir, { recursive: true, force: true });
+    }
+  });
+
+  it("abort during a slow step (bank latency 3 s): AbortError well under 3 s, shared browser up with 0 contexts, 0 rows", async () => {
+    const evidenceBaseDir = await mkdtemp(path.join(tmpdir(), "rote-fleet-abort-"));
+    try {
+      await control("latency/3000");
+      const ac = new AbortController();
+      const started = Date.now();
+      setTimeout(() => ac.abort(), 1000);
+      const error = await transfer({ memo: "rote-s4-abort-slow" }, { signal: ac.signal, evidenceBaseDir }).then(
+        (r) => { throw new Error(`expected a rejection, got ${JSON.stringify(r)}`); },
+        (e: unknown) => e,
+      );
+      const elapsed = Date.now() - started;
+      expect((error as DOMException).name).toBe("AbortError");
+      expect(elapsed).toBeLessThan(2_500);
+      const log = await onlyRunLog(evidenceBaseDir);
+      expect(log.map((e) => e.kind)).toContain("aborted");
+      expect(log.map((e) => e.kind)).not.toContain("result");
+      expect(log.find((e) => e.kind === "aborted")?.detail).toMatchObject({ irreversibleAttempted: null });
+      await control("latency/0");
+      expect(await ledger()).toEqual([]);
+      // afterEach: browser connected, 0 contexts.
+    } finally {
+      await rm(evidenceBaseDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("abort inside after() (the click happened): still rejects with AbortError, 1 row, aborted entry names step-11", async () => {
+    const evidenceBaseDir = await mkdtemp(path.join(tmpdir(), "rote-fleet-abort-"));
+    try {
+      const ac = new AbortController();
+      const { calls, hooks } = recordingHooks({ after: async () => ac.abort() });
+      await expect(
+        transfer({ memo: "rote-s4-abort-after" }, { signal: ac.signal, evidenceBaseDir, onIrreversible: hooks }),
+      ).rejects.toMatchObject({ name: "AbortError" });
+      expect(calls.map((c) => c.hook)).toEqual(["before", "after"]);
+      expect(await ledger()).toHaveLength(1); // the verifier's job, not replay's
+      const log = await onlyRunLog(evidenceBaseDir);
+      expect(log.find((e) => e.kind === "aborted")?.detail).toMatchObject({ irreversibleAttempted: { stepId: "step-11" } });
+      expect(log.map((e) => e.kind)).not.toContain("result");
+    } finally {
+      await rm(evidenceBaseDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it("abort without a shared browser closes the browser replay launched, and still rejects", async () => {
+    await control("latency/3000");
+    const close = vi.spyOn(WebSurface.prototype, "close");
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 1000);
+    const { capability, entryUrl } = await forTenant(transferBase, TENANT_A);
+    await expect(
+      runReplay({
+        capability,
+        entryUrl,
+        params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "1.00", memo: "rote-s4-abort-owned" },
+        statusDir,
+        approveRisky: true,
+        signal: ac.signal,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(close).toHaveBeenCalledTimes(1);
+  }, 30_000);
+
+  it("the abort listener is removed when the run ends (no leak on a long-lived worker)", async () => {
+    const ac = new AbortController();
+    const add = vi.spyOn(ac.signal, "addEventListener");
+    const remove = vi.spyOn(ac.signal, "removeEventListener");
+    const result = await runReplay({ capability: memberLookup, entryUrl: baseUrl, params: { ...CREDS, memberId: "10001" }, statusDir, browser, signal: ac.signal });
+    expect(result.status).toBe("success");
+    expect(add).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0]![1]);
+  }, 30_000);
+});

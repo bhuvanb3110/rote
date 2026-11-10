@@ -98,6 +98,8 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         `${capability.target.entryUrlPattern}.`,
     );
   }
+  // Already aborted: reject before any evidence, browser or context exists.
+  options.signal?.throwIfAborted();
 
   const runId = `${capability.id}-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
   const evidence = await EvidenceRecorder.create(options.evidenceBaseDir ?? defaultEvidenceBaseDir(), runId);
@@ -127,13 +129,14 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   const outputsByStepId = new Map<string, string>();
   const stepConfidenceScores: number[] = [];
 
-  let closed = false;
-  const closeSurface = async () => {
-    if (!closed) {
-      closed = true;
-      await surface.close();
-    }
+  // One shared close: the abort listener starts it, and every exit path awaits the same promise,
+  // so "rejected" also means "context closed".
+  let closing: Promise<void> | null = null;
+  const closeSurface = (): Promise<void> => (closing ??= surface.close());
+  const onAbort = () => {
+    closeSurface().catch(() => undefined);
   };
+  options.signal?.addEventListener("abort", onAbort, { once: true });
 
   // Set right BEFORE the irreversible action is dispatched (step-04 plan section 5). From then on
   // the bank may have committed, so: no reload/recoverable retry, no second click of the
@@ -195,6 +198,8 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   }
 
   async function finish(result: ReplayResult): Promise<ReplayResult> {
+    // An aborted run never returns a result, whatever exit it was heading for.
+    options.signal?.throwIfAborted();
     const marked: ReplayResult =
       irreversibleAttempted && result.status !== "success"
         ? {
@@ -217,10 +222,12 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   }
 
   try {
+    options.signal?.throwIfAborted(); // aborted while the browser/context was starting
     await surface.act({ kind: "navigate", url: options.entryUrl });
 
     let stepIndex = 0;
     stepLoop: while (stepIndex < capability.steps.length) {
+      options.signal?.throwIfAborted();
       const step = capability.steps[stepIndex]!;
       currentStepId = step.id;
       const executable = buildExecutableAction(step, params);
@@ -294,8 +301,9 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
           detail: { stepId: step.id, reason: riskReason, riskSources },
         });
         // A throw here (the fleet's fencing check) prevents the click; the top-level catch closes
-        // the context and rethrows it unchanged.
+        // the context and rethrows it unchanged. An abort during before() also stops the click.
         await runHook("before", step);
+        options.signal?.throwIfAborted();
       }
 
       let observation: Observation | null = null;
@@ -331,6 +339,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
                 detail: { stepId: step.id, timeoutMs: IRREVERSIBLE_SETTLE_TIMEOUT_MS, ...settled },
               });
               await runHook("after", step);
+              options.signal?.throwIfAborted();
             }
           } else {
             try {
@@ -564,6 +573,19 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
     }
     return await finish({ status: "success", outputs, evidenceRef });
   } catch (err) {
+    // Abort first: whatever was in flight failed because the context was closed under it.
+    if (options.signal?.aborted) {
+      await closeSurface().catch(() => undefined);
+      const reason: unknown = options.signal.reason;
+      await evidence
+        .append({
+          turn: -1,
+          kind: "aborted",
+          detail: { reason: reason instanceof Error ? `${reason.name}: ${reason.message}` : String(reason), irreversibleAttempted },
+        })
+        .catch(() => undefined);
+      throw reason;
+    }
     // Hook errors reject unchanged, even after the attempt. Before the attempt, any throw rejects
     // exactly as it always did.
     if (hookFailure || !irreversibleAttempted) {
@@ -586,5 +608,8 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
       await closeSurface();
       throw finishErr;
     }
+  } finally {
+    // A long-lived worker reuses one signal source across jobs; never leak a listener.
+    options.signal?.removeEventListener("abort", onAbort);
   }
 }

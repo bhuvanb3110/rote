@@ -76,4 +76,15 @@ export interface ReplayOptions {
   statusDir?: string;
   /** Callbacks around the irreversible action (the fleet's commit intent / fault injection). */
   onIrreversible?: IrreversibleHooks;
+  /**
+   * Aborts the run (fleet: the heartbeat lost the lease). Already aborted at entry → rejects with
+   * `signal.reason` before any evidence, browser or context is created. Aborted mid-run → replay
+   * closes its context (or the browser it launched) immediately, mid-action, and rejects with
+   * `signal.reason`. Abort ALWAYS rejects and never returns a ReplayResult, even after the
+   * irreversible action was attempted: a worker that lost its lease must not record anything, and
+   * the next lease holder recovers by reading the history. Evidence gets one `aborted` entry
+   * (`reason`, `irreversibleAttempted`); no `result` entry and no confidence write. Takes precedence
+   * over a hook error. Not observed while paused for a human (controller).
+   */
+  signal?: AbortSignal;
 }
