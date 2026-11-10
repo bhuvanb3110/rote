@@ -18,6 +18,7 @@ import app from "../../mock-app/app.js";
 import { TENANTS, type TenantConfig } from "../../mock-app/tenants.js";
 import { deserializeCapability, type Capability, type ReplayResult } from "../artifact/index.js";
 import { approveCapability } from "../confidence/index.js";
+import { buildPolicyForOrigin, policyGate } from "../safety/index.js";
 import { WebSurface } from "../surface/index.js";
 import { applyTenantOverride, deserializeTenantOverride } from "../tenant/index.js";
 import { runReplay } from "./replay.js";
@@ -92,6 +93,31 @@ async function matchingCount(memo: string): Promise<string> {
   const result = await runReplay({ capability, entryUrl, params: { ...CREDS, memberId: "10001", memo }, statusDir, browser });
   expect(result.status, JSON.stringify(result)).toBe("success");
   return result.status === "success" ? String(result.outputs.matchingCount) : "";
+}
+
+/** `base` with step `stepId` replaced by `patch(step)`. */
+function withStep(base: Capability, stepId: string, patch: (step: Capability["steps"][number]) => Capability["steps"][number]): Capability {
+  return { ...base, steps: base.steps.map((s) => (s.id === stepId ? patch(s) : s)) };
+}
+
+/**
+ * Transfer on tenant-a whose step-11 looks like a careless tenant override: no roleName "Submit",
+ * only a textAnchor, described as "Submit control". The live gate reads describedAs and says safe.
+ */
+async function transferWithGateBlindSubmit(): Promise<{ capability: Capability; entryUrl: string }> {
+  const { capability, entryUrl } = await forTenant(transferBase, TENANT_A);
+  return {
+    entryUrl,
+    capability: withStep(capability, "step-11", (s) => ({
+      ...s,
+      target: { describedAs: "Submit control", strategies: [{ kind: "textAnchor", anchorText: "Submit", confidence: 0.6 }] },
+    })),
+  };
+}
+
+function gateRisk(capability: Capability, stepId: string): "safe" | "risky" {
+  const step = capability.steps.find((s) => s.id === stepId)!;
+  return policyGate({ kind: "click", target: step.target }, { policy: buildPolicyForOrigin(baseUrl), currentUrl: `${baseUrl}/` }).risk;
 }
 
 /** Every entry of the run's evidence log. */
@@ -182,4 +208,41 @@ describe("browser: reuse the worker's browser, close only the run's context", ()
     });
     expect(result.status).toBe("success");
   }, 30_000);
+});
+
+describe("irreversibility hardening: gate risky OR artifact risky", () => {
+  it("gate says safe, artifact says risky: refused without approveRisky (0 rows); runs with it (1 row)", async () => {
+    const { capability, entryUrl } = await transferWithGateBlindSubmit();
+    expect(gateRisk(capability, "step-11")).toBe("safe");
+    const params = { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", memo: "rote-s4-hardening" };
+
+    const refused = await runReplay({ capability, entryUrl, params, statusDir, browser });
+    expect(refused).toMatchObject({ status: "needs_human", atStepId: "step-11" });
+    expect(await ledger()).toEqual([]);
+    const blocked = (await evidenceLog(refused)).find((e) => e.kind === "blocked");
+    expect(blocked?.detail.riskSources).toEqual({ gate: "safe", artifact: "risky" });
+
+    const approved = await runReplay({ capability, entryUrl, params, statusDir, browser, approveRisky: true });
+    expect(approved.status, JSON.stringify(approved)).toBe("success");
+    expect((await ledger()).map((r) => r.memo)).toEqual(["rote-s4-hardening"]);
+    const riskApproved = (await evidenceLog(approved)).find((e) => e.kind === "risk_approved");
+    expect(riskApproved?.detail).toMatchObject({ stepId: "step-11", riskSources: { gate: "safe", artifact: "risky" } });
+  }, 60_000);
+
+  it("artifact says safe, gate says risky: still irreversible (today's behavior, pinned)", async () => {
+    const { capability: base, entryUrl } = await forTenant(transferBase, TENANT_A);
+    const capability = withStep(base, "step-11", (s) => ({ ...s, risk: "safe" }));
+    expect(gateRisk(capability, "step-11")).toBe("risky");
+    const result = await runReplay({
+      capability,
+      entryUrl,
+      params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", memo: "rote-s4-converse" },
+      statusDir,
+      browser,
+    });
+    expect(result).toMatchObject({ status: "needs_human", atStepId: "step-11" });
+    const blocked = (await evidenceLog(result)).find((e) => e.kind === "blocked");
+    expect(blocked?.detail.riskSources).toEqual({ gate: "risky", artifact: "safe" });
+    expect(await ledger()).toEqual([]);
+  }, 60_000);
 });

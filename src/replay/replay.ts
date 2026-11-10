@@ -168,27 +168,39 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
           evidenceRef,
         });
       }
-      // A live-classified risky action is never auto-executed by default -- the artifact's own
-      // recorded risk reflects what discovery observed, not a standing authorization to replay
-      // it unattended. The caller must explicitly opt in per run via approveRisky; otherwise
-      // this pauses for a human (or, with no controller, is exactly the "needs_human" case
-      // CLAUDE.md's "discovery stops at confirmation screens" is protecting).
-      if (decision.risk === "risky" && !options.approveRisky) {
+      // Hardening (FLEET_BRIEF amendment 3, step-04 plan section 2): a step is irreversible if the
+      // live gate says risky OR the artifact recorded `risk: "risky"`. It can only be stricter than
+      // the gate alone -- e.g. a tenant override that drops the roleName "Submit" strategy makes
+      // the gate say safe, but the artifact still knows. `irreversible` is the one flag every risk
+      // decision below uses; evidence records which source said so.
+      const irreversible = decision.risk === "risky" || step.risk === "risky";
+      const riskSources = { gate: decision.risk, artifact: step.risk };
+      const riskReason =
+        decision.risk === "risky"
+          ? decision.reason
+          : `the artifact marks step "${step.id}" risk: "risky" (the live gate classified it safe)`;
+
+      // An irreversible action is never auto-executed by default -- the artifact's own recorded
+      // risk reflects what discovery observed, not a standing authorization to replay it
+      // unattended. The caller must explicitly opt in per run via approveRisky; otherwise this
+      // pauses for a human (or, with no controller, is exactly the "needs_human" case CLAUDE.md's
+      // "discovery stops at confirmation screens" is protecting).
+      if (irreversible && !options.approveRisky) {
         await evidence.append({
           turn: stepIndex,
           kind: "blocked",
-          detail: { stepId: step.id, reason: `risky/irreversible (unapproved): ${decision.reason}` },
+          detail: { stepId: step.id, reason: `risky/irreversible (unapproved): ${riskReason}`, riskSources },
         });
         const outcome = await pauseOrFail(
           controller,
           surface,
           capability,
           step,
-          `risky/irreversible action blocked: ${decision.reason}`,
+          `risky/irreversible action blocked: ${riskReason}`,
           () =>
             finish({
               status: "needs_human",
-              reason: `Step "${step.id}" is risky/irreversible and requires human authorization (rerun with approveRisky to proceed): ${decision.reason}`,
+              reason: `Step "${step.id}" is risky/irreversible and requires human authorization (rerun with approveRisky to proceed): ${riskReason}`,
               atStepId: step.id,
               contextRef: evidenceRef,
             }),
@@ -201,11 +213,11 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         }
         continue stepLoop;
       }
-      if (decision.risk === "risky" && options.approveRisky) {
+      if (irreversible && options.approveRisky) {
         await evidence.append({
           turn: stepIndex,
           kind: "risk_approved",
-          detail: { stepId: step.id, reason: decision.reason },
+          detail: { stepId: step.id, reason: riskReason, riskSources },
         });
       }
 
