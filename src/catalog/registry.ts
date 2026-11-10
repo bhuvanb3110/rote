@@ -5,7 +5,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { deserializeCapability, type Capability } from "../artifact/index.js";
 import { resolveTenant, DEFAULT_OVERRIDES_DIR } from "../tenant/index.js";
-import { readCapabilityStatus } from "../confidence/index.js";
+import { isApprovalCurrent, readCapabilityStatus } from "../confidence/index.js";
 import { capabilityToJsonSchema, type CatalogEntry } from "./schema.js";
 
 export const DEFAULT_ARTIFACTS_DIR = "artifacts";
@@ -47,7 +47,9 @@ export async function listCapabilities(options: ListCapabilitiesOptions = {}): P
         name: capability.name,
         description: capability.description,
         version: capability.version,
-        approvalStatus: status.approvalStatus,
+        // Effective status for THIS artifact version: an approval for another version is stale
+        // (D15), so the catalog must not advertise it as approved.
+        approvalStatus: isApprovalCurrent(status, capability.version) ? "approved" : "draft",
         ...capabilityToJsonSchema(capability),
       };
       if (!options.tenant) return entry;

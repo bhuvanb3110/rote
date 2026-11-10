@@ -8,7 +8,7 @@ import { runReplay } from "../replay/index.js";
 import { commitUncertainWarning, deserializeCapability, type Capability, type ReplayResult } from "../artifact/index.js";
 import { EscalationController, createOperatorConsole } from "../escalation/index.js";
 import { resolveTenant } from "../tenant/index.js";
-import { createCatalogApp, invokeCapability, listCapabilities, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
+import { createCatalogApp, findCapability, invokeCapability, listCapabilities, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
 import { approveCapability, readRunConfidence } from "../confidence/index.js";
 
 const logger = pino();
@@ -336,10 +336,23 @@ catalogCommand
   )
   .option("--reason <text>", "human override reason -- force-approves regardless of history")
   .action(async (id: string, opts: { reason?: string }) => {
+    // An approval is bound to the artifact version it was given for (docs/DECISIONS.md D15), so the
+    // version comes from the artifact on disk, never from the operator.
+    const capability = await findCapability(id);
+    if (!capability) {
+      logger.error({ id }, "catalog approve: no capability with this id");
+      process.exitCode = 1;
+      return;
+    }
     try {
-      const status = await approveCapability(id, { reason: opts.reason });
+      const status = await approveCapability(id, { version: capability.version, reason: opts.reason });
       logger.info(
-        { capabilityId: status.capabilityId, approvedAt: status.approvedAt, reason: status.approvedReason },
+        {
+          capabilityId: status.capabilityId,
+          approvedVersion: status.approvedVersion,
+          approvedAt: status.approvedAt,
+          reason: status.approvedReason,
+        },
         "catalog approve: approved",
       );
     } catch (err) {

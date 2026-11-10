@@ -38,7 +38,7 @@ import { z } from "zod";
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
-const SEMVER_REGEX = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$/;
+export const SEMVER_REGEX = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$/;
 
 const ConfidenceSchema = z.number().min(0).max(1);
 

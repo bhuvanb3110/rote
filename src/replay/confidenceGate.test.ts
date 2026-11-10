@@ -13,7 +13,7 @@ import app from "../../mock-app/app.js";
 import { deserializeCapability, type Capability } from "../artifact/index.js";
 import { deserializeTenantOverride } from "../tenant/types.js";
 import { applyTenantOverride } from "../tenant/apply.js";
-import { readCapabilityStatus } from "../confidence/index.js";
+import { approveCapability, readCapabilityStatus } from "../confidence/index.js";
 import { runReplay } from "./replay.js";
 
 const FRESH_ID = "confidence-gate-test";
@@ -121,4 +121,54 @@ describe("approval gate + confidence scoring, wired into the real replay path", 
     expect(status.history).toHaveLength(1);
     expect(status.history[0]!.confidence).toBe(0);
   }, 30000);
+
+  it("an approval for another version refuses unattended replay before any browser launches (D15)", async () => {
+    statusDir = await mkdtemp(path.join(tmpdir(), "confidence-gate-test-"));
+    await approveCapability(FRESH_ID, { version: "1.0.0", reason: "approved at 1.0.0", statusDir });
+    const edited: Capability = { ...baseCapability, version: "1.1.0" };
+
+    const refused = await runReplay({
+      capability: edited,
+      params: { ...CREDS, memberId: "10001" },
+      entryUrl: baseUrl,
+      headless: true,
+      statusDir,
+    });
+    expect(refused.status).toBe("needs_human");
+    if (refused.status === "needs_human") {
+      expect(refused.reason).toContain("approved for 1.0.0, artifact is 1.1.0; re-approve");
+      expect(refused.atStepId).toBe(edited.steps[0]!.id);
+    }
+
+    // Re-approving for 1.1.0 lets the same artifact run, with no approveUnattended.
+    await approveCapability(FRESH_ID, { version: "1.1.0", reason: "re-approved at 1.1.0", statusDir });
+    const allowed = await runReplay({
+      capability: edited,
+      params: { ...CREDS, memberId: "10001" },
+      entryUrl: baseUrl,
+      headless: true,
+      statusDir,
+    });
+    expect(allowed.status).toBe("success");
+  }, 30000);
+
+  it("auto-promotion through real runs records the replayed artifact's version (D15)", async () => {
+    statusDir = await mkdtemp(path.join(tmpdir(), "confidence-gate-test-"));
+    const v = { ...baseCapability, version: "2.3.4" };
+    for (let i = 0; i < 3; i += 1) {
+      const result = await runReplay({
+        capability: v,
+        params: { ...CREDS, memberId: "10001" },
+        entryUrl: baseUrl,
+        headless: true,
+        statusDir,
+        approveUnattended: true,
+      });
+      expect(result.status).toBe("success");
+    }
+    const status = await readCapabilityStatus(FRESH_ID, statusDir);
+    expect(status.approvalStatus).toBe("approved");
+    expect(status.approvedVersion).toBe("2.3.4");
+    expect(status.history.every((run) => run.version === "2.3.4")).toBe(true);
+  }, 60000);
 });

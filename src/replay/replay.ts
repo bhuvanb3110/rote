@@ -110,7 +110,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   // capability that hasn't earned "approved" status is refused for unattended replay the same way
   // an unapproved risky action already is. finish() isn't reusable here (it assumes a `surface` to
   // close, and none has been launched yet), so this builds and validates the result by hand.
-  const approval = await checkApproval(capability.id, options);
+  const approval = await checkApproval(capability.id, capability.version, options);
   if (!approval.allowed) {
     await evidence.append({ turn: -1, kind: "blocked", detail: { reason: approval.reason } });
     const gated = ReplayResultSchema.parse({
@@ -215,7 +215,10 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
     const commitUncertain = validated.status === "success" ? undefined : validated.commitUncertain;
     await evidence.append({ turn: -1, kind: "result", detail: { status: validated.status, confidence, commitUncertain } });
     if (validated.status === "success") {
-      await recordConfidenceRun(capability.id, confidence, runId, { statusDir: options.statusDir });
+      await recordConfidenceRun(capability.id, confidence, runId, {
+        version: capability.version,
+        statusDir: options.statusDir,
+      });
     }
     await closeSurface();
     return validated;

@@ -62,7 +62,11 @@ beforeAll(async () => {
   const override = JSON.parse(await readFile(path.join(repo, "overrides/transfer.tenant-b.json"), "utf8"));
   override.entryUrl = `${baseUrl}/tenant-b/`;
   await writeFile(path.join(overridesDir, "transfer.tenant-b.json"), JSON.stringify(override));
-  await approveCapability("transfer", { statusDir, reason: "test-only approval in a temp statusDir" });
+  await approveCapability("transfer", {
+    version: artifact.version,
+    statusDir,
+    reason: "test-only approval in a temp statusDir",
+  });
 });
 
 afterEach(async () => {

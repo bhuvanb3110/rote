@@ -167,8 +167,12 @@ beforeAll(async () => {
   transferBase = await loadArtifact("transfer");
   lookupBase = await loadArtifact("transfer-history-lookup");
   statusDir = await mkdtemp(path.join(tmpdir(), "rote-fleet-status-"));
-  for (const id of ["member-lookup", "transfer", "transfer-history-lookup"]) {
-    await approveCapability(id, { statusDir, reason: "test-only approval in a temp statusDir" });
+  for (const capability of [memberLookup, transferBase, lookupBase]) {
+    await approveCapability(capability.id, {
+      version: capability.version,
+      statusDir,
+      reason: "test-only approval in a temp statusDir",
+    });
   }
 });
 

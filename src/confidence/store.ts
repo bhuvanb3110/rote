@@ -42,8 +42,8 @@ export async function readCapabilityStatus(
  * parallel workers) never observes a truncated/partial write. rename() is atomic on the same
  * volume. This does NOT solve the read-modify-write "lost update" race (two writers reading the
  * same old state and each appending their own run could still drop one entry) -- a real file
- * lock or single-writer queue would, but that's exactly the scaling infra CLAUDE.md says not to
- * build here; the honest limit is a lost history entry under true concurrent writes, not corrupt
+ * lock or single-writer queue would, but this file store predates the fleet (which keeps its state in
+ * Postgres, docs/DECISIONS.md D2) and fleet workers never write it (D7); the honest limit is a lost history entry under true concurrent writes, not corrupt
  * JSON.
  */
 async function writeCapabilityStatus(status: CapabilityStatus, statusDir: string): Promise<void> {
@@ -55,57 +55,87 @@ async function writeCapabilityStatus(status: CapabilityStatus, statusDir: string
 }
 
 /**
+ * True when `status` lets artifact `version` replay unattended: approved, and the approval either
+ * names exactly this version or names none at all (grandfathered: written before approvals were
+ * bound to a version, docs/DECISIONS.md D15). An approval for any other version is stale.
+ */
+export function isApprovalCurrent(status: CapabilityStatus, version: string): boolean {
+  return (
+    status.approvalStatus === "approved" &&
+    (status.approvedVersion === undefined || status.approvedVersion === version)
+  );
+}
+
+/**
  * Consecutive qualifying runs at the TAIL of history -- i.e. since the last run below threshold.
  * A sub-threshold run isn't flagged or filtered out; it just breaks the streak, the same way any
  * real chronological sequence would, which is exactly what "doesn't count toward promotion" means.
+ *
+ * With `version`, a run of any other version (or one recorded before runs carried a version) also
+ * breaks the streak: runs of 1.0.0 say nothing about whether 1.1.0 is proven.
  */
 export function consecutiveQualifyingRuns(
   history: ConfidenceRunRecord[],
   threshold: number = DEFAULT_CONFIDENCE_THRESHOLD,
+  version?: string,
 ): number {
   let count = 0;
   for (let i = history.length - 1; i >= 0; i -= 1) {
-    if (history[i]!.confidence < threshold) break;
+    const run = history[i]!;
+    if (run.confidence < threshold) break;
+    if (version !== undefined && run.version !== version) break;
     count += 1;
   }
   return count;
 }
 
+function markApproved(status: CapabilityStatus, version: string, reason: string): void {
+  status.approvalStatus = "approved";
+  status.approvedAt = new Date().toISOString();
+  status.approvedReason = reason;
+  status.approvedVersion = version;
+}
+
 export interface RecordRunOptions {
+  /** The artifact version that was replayed; recorded on the run and on any auto-promotion. */
+  version: string;
   statusDir?: string;
   threshold?: number;
   requiredConsecutive?: number;
 }
 
 /**
- * Appends one successful run's confidence to a DRAFT capability's history, then auto-promotes to
- * approved once the tail has requiredConsecutive runs each >= threshold -- this is how a draft
- * capability's history accumulates in the first place, once a human opts individual runs in via
- * approveUnattended (or operator). A capability that's already approved is left untouched (no
- * write at all): approval no longer depends on history once earned, so there's nothing further to
- * track, and it keeps replaying an already-proven capability from growing its sidecar file (and
- * dirtying a committed one) on every single successful run forever.
+ * Appends one successful run's confidence to a capability's history, then auto-promotes to
+ * approved -- for this run's version -- once the tail has requiredConsecutive runs of that version,
+ * each >= threshold. This is how a draft capability's history accumulates in the first place, once
+ * a human opts individual runs in via approveUnattended (or operator). A capability whose approval
+ * already covers this version is left untouched (no write at all): approval no longer depends on
+ * history once earned, and it keeps replaying an already-proven capability from growing its
+ * sidecar file (and dirtying a committed one) on every single successful run forever. An approval
+ * for a DIFFERENT version is stale, so the run is recorded as for a draft.
  */
 export async function recordConfidenceRun(
   capabilityId: string,
   confidence: number,
   runId: string,
-  options: RecordRunOptions = {},
+  options: RecordRunOptions,
 ): Promise<CapabilityStatus> {
   const statusDir = options.statusDir ?? DEFAULT_STATUS_DIR;
   const threshold = options.threshold ?? DEFAULT_CONFIDENCE_THRESHOLD;
   const required = options.requiredConsecutive ?? DEFAULT_REQUIRED_CONSECUTIVE_RUNS;
 
   const status = await readCapabilityStatus(capabilityId, statusDir);
-  if (status.approvalStatus === "approved") {
+  if (isApprovalCurrent(status, options.version)) {
     return status;
   }
 
-  status.history.push({ runId, confidence, at: new Date().toISOString() });
-  if (consecutiveQualifyingRuns(status.history, threshold) >= required) {
-    status.approvalStatus = "approved";
-    status.approvedAt = new Date().toISOString();
-    status.approvedReason = `Auto-promoted: ${required} consecutive runs with confidence >= ${threshold}.`;
+  status.history.push({ runId, confidence, at: new Date().toISOString(), version: options.version });
+  if (consecutiveQualifyingRuns(status.history, threshold, options.version) >= required) {
+    markApproved(
+      status,
+      options.version,
+      `Auto-promoted: ${required} consecutive runs of ${options.version} with confidence >= ${threshold}.`,
+    );
   }
 
   await writeCapabilityStatus(status, statusDir);
@@ -113,6 +143,8 @@ export async function recordConfidenceRun(
 }
 
 export interface ApproveOptions {
+  /** The artifact version being approved (required: an approval always names its version, D15). */
+  version: string;
   reason?: string;
   statusDir?: string;
   threshold?: number;
@@ -120,43 +152,42 @@ export interface ApproveOptions {
 }
 
 /**
- * Manual approval. With `reason`, a human override always wins, regardless of history. Without
- * one, this only promotes a capability whose history already qualifies -- it re-checks the same
- * rule recordConfidenceRun applies automatically, useful when a run happened with a stricter
- * requiredConsecutive/threshold than the defaults, or simply to confirm current status.
+ * Manual approval of one artifact version. With `reason`, a human override always wins,
+ * regardless of history. Without one, this only promotes a capability whose history of THIS
+ * version already qualifies -- it re-checks the same rule recordConfidenceRun applies
+ * automatically, useful when a run happened with a stricter requiredConsecutive/threshold than the
+ * defaults, or simply to confirm current status.
  */
-export async function approveCapability(
-  capabilityId: string,
-  options: ApproveOptions = {},
-): Promise<CapabilityStatus> {
+export async function approveCapability(capabilityId: string, options: ApproveOptions): Promise<CapabilityStatus> {
   const statusDir = options.statusDir ?? DEFAULT_STATUS_DIR;
   const status = await readCapabilityStatus(capabilityId, statusDir);
 
   if (options.reason) {
-    status.approvalStatus = "approved";
-    status.approvedAt = new Date().toISOString();
-    status.approvedReason = options.reason;
+    markApproved(status, options.version, options.reason);
     await writeCapabilityStatus(status, statusDir);
     return status;
   }
 
-  if (status.approvalStatus === "approved") {
+  if (isApprovalCurrent(status, options.version)) {
     return status;
   }
 
   const threshold = options.threshold ?? DEFAULT_CONFIDENCE_THRESHOLD;
   const required = options.requiredConsecutive ?? DEFAULT_REQUIRED_CONSECUTIVE_RUNS;
-  const qualifying = consecutiveQualifyingRuns(status.history, threshold);
+  const qualifying = consecutiveQualifyingRuns(status.history, threshold, options.version);
   if (qualifying < required) {
     throw new Error(
-      `Capability "${capabilityId}" does not yet qualify for approval: ${qualifying}/${required} ` +
-        `consecutive runs at confidence >= ${threshold}. Pass a reason to override manually.`,
+      `Capability "${capabilityId}" ${options.version} does not yet qualify for approval: ` +
+        `${qualifying}/${required} consecutive runs of ${options.version} at confidence >= ${threshold}. ` +
+        `Pass a reason to override manually.`,
     );
   }
 
-  status.approvalStatus = "approved";
-  status.approvedAt = new Date().toISOString();
-  status.approvedReason = `Auto-promoted: ${required} consecutive runs with confidence >= ${threshold}.`;
+  markApproved(
+    status,
+    options.version,
+    `Auto-promoted: ${required} consecutive runs of ${options.version} with confidence >= ${threshold}.`,
+  );
   await writeCapabilityStatus(status, statusDir);
   return status;
 }

@@ -3,11 +3,20 @@
 // artifact). Schema-first with Zod, same fail-loud serialize/deserialize pattern as
 // src/tenant/types.ts's TenantOverride.
 import { z } from "zod";
+import { SEMVER_REGEX } from "../artifact/schema.js";
+
+const VersionSchema = z.string().regex(SEMVER_REGEX, "version must be semantic, e.g. 1.0.0");
 
 export const ConfidenceRunRecordSchema = z.object({
   runId: z.string().min(1),
   confidence: z.number().min(0).max(1),
   at: z.iso.datetime(),
+  /**
+   * The artifact version this run replayed. Optional so history written before approvals were
+   * version-bound still parses; a record without it never counts toward promoting a specific
+   * version (see consecutiveQualifyingRuns).
+   */
+  version: VersionSchema.optional(),
 });
 export type ConfidenceRunRecord = z.infer<typeof ConfidenceRunRecordSchema>;
 
@@ -20,6 +29,13 @@ export const CapabilityStatusSchema = z.object({
   history: z.array(ConfidenceRunRecordSchema),
   approvedAt: z.iso.datetime().optional(),
   approvedReason: z.string().min(1).optional(),
+  /**
+   * The artifact version the approval covers (docs/DECISIONS.md D15). Every approval written since
+   * 2026-11-09 sets it; checkApproval refuses an artifact whose version differs. Optional so status
+   * files written before then still parse: a missing value is treated as grandfathered (allowed,
+   * and the gate's reason says so).
+   */
+  approvedVersion: VersionSchema.optional(),
 });
 export type CapabilityStatus = z.infer<typeof CapabilityStatusSchema>;
 

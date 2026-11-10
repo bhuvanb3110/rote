@@ -15,8 +15,13 @@ export interface ApprovalCheckOptions {
   statusDir?: string;
 }
 
+/**
+ * `capabilityVersion` is the artifact's own `version`. An approval is bound to the version it was
+ * given for (docs/DECISIONS.md D15): an edited artifact with a bumped version does not inherit it.
+ */
 export async function checkApproval(
   capabilityId: string,
+  capabilityVersion: string,
   options: ApprovalCheckOptions,
 ): Promise<ApprovalDecision> {
   if (options.approveUnattended) {
@@ -25,7 +30,27 @@ export async function checkApproval(
 
   const status = await readCapabilityStatus(capabilityId, options.statusDir ?? DEFAULT_STATUS_DIR);
   if (status.approvalStatus === "approved") {
-    return { allowed: true, reason: `Capability "${capabilityId}" is approved for unattended replay.` };
+    if (status.approvedVersion === undefined) {
+      return {
+        allowed: true,
+        reason:
+          `Capability "${capabilityId}" is approved for unattended replay under a grandfathered approval ` +
+          `that records no approvedVersion (it predates version-bound approvals); artifact is ` +
+          `${capabilityVersion}. Re-approve to bind it to a version.`,
+      };
+    }
+    if (status.approvedVersion === capabilityVersion) {
+      return {
+        allowed: true,
+        reason: `Capability "${capabilityId}" is approved for unattended replay at version ${capabilityVersion}.`,
+      };
+    }
+    return {
+      allowed: false,
+      reason:
+        `Capability "${capabilityId}" was approved for ${status.approvedVersion}, artifact is ` +
+        `${capabilityVersion}; re-approve (see "catalog approve") before unattended replay.`,
+    };
   }
 
   return {
