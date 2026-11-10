@@ -50,6 +50,41 @@ call. Pre-existing; not caused by Step 2. **Fix:** `WebSurface.perceive()` retri
 failure, throws as before. Retries are counted on the surface (`screenshotRetries`) so the fleet can
 report them as a metric. Unit tests: `src/surface/webSurface.test.ts`. Rationale: D8.
 
+## Known limitations
+
+Recorded as found; each names its planned fix or the step that owns it.
+
+1. **Screenshots show "Signed in as <username>".** The member-lookup page (`renderHome`) prints the
+   operator's username, and replay screenshots every step into evidence. The mock uses fake
+   credentials, so committed evidence is safe, but against a real bank this puts a credential value
+   in a screenshot. **Planned fix (Day 4):** Playwright's screenshot `mask` option for elements that
+   display credential values, driven from the capability's redacted inputs.
+2. **The artifact input schema has no non-empty / min-length constraint.** `TypedParamSchema` is
+   `{name, type, required, description, redact}`, and `inputsToZodSchema` maps `string` to a plain
+   `z.string()`. So `""` passes validation and reaches the browser. Measured (Step 4): an empty
+   `toMemberId` or `amount` is now the `REQUIRED_FIELD_MISSING` business outcome (the bank's
+   "… is required."). An empty `memberId` searches for nothing; the bank redirects to `/member/`,
+   which has no route (Express's default 404, "Cannot GET /member/"), and replay fails at step-06
+   (no Transfer button), before Submit. Fixing this needs a schema change (e.g. `minLength` on
+   `TypedParam`), not made here; it belongs in a reviewed schema step.
+3. **Business-outcome recognizers are scoped by CSS, not semantics** (D14). The transfer and lookup
+   outcomes are `elementPresent` on `.msg1.err:has-text("…")`. The existing schema could do this
+   with no change, and it fixes the memo false positive (a memo containing "Insufficient funds" was
+   reported as that outcome; tested). But the descriptor has only a `css` strategy (a message box
+   has no role or label to match), and `:has-text` is Playwright-specific, so a future
+   `DesktopSurface` would need an equivalent. The other three artifacts (`member-lookup`,
+   `open-sub-account*`) still use whole-page `textPresent`; they have no free-text field that
+   echoes back.
+4. **A Submit that is never found still gets `commitUncertain`.** `irreversibleAttempted` is set
+   before `act()` (approved, so a crash inside the click already counts). If the locator doesn't
+   resolve at all, the click was never dispatched, but the result still carries the marker. Also,
+   the bounded settle wait runs its full 10 s, because no navigation comes. Safe, but it costs the
+   fleet one history lookup (0 matches → retry). Possible fix: `WebSurface` throws a typed
+   "locator not resolved" error that `runReplay` treats as "not dispatched". Open question for the
+   reviewer.
+5. **`signal` is not observed while paused for a human.** With an `EscalationController`,
+   `waitForAutomation()` does not race the abort. Fleet workers never pass a controller.
+
 ## The seven questions
 
 ### 1. Language, framework, and how replay is invoked
@@ -125,6 +160,14 @@ would fail `/^submit$/i` and the click would be classified **safe** — silently
 commit-intent hook. Tenant-c's hostile `<a>` buttons make a textAnchor-only override tempting.
 Rule for the transfer artifacts and any override: keep a `roleName` strategy named exactly
 "Submit" on the irreversible step, and add a test per tenant asserting the live gate says risky.
+
+**Fixed in Step 4 (2026-11-09).** `runReplay` now treats a step as irreversible if the live gate
+says risky **or** the artifact step has `risk: "risky"` (`replay.ts`, "Hardening"). `step.risk` is
+read, and the override hazard above no longer skips the gate, the hooks or the post-attempt rules:
+`src/replay/fleet.test.ts` replays a step-11 that has only a textAnchor and is described as
+"Submit control" (the gate says safe). It is refused without `approveRisky` (0 rows), and with it,
+`onIrreversible.before` runs. Evidence records `riskSources: {gate, artifact}`. The roleName rule
+above still stands as good practice.
 
 ### 4. Transaction history page and memo field in the mock bank?
 
@@ -215,7 +258,8 @@ Jaeger, Prometheus and Grafana — see the open question in the Day-1 handoff. I
    `deserializeCapability`, approve them with a recorded reason, and add replay tests. Open
    question for the builder: re-run discovery for the read-only lookup later, as evidence?
 4. **Replay gains three optional, additive options** (extend, don't fork; every existing call
-   site keeps working unchanged):
+   site keeps working unchanged). *Built in Step 4 (docs/plans/step-04.md, D10–D13); `after()`
+   now runs once the bank has answered (D12), and `invokeCapability` passes all three through.*
    - `browser?: Browser` — reuse a worker's browser; `WebSurface` opens a fresh context per run and
      closes only that context
    - `onIrreversible?: { before(step): Promise<void>; after(step): Promise<void> }` — `before`

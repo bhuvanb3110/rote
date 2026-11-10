@@ -188,3 +188,140 @@ the real memory ceiling instead of assuming it, and the brief itself prefers an 
 at N workers because each context needs X MB" to a big number.
 
 **Date.** 2026-11-09
+
+## D10: "The commit may have happened" is an optional `commitUncertain` field, not a fifth status
+
+**Decision.** `ReplayResult`'s `business_outcome`, `needs_human` and `failure` members gain an
+optional `commitUncertain: { irreversibleStepId, detail }` (`src/artifact/replayResult.ts`).
+`runReplay` sets `irreversibleAttempted` right *before* it dispatches the irreversible click, and
+`finish()` (the one function every result goes through) adds the field to every non-success result
+from then on. `success` never carries it. Meaning: **present → verify (history lookup) before any
+retry; absent on a non-success → nothing irreversible was attempted, a blind retry is safe.** Once
+the attempt is made, replay also stops applying recoverable retries/reloads, never repeats the
+irreversible step (operator mode: a "retry" after hand-back becomes a terminal `needs_human`), and
+turns any throw into `failure`/`unknown` with the field. The CLI prints a distinct warning line.
+
+Fleet rule (built on Day 2): `business_outcome` + `commitUncertain` → verify via history. 1 match →
+the job succeeded. 0 matches → record the business outcome as **final, no retry**. A bank refusal
+is never looped until `max_attempts`.
+
+**Alternatives considered.**
+- A fifth status `commit_unknown` — changes CLAUDE.md's four-way union (a non-negotiable) and throws
+  away the real classification ("503 after Submit" is still a `failure`; "Insufficient funds on the
+  confirm POST" is still a `business_outcome`).
+- `failure.category: "commit-unknown"` — covers only `failure` and overwrites the real category;
+  `business_outcome`/`needs_human` after Submit would have nowhere to say it.
+- Leave it to the caller to infer from `atStepId` — every caller would have to know which step is
+  irreversible, and a throw after the click would carry no result at all.
+
+**Why.** Step 3 measured the trap: with `errors/after-write` the bank commits, the page shows a 503,
+and replay returned a plain `failure` that a retry-on-failure caller would repeat. A
+"transient right after Submit" test, run against the old rules, showed the worse case: replay's
+recoverable reload re-posted the confirm form and reported `success` with a commit made by the
+*second* POST. An additive optional field keeps every existing consumer compiling and every old
+result parsing, while making the dangerous case explicit and set in one place. Reviewer approved the
+field and the `business_outcome` coverage (step-04 reviewer decisions 1 and 3).
+
+**Date.** 2026-11-09
+
+## D11: Abort and hook errors reject; they never return a `ReplayResult`
+
+**Decision.** If `onIrreversible.before()` throws, the click never happens and `runReplay` rejects
+with that same error, unwrapped. If `after()` throws, `runReplay` rejects with its error. If
+`signal` aborts (already at entry, or mid-run), replay closes its context at once and rejects with
+`signal.reason`, even after the irreversible attempt; evidence gets one `aborted` entry
+(`reason`, `irreversibleAttempted`), no `result` entry and no confidence write. Abort wins over a
+hook error. In every case the run's context is closed before the promise settles.
+
+**Alternatives considered.**
+- Return a `failure` carrying `commitUncertain` on abort after the attempt — gives a worker that has
+  already lost its lease something that looks recordable.
+- Wrap hook errors in a replay error type — the fleet would have to unwrap its own fencing error to
+  recognize it.
+- Let the run finish after an abort and discard the result — keeps clicking on a job another worker
+  now owns.
+
+**Why.** The fleet aborts only when its heartbeat has lost the lease, and its hooks throw only for
+its own reasons (fencing). In both cases the fleet owns the outcome: a stale worker must record
+nothing, and the next lease holder recovers by reading the bank's history. A rejection is the one
+shape a worker cannot accidentally persist as a job result. Reviewer approved (decision 2).
+
+**Date.** 2026-11-09
+
+## D12: `onIrreversible.after()` runs once the bank has answered, with a bounded wait
+
+**Decision.** After the irreversible click, replay waits up to **10 s** for the main frame's
+resulting navigation to reach `load` (`WebSurface.watchNextNavigation`, attached *before* the click
+so the navigation can't be missed), then calls `after()`. A timeout or error in that wait does not
+throw: it is recorded as an `irreversible_settle` evidence entry (`loaded: false`, `reason`) and
+`after()` still runs. `after()` also runs if the click itself threw.
+
+**Alternatives considered.**
+- Call `after()` as soon as the click resolves (the original plan) — Playwright's click can resolve
+  before the POST is processed, so a crash-after-submit test would sometimes see 0 rows and sometimes
+  1, which proves nothing.
+- Wait for a specific success page — couples the hook to each capability's success condition, and a
+  503 or business-outcome answer would never arrive.
+- Throw when the wait times out — turns a slow bank into a lost result right after the commit, the
+  worst moment to throw.
+
+**Why.** The crash-after-submit test is only meaningful if, when `after()` fires, the bank has
+already processed the POST: then the ledger has exactly one row and the fleet must find it via
+history. Waiting for "load" of whatever page comes back (success, error or 503) gives that, for
+every outcome, without knowing the capability. Bounded, because a hung bank must not hang a worker.
+Cost: a click that navigates nowhere (e.g. a Submit that was never found) waits the full 10 s; this
+only happens on an already-failing run. Reviewer decision 7.
+
+**Date.** 2026-11-09
+
+## D13: Reuse the worker's browser; workers enter through `invokeCapability`
+
+**Decision.** `ReplayOptions.browser` (and `WebSurfaceOptions.browser`): replay opens a fresh
+context on the given browser and closes only that context on every exit path. `headless` is ignored,
+not rejected, when a browser is passed. `invokeCapability` passes `browser`, `onIrreversible`,
+`signal`, `evidenceBaseDir` and `statusDir` through to `runReplay`; fleet workers call
+`invokeCapability`, never `runReplay` directly.
+
+**Alternatives considered.**
+- One browser per job (today's behavior) — a Chromium launch per job costs time and memory the
+  4 GB Docker VM doesn't have (D9).
+- Throw when both `headless` and `browser` are given — `invokeCapability` always passes `headless`,
+  so the fleet's own call would throw.
+- Workers call `runReplay` and resolve tenant overrides themselves — a second copy of tenant
+  resolution that can drift from the CLI and HTTP paths.
+
+**Why.** One browser per worker and one context per job is the brief's model: contexts don't share
+cookies (tested with two concurrent runs) and are cheap to create and destroy. Routing workers
+through `invokeCapability` keeps param validation and tenant resolution in one place for CLI, HTTP
+and fleet. Reviewer decisions 4 and 5.
+
+**Date.** 2026-11-09
+
+## D14: Scope business-outcome recognizers to the bank's error box, without a schema change
+
+**Decision.** The transfer and history-lookup `knownOutcomes` are `elementPresent` recognizers whose
+target is a single `css` strategy on the error-message element, e.g.
+`.msg1.err:has-text("Insufficient funds")` (Playwright's `:has-text` through `page.locator`),
+instead of whole-page `textPresent`. `RECIPIENT_CLOSED` requires both "Recipient" and "is closed.".
+Both artifacts are now 1.1.0. Added `REQUIRED_FIELD_MISSING` ("is required.").
+
+**Alternatives considered.**
+- Keep whole-page `textPresent` — the confirm and history pages display the memo, so a memo
+  containing "Insufficient funds" or "Record not found" was reported as that business outcome
+  (test written first; it failed with `NO_SUCH_MEMBER`).
+- Add a scoped recognizer kind to the schema (e.g. `textPresent` with a `within` descriptor) — cleaner
+  and surface-neutral, but a schema change, which this step was told not to make.
+- Choose memo text that can never collide — the fleet controls its own memo (`rote-<uuid>`), but
+  other operators' memos appear in the same history.
+
+**Why.** It closes a real false positive that would mislabel a committed transfer, and in the
+lookup it would break the fleet's verify step, using vocabulary the schema already has. Limits,
+recorded in REPO_NOTES: the descriptor is CSS-only (no semantic strategy exists for a non-interactive
+message box), and `:has-text` is Playwright-specific, so a future `DesktopSurface` would need its
+own equivalent; if the bank's error markup changes, these recognizers stop matching and the run ends
+in a `failure` at the Submit step (no Submit button on the re-shown form) instead of a
+`business_outcome`. Nothing is submitted, but the result carries a conservative `commitUncertain`
+(see the REPO_NOTES limitation on a Submit that is never found). A scoped recognizer kind is the
+proper fix in a reviewed schema step.
+
+**Date.** 2026-11-09

@@ -72,6 +72,17 @@ recognized, caller-branchable outcome the artifact was compiled to detect, disti
 `failure`. (The CLI still exits non-zero for any non-`success` status, including this one — check
 `status`/`code` in the JSON log, not just the exit code.)
 
+**Result contract.** Every replay returns one of four statuses: `success`, `business_outcome`,
+`needs_human`, `failure`. A non-`success` result may also carry **`commitUncertain`**
+(`{irreversibleStepId, detail}`), which means the run already *attempted* its irreversible step
+(e.g. the transfer's Submit). The commit may have happened, so check the bank's history before any
+retry. If a non-success result has no `commitUncertain`, nothing irreversible was attempted and a
+retry is safe. The CLI also logs a separate warning line, `commit may have happened at <step> --
+verify before retrying`. The catalog HTTP API returns the field unchanged in its 200 body. Once the
+irreversible step has been attempted, replay never reloads, never retries that step, and turns
+unexpected errors into `failure`/`unknown` with the marker. See
+[docs/DECISIONS.md](docs/DECISIONS.md) D10.
+
 **4. Human-in-the-loop escalation demo:**
 
 ```

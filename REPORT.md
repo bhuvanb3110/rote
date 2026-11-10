@@ -180,6 +180,17 @@ re-evaluating: `successCondition` now passing means the human finished the job b
 neither passing means **retry** the step fresh (safe even if the human did nothing — it just
 re-pauses). Elaborated with real evidence in §5.
 
+**After an irreversible action (fleet Step 4).** A step is irreversible if the live policy gate
+*or* the artifact's own `risk: "risky"` says so. Replay marks the attempt right before it dispatches
+that click. From then on it applies no recoverable reload: a reload of the POST response would
+re-post the form, and a test showed exactly that, with a second POST committing and replay
+reporting `success`. It also never retries the irreversible step (in operator mode a "retry" after
+hand-back becomes `needs_human`), and it turns any throw into `failure`/`unknown`. Every non-success
+result then carries an optional `commitUncertain` field: "the commit may have happened, verify
+before retrying". The four-way union is unchanged. Optional hooks run just before the click and
+again once the bank has answered it, and an `AbortSignal` lets a caller stop a run at once; both
+reject rather than return a result. Rationale: `docs/DECISIONS.md` D10–D12.
+
 ## 4. Heterogeneity & multi-tenant
 
 *Desktop heterogeneity below is design, not built code, flagged explicitly per the project's own

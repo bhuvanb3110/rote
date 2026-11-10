@@ -302,3 +302,24 @@ Test discipline: the "transient right after Submit" test is written first, run a
 unpatched rules, and its failure (reload re-posted, 1 row, "success") is recorded in that commit's
 message before the fix makes it pass. `npm test` before every commit; never commit or push on red.
 The full suite runs 3 times at the end and all three result lines are reported.
+
+## Built (2026-11-09)
+
+Built in the reviewer's order. Tests live in `src/replay/fleet.test.ts` (one shared Chromium passed as
+`browser`), `src/catalog/invoke.test.ts`, `mock-app/transfer.http.test.ts` and
+`src/replay/transfer.test.ts`. Decisions: D10–D14. Where the build went beyond or differed from the
+text above:
+
+- The failing-first test failed exactly as predicted: `success`, 1 row, a `recover` entry at step-11.
+- Rule 5.1's result is `failure` / `unexpected-state` at the step that saw the interstitial, plus
+  the marker. Its evidence is a `blocked` entry, not `recover`.
+- "Transient before Submit" recovers at step-03 (the post-login landing page is the first
+  authenticated request).
+- Item 9: the schema *can* scope recognizers (`elementPresent` + a `css` `:has-text` strategy), so
+  it was done with no schema change. The history-lookup's two outcomes were scoped too, because the
+  history page also lists memos and the fleet's verify step reads it. Both artifacts are now 1.1.0.
+  Limits: REPO_NOTES "Known limitations" 3.
+- Item 8: no min-length exists in `TypedParamSchema`, so only `REQUIRED_FIELD_MISSING` was added;
+  REPO_NOTES "Known limitations" 2.
+- Found while testing: a Submit that is never found still gets `commitUncertain` and the full 10 s
+  settle wait (REPO_NOTES "Known limitations" 4; open question).
