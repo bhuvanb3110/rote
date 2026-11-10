@@ -16,7 +16,8 @@
     "mock": "tsx mock-app/index.ts",
     "demo:agent": "tsx examples/agent-demo.ts",
     "evidence:transfer": "tsx scripts/evidence-transfer-replay.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:unit": "vitest run --exclude \"**/*.db.test.ts\""
   },
   "license": "ISC",
   "dependencies": {
@@ -24,6 +25,7 @@
     "commander": "^15.0.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "pg": "^8.23.1",
     "pino": "^10.3.1",
     "playwright": "^1.62.1",
     "zod": "^4.4.3"
@@ -31,6 +33,7 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.2.0",
+    "@types/pg": "^8.23.1",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
