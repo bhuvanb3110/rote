@@ -4,12 +4,14 @@
 // being re-recorded. See overrides/member-lookup.tenant-b.json for what actually differs.
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import app from "../../mock-app/app.js";
 import { deserializeCapability, type Capability } from "../artifact/index.js";
+import { approvalKey, approveCapability } from "../confidence/index.js";
 import { runReplay } from "../replay/index.js";
 import { applyTenantOverride } from "./apply.js";
 import { deserializeTenantOverride } from "./types.js";
@@ -17,6 +19,8 @@ import { deserializeTenantOverride } from "./types.js";
 let server: Server;
 let baseUrl: string;
 let capability: Capability;
+// The relaxed base is approved here, test-only (D24): status/ approves the unrelaxed artifact.
+let statusDir: string;
 
 const CREDS = { username: "operator", password: "operator" };
 
@@ -50,15 +54,20 @@ beforeAll(async () => {
   const { port } = server.address() as AddressInfo;
   baseUrl = `http://localhost:${port}`;
   capability = await loadRelaxedCapability();
+  statusDir = await mkdtemp(path.join(tmpdir(), "rote-multitenant-status-"));
+  await approveCapability(capability.id, { ...approvalKey(capability), statusDir, reason: "test-only approval of the relaxed base" });
 });
 
 afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  await rm(statusDir, { recursive: true, force: true });
 });
 
 describe("member-lookup replays against multiple tenants without being re-recorded", () => {
   it("tenant A, no override: the base capability succeeds as-is against the root-mounted tenant", async () => {
     const result = await runReplay({
+      statusDir,
+      approvalArtifact: capability,
       capability,
       params: { ...CREDS, memberId: "10001" },
       entryUrl: baseUrl,
@@ -77,6 +86,8 @@ describe("member-lookup replays against multiple tenants without being re-record
     const effective = applyTenantOverride(capability, override);
 
     const result = await runReplay({
+      statusDir,
+      approvalArtifact: capability,
       capability: effective,
       params: { ...CREDS, memberId: "10001" },
       entryUrl: `${baseUrl}/tenant-b/`,
@@ -107,6 +118,8 @@ describe("member-lookup replays against multiple tenants without being re-record
 
   it("tenant B without the override would fail: the base capability alone can't find 'Search' or the old balance label", async () => {
     const result = await runReplay({
+      statusDir,
+      approvalArtifact: capability,
       capability, // no override applied -- deliberately reusing the base descriptors on tenant B
       params: { ...CREDS, memberId: "10001" },
       entryUrl: `${baseUrl}/tenant-b/`,
@@ -125,6 +138,8 @@ describe("member-lookup replays against multiple tenants without being re-record
     const effective = applyTenantOverride(capability, override);
 
     const result = await runReplay({
+      statusDir,
+      approvalArtifact: capability,
       capability: effective,
       params: { ...CREDS, memberId: "10001" },
       entryUrl: `${baseUrl}/tenant-c/`,
@@ -160,6 +175,8 @@ describe("member-lookup replays against multiple tenants without being re-record
 
   it("tenant C without the override would fail: roleName/labelText alone can't survive hostile markup", async () => {
     const result = await runReplay({
+      statusDir,
+      approvalArtifact: capability,
       capability, // no override -- just the base artifact's own roleName(+labelText) strategies
       params: { ...CREDS, memberId: "10001" },
       entryUrl: `${baseUrl}/tenant-c/`,

@@ -9,7 +9,7 @@ import { commitUncertainWarning, deserializeCapability, type Capability, type Re
 import { EscalationController, createOperatorConsole } from "../escalation/index.js";
 import { resolveTenant } from "../tenant/index.js";
 import { createCatalogApp, findCapability, invokeCapability, listCapabilities, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
-import { approveCapability, readRunConfidence } from "../confidence/index.js";
+import { approvalKey, approveCapability, readRunConfidence } from "../confidence/index.js";
 import { createPool, databaseUrlFromEnv, migrate, redactDatabaseUrl } from "../queue/index.js";
 
 const logger = pino();
@@ -127,6 +127,7 @@ program
       );
       const result = await runReplay({
         capability,
+        approvalArtifact: baseCapability, // the approval covers the artifact, not the tenant-merged copy (D24)
         params,
         entryUrl,
         headless: !opts.headed,
@@ -217,6 +218,7 @@ program
 
       const result = await runReplay({
         capability,
+        approvalArtifact: baseCapability, // the approval covers the artifact, not the tenant-merged copy (D24)
         params,
         entryUrl,
         headless: false, // a human must be able to see and click the SAME window
@@ -346,11 +348,12 @@ catalogCommand
       return;
     }
     try {
-      const status = await approveCapability(id, { version: capability.version, reason: opts.reason });
+      const status = await approveCapability(id, { ...approvalKey(capability), reason: opts.reason });
       logger.info(
         {
           capabilityId: status.capabilityId,
           approvedVersion: status.approvedVersion,
+          approvedDigest: status.approvedDigest,
           approvedAt: status.approvedAt,
           reason: status.approvedReason,
         },

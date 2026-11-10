@@ -5,6 +5,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { capabilityDigest, type Capability } from "../artifact/index.js";
 import {
   deserializeCapabilityStatus,
   serializeCapabilityStatus,
@@ -55,14 +56,29 @@ async function writeCapabilityStatus(status: CapabilityStatus, statusDir: string
 }
 
 /**
- * True when `status` lets artifact `version` replay unattended: approved, and the approval either
- * names exactly this version or names none at all (grandfathered: written before approvals were
- * bound to a version, docs/DECISIONS.md D15). An approval for any other version is stale.
+ * What an approval is bound to: the artifact's version (D15) and the SHA-256 of its canonical JSON
+ * (D24). Every approval records both; every check compares both.
  */
-export function isApprovalCurrent(status: CapabilityStatus, version: string): boolean {
+export interface ApprovalKey {
+  version: string;
+  digest: string;
+}
+
+/** The approval key of an artifact as it is now. */
+export function approvalKey(capability: Capability): ApprovalKey {
+  return { version: capability.version, digest: capabilityDigest(capability) };
+}
+
+/**
+ * True when `status` lets the artifact with this key replay unattended: approved, and the approval
+ * names exactly this version (or none: grandfathered, D15) AND exactly this digest (or none:
+ * grandfathered, D24). An approval for any other version or content is stale.
+ */
+export function isApprovalCurrent(status: CapabilityStatus, key: ApprovalKey): boolean {
   return (
     status.approvalStatus === "approved" &&
-    (status.approvedVersion === undefined || status.approvedVersion === version)
+    (status.approvedVersion === undefined || status.approvedVersion === key.version) &&
+    (status.approvedDigest === undefined || status.approvedDigest === key.digest)
   );
 }
 
@@ -72,33 +88,37 @@ export function isApprovalCurrent(status: CapabilityStatus, version: string): bo
  * real chronological sequence would, which is exactly what "doesn't count toward promotion" means.
  *
  * With `version`, a run of any other version (or one recorded before runs carried a version) also
- * breaks the streak: runs of 1.0.0 say nothing about whether 1.1.0 is proven.
+ * breaks the streak: runs of 1.0.0 say nothing about whether 1.1.0 is proven. With `digest`, the
+ * same holds for content (D24): runs of other content, or runs that recorded no digest, break it.
  */
 export function consecutiveQualifyingRuns(
   history: ConfidenceRunRecord[],
   threshold: number = DEFAULT_CONFIDENCE_THRESHOLD,
   version?: string,
+  digest?: string,
 ): number {
   let count = 0;
   for (let i = history.length - 1; i >= 0; i -= 1) {
     const run = history[i]!;
     if (run.confidence < threshold) break;
     if (version !== undefined && run.version !== version) break;
+    if (digest !== undefined && run.digest !== digest) break;
     count += 1;
   }
   return count;
 }
 
-function markApproved(status: CapabilityStatus, version: string, reason: string): void {
+function markApproved(status: CapabilityStatus, key: ApprovalKey, reason: string): void {
   status.approvalStatus = "approved";
   status.approvedAt = new Date().toISOString();
   status.approvedReason = reason;
-  status.approvedVersion = version;
+  status.approvedVersion = key.version;
+  status.approvedDigest = key.digest;
 }
 
-export interface RecordRunOptions {
-  /** The artifact version that was replayed; recorded on the run and on any auto-promotion. */
-  version: string;
+export interface RecordRunOptions extends ApprovalKey {
+  // version: the artifact version that was replayed; digest: its capabilityDigest(). Both are
+  // recorded on the run and on any auto-promotion.
   statusDir?: string;
   threshold?: number;
   requiredConsecutive?: number;
@@ -125,15 +145,21 @@ export async function recordConfidenceRun(
   const required = options.requiredConsecutive ?? DEFAULT_REQUIRED_CONSECUTIVE_RUNS;
 
   const status = await readCapabilityStatus(capabilityId, statusDir);
-  if (isApprovalCurrent(status, options.version)) {
+  if (isApprovalCurrent(status, options)) {
     return status;
   }
 
-  status.history.push({ runId, confidence, at: new Date().toISOString(), version: options.version });
-  if (consecutiveQualifyingRuns(status.history, threshold, options.version) >= required) {
+  status.history.push({
+    runId,
+    confidence,
+    at: new Date().toISOString(),
+    version: options.version,
+    digest: options.digest,
+  });
+  if (consecutiveQualifyingRuns(status.history, threshold, options.version, options.digest) >= required) {
     markApproved(
       status,
-      options.version,
+      options,
       `Auto-promoted: ${required} consecutive runs of ${options.version} with confidence >= ${threshold}.`,
     );
   }
@@ -142,9 +168,9 @@ export async function recordConfidenceRun(
   return status;
 }
 
-export interface ApproveOptions {
-  /** The artifact version being approved (required: an approval always names its version, D15). */
-  version: string;
+export interface ApproveOptions extends ApprovalKey {
+  // version + digest of the artifact being approved: required, an approval always names both (D15,
+  // D24). Use approvalKey(capability).
   reason?: string;
   statusDir?: string;
   threshold?: number;
@@ -163,18 +189,18 @@ export async function approveCapability(capabilityId: string, options: ApproveOp
   const status = await readCapabilityStatus(capabilityId, statusDir);
 
   if (options.reason) {
-    markApproved(status, options.version, options.reason);
+    markApproved(status, options, options.reason);
     await writeCapabilityStatus(status, statusDir);
     return status;
   }
 
-  if (isApprovalCurrent(status, options.version)) {
+  if (isApprovalCurrent(status, options)) {
     return status;
   }
 
   const threshold = options.threshold ?? DEFAULT_CONFIDENCE_THRESHOLD;
   const required = options.requiredConsecutive ?? DEFAULT_REQUIRED_CONSECUTIVE_RUNS;
-  const qualifying = consecutiveQualifyingRuns(status.history, threshold, options.version);
+  const qualifying = consecutiveQualifyingRuns(status.history, threshold, options.version, options.digest);
   if (qualifying < required) {
     throw new Error(
       `Capability "${capabilityId}" ${options.version} does not yet qualify for approval: ` +
@@ -185,7 +211,7 @@ export async function approveCapability(capabilityId: string, options: ApproveOp
 
   markApproved(
     status,
-    options.version,
+    options,
     `Auto-promoted: ${required} consecutive runs of ${options.version} with confidence >= ${threshold}.`,
   );
   await writeCapabilityStatus(status, statusDir);

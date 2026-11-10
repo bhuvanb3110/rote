@@ -73,8 +73,8 @@ async function main(): Promise<void> {
 
   // What the gate says from the committed status/ files, before anything runs.
   const gate = [
-    { id: transferCap.id, version, decision: await checkApproval(transferCap.id, version, {}) },
-    { id: lookupCap.id, version, decision: await checkApproval(lookupCap.id, version, {}) },
+    { id: transferCap.id, version, decision: await checkApproval(transferCap, {}) },
+    { id: lookupCap.id, version, decision: await checkApproval(lookupCap, {}) },
   ];
   const approvedNow = gate.every((g) => g.decision.allowed);
   if (!approvedNow && !PRE_APPROVAL) {

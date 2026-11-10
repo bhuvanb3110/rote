@@ -1,19 +1,38 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import app from "../../mock-app/app.js";
 import { deserializeCapability, type Capability } from "../artifact/index.js";
 import { EscalationController } from "../escalation/index.js";
-import { runReplay } from "./replay.js";
+import { approvalKey, approveCapability } from "../confidence/index.js";
+import { runReplay as runReplayUnapproved } from "./replay.js";
+import type { ReplayOptions } from "./types.js";
 
 let server: Server;
 let baseUrl: string;
 let capability: Capability;
 let subAccountCapability: Capability;
 let confirmedCapability: Capability;
+let statusDir: string;
+
+/**
+ * runReplay after a test-only approval of EXACTLY the capability being replayed, in a temp
+ * statusDir. These tests run port-relaxed or deliberately edited copies of the artifacts, which are
+ * different content from what status/ approves (D24); the approval gate itself is tested in
+ * confidenceGate.test.ts and src/confidence/approval.test.ts.
+ */
+async function runReplay(options: ReplayOptions) {
+  await approveCapability(options.capability.id, {
+    ...approvalKey(options.capability),
+    statusDir,
+    reason: "test-only approval of exactly this content, in a temp statusDir",
+  });
+  return runReplayUnapproved({ statusDir, ...options });
+}
 
 const CONFIRM_TARGET = {
   describedAs: "Confirm button",
@@ -46,6 +65,7 @@ beforeAll(async () => {
   await new Promise<void>((resolve) => server.listen(0, resolve));
   const { port } = server.address() as AddressInfo;
   baseUrl = `http://localhost:${port}`;
+  statusDir = await mkdtemp(path.join(tmpdir(), "rote-replay-status-"));
 
   capability = await loadRelaxed("../../artifacts/member-lookup.json");
   subAccountCapability = await loadRelaxed("../../artifacts/open-sub-account.json");
@@ -54,6 +74,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  await rm(statusDir, { recursive: true, force: true });
 });
 
 describe("replay against the mock app", () => {

@@ -72,6 +72,14 @@ export interface ReplayOptions {
    * until enough consecutive high-confidence runs auto-promote it.
    */
   approveUnattended?: boolean;
+  /**
+   * The artifact the approval gate checks (version + content digest, D15/D24) and that confidence
+   * runs are recorded against. Defaults to `capability`. invokeCapability passes the BASE artifact
+   * here, because `capability` is then the tenant-effective one (overrides applied), whose digest is
+   * not the approved artifact's. Must have the same id and version as `capability` (else replay
+   * throws before anything runs).
+   */
+  approvalArtifact?: Capability;
   /** Defaults to "status" -- where per-capability approval/confidence sidecar files live. */
   statusDir?: string;
   /** Callbacks around the irreversible action (the fleet's commit intent / fault injection). */

@@ -1,8 +1,10 @@
-// Guards the committed status/ files against the gap D15 closed: every committed artifact is
-// approved, the approval names a version, and that version is the artifact's current version. If
-// an artifact is edited and its version bumped without a re-approval, this goes red here, in the
-// same commit, instead of silently turning into a needs_human refusal at run time.
+// Guards the committed status/ files against the gaps D15 and D24 closed: every committed artifact
+// is approved, the approval names a version AND a content digest, and both are the artifact's
+// current ones. If an artifact is edited -- with or without a version bump -- and not re-approved,
+// this goes red here, in the same commit, instead of silently turning into a needs_human refusal at
+// run time.
 import { describe, expect, it } from "vitest";
+import { capabilityDigest } from "../artifact/index.js";
 import { loadCapabilities } from "./registry.js";
 import { checkApproval, readCapabilityStatus } from "../confidence/index.js";
 
@@ -20,14 +22,15 @@ describe("committed approvals (status/) match the committed artifacts (artifacts
   });
 
   for (const capability of capabilities) {
-    it(`${capability.id} ${capability.version}: approved for exactly this version`, async () => {
+    it(`${capability.id} ${capability.version}: approved for exactly this version and this content`, async () => {
       const status = await readCapabilityStatus(capability.id);
       expect(status.approvalStatus).toBe("approved");
       expect(status.approvedVersion).toBe(capability.version);
-      const decision = await checkApproval(capability.id, capability.version, {});
+      expect(status.approvedDigest).toBe(capabilityDigest(capability));
+      const decision = await checkApproval(capability, {});
       expect(decision).toEqual({
         allowed: true,
-        reason: `Capability "${capability.id}" is approved for unattended replay at version ${capability.version}.`,
+        reason: `Capability "${capability.id}" is approved for unattended replay at version ${capability.version} (content digest matches).`,
       });
     });
   }

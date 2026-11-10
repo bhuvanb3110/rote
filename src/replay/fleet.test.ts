@@ -17,7 +17,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import app from "../../mock-app/app.js";
 import { TENANTS, type TenantConfig } from "../../mock-app/tenants.js";
 import { deserializeCapability, type Capability, type ReplayResult } from "../artifact/index.js";
-import { approveCapability } from "../confidence/index.js";
+import { approvalKey, approveCapability } from "../confidence/index.js";
 import { EscalationController } from "../escalation/index.js";
 import { buildPolicyForOrigin, policyGate } from "../safety/index.js";
 import { WebSurface } from "../surface/index.js";
@@ -73,13 +73,28 @@ function relaxed(capability: Capability): Capability {
   return { ...capability, target: { ...capability.target, entryUrlPattern: "^http://localhost:\\d+/" } };
 }
 
-type TransferFields = { memberId?: string; toMemberId?: string; amount?: string; memo: string };
+/**
+ * The relaxed committed base of a replayed capability: what the temp statusDir approves (D24) and
+ * what every run here passes as approvalArtifact. Tests replay copies edited the way a tenant
+ * override edits them (overrides applied, a gate-blind Submit, a step's risk); the approval stays on
+ * the base, exactly as invokeCapability passes the base.
+ */
+function baseOf(capability: Capability): Capability {
+  const bases: Record<string, Capability> = {
+    transfer: transferBase,
+    "transfer-history-lookup": lookupBase,
+    "member-lookup": memberLookup,
+  };
+  return relaxed(bases[capability.id]!);
+}
+
+type TransferFields ={ memberId?: string; toMemberId?: string; amount?: string; memo: string };
 
 /** A transfer on tenant-a through the shared browser, with approveRisky on unless overridden. */
 async function transfer(fields: TransferFields, extra: Partial<ReplayOptions> = {}): Promise<ReplayResult> {
   const { capability, entryUrl } = await forTenant(transferBase, TENANT_A);
   return runReplay({
-    capability,
+    capability, approvalArtifact: baseOf(capability),
     entryUrl,
     params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", ...fields },
     approveRisky: true,
@@ -91,7 +106,7 @@ async function transfer(fields: TransferFields, extra: Partial<ReplayOptions> = 
 
 async function matchingCount(memo: string): Promise<string> {
   const { capability, entryUrl } = await forTenant(lookupBase, TENANT_A);
-  const result = await runReplay({ capability, entryUrl, params: { ...CREDS, memberId: "10001", memo }, statusDir, browser });
+  const result = await runReplay({ capability, approvalArtifact: baseOf(capability), entryUrl, params: { ...CREDS, memberId: "10001", memo }, statusDir, browser });
   expect(result.status, JSON.stringify(result)).toBe("success");
   return result.status === "success" ? String(result.outputs.matchingCount) : "";
 }
@@ -169,7 +184,7 @@ beforeAll(async () => {
   statusDir = await mkdtemp(path.join(tmpdir(), "rote-fleet-status-"));
   for (const capability of [memberLookup, transferBase, lookupBase]) {
     await approveCapability(capability.id, {
-      version: capability.version,
+      ...approvalKey(relaxed(capability)),
       statusDir,
       reason: "test-only approval in a temp statusDir",
     });
@@ -251,13 +266,13 @@ describe("irreversibility hardening: gate risky OR artifact risky", () => {
     expect(gateRisk(capability, "step-11")).toBe("safe");
     const params = { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", memo: "rote-s4-hardening" };
 
-    const refused = await runReplay({ capability, entryUrl, params, statusDir, browser });
+    const refused = await runReplay({ capability, approvalArtifact: baseOf(capability), entryUrl, params, statusDir, browser });
     expect(refused).toMatchObject({ status: "needs_human", atStepId: "step-11" });
     expect(await ledger()).toEqual([]);
     const blocked = (await evidenceLog(refused)).find((e) => e.kind === "blocked");
     expect(blocked?.detail.riskSources).toEqual({ gate: "safe", artifact: "risky" });
 
-    const approved = await runReplay({ capability, entryUrl, params, statusDir, browser, approveRisky: true });
+    const approved = await runReplay({ capability, approvalArtifact: baseOf(capability), entryUrl, params, statusDir, browser, approveRisky: true });
     expect(approved.status, JSON.stringify(approved)).toBe("success");
     expect((await ledger()).map((r) => r.memo)).toEqual(["rote-s4-hardening"]);
     const riskApproved = (await evidenceLog(approved)).find((e) => e.kind === "risk_approved");
@@ -269,7 +284,7 @@ describe("irreversibility hardening: gate risky OR artifact risky", () => {
     const capability = withStep(base, "step-11", (s) => ({ ...s, risk: "safe" }));
     expect(gateRisk(capability, "step-11")).toBe("risky");
     const result = await runReplay({
-      capability,
+      capability, approvalArtifact: baseOf(capability),
       entryUrl,
       params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", memo: "rote-s4-converse" },
       statusDir,
@@ -285,7 +300,7 @@ describe("irreversibility hardening: gate risky OR artifact risky", () => {
     const { capability, entryUrl } = await transferWithGateBlindSubmit();
     const { calls, hooks } = recordingHooks();
     const result = await runReplay({
-      capability,
+      capability, approvalArtifact: baseOf(capability),
       entryUrl,
       params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", memo: "rote-s4-blind-hooks" },
       statusDir,
@@ -332,7 +347,7 @@ describe("onIrreversible hooks", () => {
     const { calls, hooks } = recordingHooks();
     const { capability, entryUrl } = await forTenant(lookupBase, TENANT_A);
     const lookupResult = await runReplay({
-      capability, entryUrl, params: { ...CREDS, memberId: "10001", memo: "x" }, statusDir, browser, approveRisky: true, onIrreversible: hooks,
+      capability, approvalArtifact: baseOf(capability), entryUrl, params: { ...CREDS, memberId: "10001", memo: "x" }, statusDir, browser, approveRisky: true, onIrreversible: hooks,
     });
     expect(lookupResult.status).toBe("success");
     const unapproved = await transfer({ memo: "rote-s4-unapproved" }, { approveRisky: false, onIrreversible: hooks });
@@ -346,7 +361,7 @@ describe("onIrreversible hooks", () => {
     const capability = withStep(memberLookup, memberLookup.steps[0]!.id, (s) => ({ ...s, risk: "risky" }));
     const { calls, hooks } = recordingHooks();
     const result = await runReplay({
-      capability, entryUrl: baseUrl, params: { ...CREDS, memberId: "10001" }, statusDir, browser, approveRisky: true, onIrreversible: hooks,
+      capability, approvalArtifact: baseOf(capability), entryUrl: baseUrl, params: { ...CREDS, memberId: "10001" }, statusDir, browser, approveRisky: true, onIrreversible: hooks,
     });
     expect(result.status, JSON.stringify(result)).toBe("success");
     expect(calls.map((c) => c.hook)).toEqual(["before", "after"]);
@@ -411,7 +426,7 @@ describe("after an irreversible action has been attempted", () => {
     };
     const { hooks } = recordingHooks({ before: () => control("errors/on") });
     const result = await runReplay({
-      capability,
+      capability, approvalArtifact: baseOf(capability),
       entryUrl,
       params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", memo: "rote-s4-bo-after" },
       statusDir,
@@ -455,7 +470,7 @@ describe("after an irreversible action has been attempted", () => {
     const controller = new EscalationController();
     const { calls, hooks } = recordingHooks({ before: () => control("errors/after-write") });
     const pending = runReplay({
-      capability,
+      capability, approvalArtifact: baseOf(capability),
       entryUrl,
       params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", memo: "rote-s4-operator" },
       statusDir,
@@ -552,7 +567,7 @@ describe("signal: abort always rejects, closes the context at once, records noth
     const { capability, entryUrl } = await forTenant(transferBase, TENANT_A);
     await expect(
       runReplay({
-        capability,
+        capability, approvalArtifact: baseOf(capability),
         entryUrl,
         params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "1.00", memo: "rote-s4-abort-owned" },
         statusDir,

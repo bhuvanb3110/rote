@@ -17,7 +17,7 @@
 // request_hash covers only non-secret params. The worker injects credentials per tenant (Step 6).
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-import type { Capability } from "../artifact/index.js";
+import { canonicalJson, type Capability } from "../artifact/index.js";
 import { inputsToZodSchema } from "../catalog/schema.js";
 import type { Queryable } from "./db.js";
 import { JobRowSchema, type JobRow } from "./types.js";
@@ -138,17 +138,8 @@ export function validateJobParams(capability: EnqueueCapability, params: Record<
   return parsed.data;
 }
 
-/** JSON with object keys sorted at every level, so key order never changes a hash. */
-export function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value !== null && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => v !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
+/** Re-exported from its new home (src/artifact/canonical.ts) so existing imports keep working. */
+export { canonicalJson };
 
 /** SHA-256 hex of canonical {tenant, capability_id, params}. params are already secret-free. */
 export function computeRequestHash(tenantId: string, capabilityId: string, params: Record<string, unknown>): string {

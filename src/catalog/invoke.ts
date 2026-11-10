@@ -52,6 +52,8 @@ export async function invokeCapability(options: InvokeCapabilityOptions): Promis
 
   return runReplay({
     capability: effective,
+    // The approval covers the artifact as committed, not the tenant-merged copy (D24).
+    approvalArtifact: capability,
     params: parsedParams.data,
     entryUrl,
     headless: options.headless ?? true,

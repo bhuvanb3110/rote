@@ -4,8 +4,10 @@
 // src/tenant/types.ts's TenantOverride.
 import { z } from "zod";
 import { SEMVER_REGEX } from "../artifact/schema.js";
+import { SHA256_HEX_REGEX } from "../artifact/canonical.js";
 
 const VersionSchema = z.string().regex(SEMVER_REGEX, "version must be semantic, e.g. 1.0.0");
+const DigestSchema = z.string().regex(SHA256_HEX_REGEX, "digest must be 64 lowercase hex characters (SHA-256)");
 
 export const ConfidenceRunRecordSchema = z.object({
   runId: z.string().min(1),
@@ -17,6 +19,11 @@ export const ConfidenceRunRecordSchema = z.object({
    * version (see consecutiveQualifyingRuns).
    */
   version: VersionSchema.optional(),
+  /**
+   * capabilityDigest() of the artifact this run replayed (D24). Optional for the same reason; a run
+   * without it never counts toward promoting a specific digest.
+   */
+  digest: DigestSchema.optional(),
 });
 export type ConfidenceRunRecord = z.infer<typeof ConfidenceRunRecordSchema>;
 
@@ -36,6 +43,14 @@ export const CapabilityStatusSchema = z.object({
    * and the gate's reason says so).
    */
   approvedVersion: VersionSchema.optional(),
+  /**
+   * capabilityDigest() -- SHA-256 of the canonical JSON -- of the exact artifact content the approval
+   * covers (docs/DECISIONS.md D24). Every approval written since D24 sets it; checkApproval refuses
+   * an artifact whose digest differs even when the version matches. Optional so older files still
+   * parse: a missing value falls back to the version check alone (grandfathered, and the gate's
+   * reason says so).
+   */
+  approvedDigest: DigestSchema.optional(),
 });
 export type CapabilityStatus = z.infer<typeof CapabilityStatusSchema>;
 

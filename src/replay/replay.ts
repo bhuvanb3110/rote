@@ -12,7 +12,7 @@ import type { ExecutableAction, Observation } from "../surface/index.js";
 import { buildPolicyForOrigin, policyGate, redact } from "../safety/index.js";
 import { EvidenceRecorder, defaultEvidenceBaseDir } from "../evidence/index.js";
 import { ReplayResultSchema, type Capability, type ReplayResult, type Step } from "../artifact/index.js";
-import { checkApproval, computeRunConfidence, recordConfidenceRun, stepConfidence } from "../confidence/index.js";
+import { approvalKey, checkApproval, computeRunConfidence, recordConfidenceRun, stepConfidence } from "../confidence/index.js";
 import type { EscalationController } from "../escalation/index.js";
 import { evaluateCheckpoint } from "./checkpoint.js";
 import { describeCheckpoint, findBusinessOutcome, findRecoverableRule, isSessionTimeoutState } from "./recognize.js";
@@ -110,7 +110,16 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   // capability that hasn't earned "approved" status is refused for unattended replay the same way
   // an unapproved risky action already is. finish() isn't reusable here (it assumes a `surface` to
   // close, and none has been launched yet), so this builds and validates the result by hand.
-  const approval = await checkApproval(capability.id, capability.version, options);
+  // The approval is about the base artifact (D24), which differs from `capability` when a tenant
+  // override was applied; invokeCapability passes it. Direct callers replay the artifact itself.
+  const approvalArtifact = options.approvalArtifact ?? capability;
+  if (approvalArtifact.id !== capability.id || approvalArtifact.version !== capability.version) {
+    throw new Error(
+      `approvalArtifact ${approvalArtifact.id} ${approvalArtifact.version} is not the base of the replayed ` +
+        `capability ${capability.id} ${capability.version}.`,
+    );
+  }
+  const approval = await checkApproval(approvalArtifact, options);
   if (!approval.allowed) {
     await evidence.append({ turn: -1, kind: "blocked", detail: { reason: approval.reason } });
     const gated = ReplayResultSchema.parse({
@@ -216,7 +225,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
     await evidence.append({ turn: -1, kind: "result", detail: { status: validated.status, confidence, commitUncertain } });
     if (validated.status === "success") {
       await recordConfidenceRun(capability.id, confidence, runId, {
-        version: capability.version,
+        ...approvalKey(approvalArtifact),
         statusDir: options.statusDir,
       });
     }

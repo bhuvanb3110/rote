@@ -17,7 +17,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import app from "../../mock-app/app.js";
 import { TENANTS, type TenantConfig } from "../../mock-app/tenants.js";
 import { deserializeCapability, serializeCapability, type Capability, type ReplayResult } from "../artifact/index.js";
-import { approveCapability } from "../confidence/index.js";
+import { approvalKey, approveCapability } from "../confidence/index.js";
 import { buildPolicyForOrigin, policyGate } from "../safety/index.js";
 import { applyTenantOverride, deserializeTenantOverride } from "../tenant/index.js";
 import { runReplay } from "./replay.js";
@@ -59,16 +59,25 @@ async function loadArtifact(id: string): Promise<Capability> {
  * The capability exactly as invokeCapability would resolve it for this tenant (the real override
  * file, applied the real way), with only the port relaxed: tests run the bank on an ephemeral port.
  */
-async function forTenant(base: Capability, tenant: TenantConfig): Promise<{ capability: Capability; entryUrl: string }> {
+async function forTenant(
+  base: Capability,
+  tenant: TenantConfig,
+): Promise<{ capability: Capability; approvalArtifact: Capability; entryUrl: string }> {
   const override = deserializeTenantOverride(
     await readFile(path.join(repo, "overrides", `${base.id}.${tenant.id}.json`), "utf8"),
   );
   expect(new URL(override.entryUrl).pathname).toBe(`${tenant.pathPrefix}/`);
-  const applied = applyTenantOverride(base, override);
   return {
-    capability: { ...applied, target: { ...applied.target, entryUrlPattern: "^http://localhost:\\d+/" } },
+    capability: relax(applyTenantOverride(base, override)),
+    // What the temp statusDir approves (D24): the relaxed BASE, as invokeCapability passes the base.
+    approvalArtifact: relax(base),
     entryUrl: `${baseUrl}${tenant.pathPrefix}/`,
   };
+}
+
+/** Only the port relaxed: tests run the bank on an ephemeral port. */
+function relax(capability: Capability): Capability {
+  return { ...capability, target: { ...capability.target, entryUrlPattern: "^http://localhost:\\d+/" } };
 }
 
 async function transfer(
@@ -76,9 +85,10 @@ async function transfer(
   fields: { memberId?: string; toMemberId?: string; amount?: string; memo: string },
   approveRisky = true,
 ): Promise<ReplayResult> {
-  const { capability, entryUrl } = await forTenant(transferBase, tenant);
+  const { capability, approvalArtifact, entryUrl } = await forTenant(transferBase, tenant);
   return runReplay({
     capability,
+    approvalArtifact,
     entryUrl,
     params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", ...fields },
     approveRisky,
@@ -87,8 +97,8 @@ async function transfer(
 }
 
 async function lookup(tenant: TenantConfig, memo: string, memberId = "10001"): Promise<ReplayResult> {
-  const { capability, entryUrl } = await forTenant(lookupBase, tenant);
-  return runReplay({ capability, entryUrl, params: { ...CREDS, memberId, memo }, statusDir });
+  const { capability, approvalArtifact, entryUrl } = await forTenant(lookupBase, tenant);
+  return runReplay({ capability, approvalArtifact, entryUrl, params: { ...CREDS, memberId, memo }, statusDir });
 }
 
 async function matchingCount(tenant: TenantConfig, memo: string): Promise<string> {
@@ -123,7 +133,7 @@ beforeAll(async () => {
   statusDir = await mkdtemp(path.join(tmpdir(), "rote-transfer-status-"));
   for (const capability of [transferBase, lookupBase]) {
     await approveCapability(capability.id, {
-      version: capability.version,
+      ...approvalKey(relax(capability)), // what the runs replay: the base with only the port relaxed
       statusDir,
       reason: "test-only approval in a temp statusDir",
     });

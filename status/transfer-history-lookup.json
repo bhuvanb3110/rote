@@ -4,5 +4,6 @@
   "history": [],
   "approvedAt": "2026-11-10T01:53:26.200Z",
   "approvedReason": "Re-approved for 1.1.0 in fleet Step 5 (approvals are version-bound, docs/DECISIONS.md D15; supersedes the Step 3 approval of 1.0.0, commit f1f2e8b). Read-only (every step safe). 1.1.0 = Step 4's error-box-scoped NO_SUCH_MEMBER/PERMISSION_DENIED recognizers (b9ecaa2, D14). Basis: evidence/transfer-replay-1.1.0/ (commit 4119e11) - unattended replay of transfer-history-lookup 1.1.0 on tenants a/b/c, matchingCount 1 for each tenant's memo, ledger-checked by script, RESULT: PASS; and src/replay/transfer.test.ts passing at 1.1.0 (npm test 20 files, 199 passed).",
-  "approvedVersion": "1.1.0"
+  "approvedVersion": "1.1.0",
+  "approvedDigest": "f17c7a1e51431a3cf9109bc0ce98fc917af9cb7def3a164dea49b660ee41c8f5"
 }

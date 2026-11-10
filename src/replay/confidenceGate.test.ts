@@ -13,7 +13,7 @@ import app from "../../mock-app/app.js";
 import { deserializeCapability, type Capability } from "../artifact/index.js";
 import { deserializeTenantOverride } from "../tenant/types.js";
 import { applyTenantOverride } from "../tenant/apply.js";
-import { approveCapability, readCapabilityStatus } from "../confidence/index.js";
+import { approvalKey, approveCapability, readCapabilityStatus } from "../confidence/index.js";
 import { runReplay } from "./replay.js";
 
 const FRESH_ID = "confidence-gate-test";
@@ -124,7 +124,8 @@ describe("approval gate + confidence scoring, wired into the real replay path", 
 
   it("an approval for another version refuses unattended replay before any browser launches (D15)", async () => {
     statusDir = await mkdtemp(path.join(tmpdir(), "confidence-gate-test-"));
-    await approveCapability(FRESH_ID, { version: "1.0.0", reason: "approved at 1.0.0", statusDir });
+    const v100: Capability = { ...baseCapability, version: "1.0.0" };
+    await approveCapability(FRESH_ID, { ...approvalKey(v100), reason: "approved at 1.0.0", statusDir });
     const edited: Capability = { ...baseCapability, version: "1.1.0" };
 
     const refused = await runReplay({
@@ -141,9 +142,42 @@ describe("approval gate + confidence scoring, wired into the real replay path", 
     }
 
     // Re-approving for 1.1.0 lets the same artifact run, with no approveUnattended.
-    await approveCapability(FRESH_ID, { version: "1.1.0", reason: "re-approved at 1.1.0", statusDir });
+    await approveCapability(FRESH_ID, { ...approvalKey(edited), reason: "re-approved at 1.1.0", statusDir });
     const allowed = await runReplay({
       capability: edited,
+      params: { ...CREDS, memberId: "10001" },
+      entryUrl: baseUrl,
+      headless: true,
+      statusDir,
+    });
+    expect(allowed.status).toBe("success");
+  }, 30000);
+
+  it("a content change with the SAME version is refused before any browser launches (D24)", async () => {
+    statusDir = await mkdtemp(path.join(tmpdir(), "confidence-gate-test-"));
+    await approveCapability(FRESH_ID, { ...approvalKey(baseCapability), reason: "approved this content", statusDir });
+    // Same id, same version, one step's intent text edited: a different artifact.
+    const edited: Capability = {
+      ...baseCapability,
+      steps: baseCapability.steps.map((s, i) => (i === 0 ? { ...s, intent: `${s.intent} (edited)` } : s)),
+    };
+    expect(edited.version).toBe(baseCapability.version);
+
+    const refused = await runReplay({
+      capability: edited,
+      params: { ...CREDS, memberId: "10001" },
+      entryUrl: baseUrl,
+      headless: true,
+      statusDir,
+    });
+    expect(refused.status).toBe("needs_human");
+    if (refused.status === "needs_human") {
+      expect(refused.reason).toContain("artifact content changed since approval; re-approve");
+    }
+
+    // The approved content itself still runs.
+    const allowed = await runReplay({
+      capability: baseCapability,
       params: { ...CREDS, memberId: "10001" },
       entryUrl: baseUrl,
       headless: true,
