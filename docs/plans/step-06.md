@@ -338,3 +338,61 @@ Docker (scripted, not in `npm test`): `docker compose build`; `up -d`; every ser
 6. **Worker memory limit 700 MB** and `restart: "no"` for Step 6 (Day 2 revisits restarts for chaos)?
 7. Carried from Step 5 (D23): **the memo of an irreversible capability is reserved** for `memo_key`
    and a client-supplied one is rejected. OK, or should enqueue ignore it silently?
+
+## Reviewer decisions (2026-11-09)
+
+The reviewer **approved** this plan with the decisions below. Where they differ from the sections
+above, these win; everything else in this file stands. The reviewer independently re-ran the full
+Step 5 suite on Postgres 16: all 271 tests passed except the version-17 assertion, as expected.
+
+### Part A, built first: approvals bound to artifact CONTENT (closes known limitation 6)
+
+A1. Every approval also records `approvedDigest`: SHA-256 of the artifact's canonical JSON (the
+    repo's stable serialization; if there is none, define it and test that key order and whitespace
+    don't change the digest).
+A2. `checkApproval` refuses when the digest differs, even if the version matches ("artifact content
+    changed since approval; re-approve"). A missing digest falls back to the version check
+    (grandfathered), and the reason says so.
+A3. Backfill digests for all five status files from the current committed artifacts; extend the guard
+    test (`committedApprovals.test.ts`) to check digests.
+A4. Tests: digest match; content change with the same version → refused; whitespace/key-order change →
+    still allowed.
+A5. A D-entry; REPO_NOTES known limitation 6 marked fixed.
+
+### Part B: Step 6 as planned, with these decisions
+
+1. **Open question 1, bank reachability: the in-container forwarder.** Written in Node (`node:net`, a
+   few lines; no socat, no extra packages), started by the worker entrypoint before the worker,
+   listening on `127.0.0.1:4100` and forwarding to the bank service. Artifacts, approvals and the
+   policy allowlist stay unchanged. Tested: bytes both ways, closes cleanly. D-entry: in a real
+   deployment the bank origin would be per-environment configuration (`entryUrlPattern`/overrides);
+   the forwarder keeps this demo's approved artifacts byte-identical.
+2. **Open question 2, `approveRisky: true` in workers: approved** for Step 6 (no chaos yet). If a
+   worker dies anyway, its job stays `running` and the 100-job exit check must report it as lost.
+   Never paper over it.
+3. **Open question 3, `commitUncertain` → `needs_human` (outcome `commit_uncertain`)** until Day 2's
+   verify: approved. Never retried.
+4. **Open question 4, approval checked at enqueue (422) AND at run time** (run time is
+   authoritative): approved.
+5. **Open question 5, `GET /jobs/:id` requires `?tenant=`** (404 on mismatch): approved. The README
+   must say clearly that this is NOT authentication; the project has no auth by scope.
+6. **Open question 6, worker memory limit 700 MB, `restart: "no"`** for Step 6: approved.
+7. **Open question 7, a client memo on an irreversible capability is rejected** (D23): approved.
+
+### Also required
+
+- Record the first image build time and the image size, and `docker stats` (memory per container)
+  during the 100-job run.
+- Keep full, unfiltered logs of every full test run under `evidence/` (no output filtering that loses
+  error text).
+- **Day-1 exit (the brief's):** 100 transfer jobs across 4 workers, all succeeded, checked by a script
+  that reads `/control/ledger`: exactly 1 ledger row per job (matched by `memo_key`), 0 duplicates,
+  0 lost, every job in a terminal state. Saved under `evidence/fleet-day1-exit/` (this replaces §9's
+  `evidence/day1-exit/`) with `check.txt` ending in `RESULT: PASS` or `FAIL`. If it fails, report the
+  failure honestly; don't tune until it passes.
+- `npm test` before every commit; never commit or push on red. Full suite 3 times at the end. Push at
+  the end.
+- Then write `docs/plans/step-07.md` (commit it; don't build it): the ledger oracle (module + CLI),
+  the seeded chaos harness (expected to fail until Day 2, its failing output saved as "before"
+  evidence), the crash-point matrix mechanism, GitHub Actions CI with a `postgres:17` service and a
+  README badge, and what stays red until Day 2.
