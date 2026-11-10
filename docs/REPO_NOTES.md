@@ -84,10 +84,14 @@ Recorded as found; each names its planned fix or the step that owns it.
    reviewer.
 5. **`signal` is not observed while paused for a human.** With an `EscalationController`,
    `waitForAutomation()` does not race the abort. Fleet workers never pass a controller.
-6. **An approval is bound to the version string, not the content** (D15, Step 5). An artifact edited
-   *without* a version bump still inherits its approval. The guard test
-   `src/catalog/committedApprovals.test.ts` catches a bump without re-approval, not an edit without a
-   bump. A content hash would catch both but breaks on formatting-only edits; not done.
+6. ~~**An approval is bound to the version string, not the content**~~ **Fixed in Step 6 (D24).**
+   Approvals now also record `approvedDigest`, SHA-256 of the artifact's canonical JSON (keys sorted,
+   no whitespace, after schema validation), so formatting-only edits keep the approval and any content
+   edit, with or without a version bump, is refused ("artifact content changed since approval;
+   re-approve"). All five status files were backfilled; the guard test checks digests. A status
+   without a digest falls back to the version check (grandfathered). **Still open:** tenant override
+   files (`overrides/*.json`) are not covered by any approval; an override edit changes what that
+   tenant's replay executes without a re-approval (open question for the reviewer).
 7. **With one hot tenant, a dequeuer can return `null` while a slot is free** (D18, Step 5). It skips
    a tenant whose row another dequeuer holds (`SKIP LOCKED`), so in a burst some dequeuers come back
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll

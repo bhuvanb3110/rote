@@ -555,3 +555,62 @@ table is storage. Strict validation makes "the queue never stores a secret" chec
 capability's own declared inputs instead of from a deny-list of names.
 
 **Date.** 2026-11-09
+
+## D24: Approvals are bound to the artifact's content (SHA-256 of canonical JSON) as well as its version
+
+(Step 6 reviewer decision, Part A. Closes REPO_NOTES known limitation 6.)
+
+**Decision.** Every approval (manual `catalog approve` and auto-promotion) records `approvedDigest`:
+SHA-256 (64 lowercase hex) of `canonicalJson(CapabilitySchema.parse(artifact))`. `canonicalJson`
+(object keys sorted at every level by code unit, `undefined` dropped, no whitespace, array order
+kept) already existed for the queue's `request_hash`; it moved to `src/artifact/canonical.ts` and is
+re-exported from `enqueue.ts`. `checkApproval(capability, …)` now takes the artifact and computes the
+digest itself (a caller cannot hand it a stale one). Order of checks: draft → refused; approved for
+another version → refused (D15); a recorded digest that differs → refused, *even when the version
+matches*: "artifact content changed since approval; re-approve", with both digests in the reason. A
+status with no `approvedDigest` falls back to the version check alone and the reason says so
+("grandfathered approval that records no approvedDigest … only the version was checked"). Runs record
+their digest; the auto-promotion streak counts only runs of the same version **and** digest, and an
+approval for other content is stale (runs are recorded, and can re-promote it).
+
+The approval is about the **base** artifact, not the tenant-merged copy replay executes, so
+`ReplayOptions` gains an additive, optional `approvalArtifact` (default: `capability`; must have the
+same id and version, or replay throws before anything runs). `invokeCapability` and the CLI's
+`replay`/`operator` pass the base they resolved overrides from.
+
+**Backfill.** All five committed status files got `approvedDigest` from the current committed
+artifacts, by `scripts/backfill-approval-digests.ts` (output: `evidence/step-06/approval-digest-
+backfill.txt`, `RESULT: PASS`). The script adds only that field and refuses unless the approval names
+the artifact's current version, the artifact file is clean, and git shows the commit that last
+changed the artifact is an ancestor of the commit that last wrote the approval. For the three
+grandfathered artifacts that is 034faf1 / 0a3b247 (2026-08-13, never edited since) before 954c4ad; for
+the transfer pair, b9ecaa2 (Step 4) before the 1.1.0 re-approval dbc3648. So each digest records what
+was actually approved, not merely what is on disk today.
+
+**Tests.** `src/confidence/approval.test.ts` (digest match; same version, edited content → refused;
+key order + tabs + CRLF → same digest, still allowed; missing digest → version fallback, still enforces
+the version), `src/artifact/canonical.test.ts`, the digest cases in `store.test.ts`, a replay-level
+refusal before any browser launches (`confidenceGate.test.ts`), and the guard test
+`committedApprovals.test.ts`, which now also asserts `approvedDigest === capabilityDigest(artifact)`
+for every committed artifact. Existing browser tests that replayed **port-relaxed copies** of the
+artifacts against the committed `status/` had been passing only because approval ignored content;
+they now approve exactly what they replay in a temp `statusDir` (or approve the relaxed base and pass
+it as `approvalArtifact`, as the tenant flow does). None of them reads or writes `status/` any more.
+
+**Alternatives considered.**
+- *Hash the file bytes.* Breaks on formatting-only edits (CRLF vs LF checkouts, re-indentation), the
+  reason D15 gave for not hashing. Canonical JSON of the validated artifact has neither problem.
+- *Hash the raw parsed JSON (before Zod).* An unknown key that Zod strips would change the digest
+  without changing behavior; hashing the validated object hashes exactly what replay runs.
+- *Replace the version check with the digest.* The version is still the human-readable claim ("1.1.0
+  is approved") and keeps the D15 reasons; the digest makes the claim exact. Both are checked.
+- *Let callers pass a digest string.* A stale or wrong value could be passed; computing it inside the
+  gate from the artifact removes that class of mistake.
+- *Also cover tenant overrides in the digest.* Overrides change what a tenant's replay executes, but
+  the reviewer's scope was the artifact; noted as an open question (REPO_NOTES limitation 6).
+
+**Why.** An approval is a claim about specific, tested content. D15 caught an edit with a version
+bump; this catches an edit without one, which is the easier mistake to make with hand-edited JSON, and
+it does so without punishing formatting.
+
+**Date.** 2026-11-09
