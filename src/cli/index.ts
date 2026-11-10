@@ -5,7 +5,7 @@ import { Command } from "commander";
 import pino from "pino";
 import { runDiscovery } from "../agent/index.js";
 import { runReplay } from "../replay/index.js";
-import { deserializeCapability, type Capability } from "../artifact/index.js";
+import { commitUncertainWarning, deserializeCapability, type Capability, type ReplayResult } from "../artifact/index.js";
 import { EscalationController, createOperatorConsole } from "../escalation/index.js";
 import { resolveTenant } from "../tenant/index.js";
 import { createCatalogApp, invokeCapability, listCapabilities, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
@@ -18,6 +18,15 @@ program
   .name("rote")
   .description("Computer-use automation CLI for legacy back-office UIs")
   .version("0.1.0");
+
+/**
+ * A distinct warning line when an irreversible action was attempted (docs/DECISIONS.md D10), so an
+ * operator reading the log cannot miss it inside the full result dump. Exit code stays 1.
+ */
+function warnIfCommitUncertain(result: ReplayResult, command: string): void {
+  if (result.status === "success" || !result.commitUncertain) return;
+  logger.warn({ commitUncertain: result.commitUncertain }, `${command}: ${commitUncertainWarning(result)}`);
+}
 
 const DEFAULT_GOAL = "look up member 10001 and read their current savings balance";
 const DEFAULT_URL = "http://localhost:4100";
@@ -130,6 +139,7 @@ program
         logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef, confidence }, "replay: success");
       } else {
         logger.warn({ ...result, confidence }, "replay: did not succeed");
+        warnIfCommitUncertain(result, "replay");
         process.exitCode = 1;
       }
     },
@@ -218,6 +228,7 @@ program
         logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef }, "operator: success");
       } else {
         logger.warn(result, "operator: did not succeed");
+        warnIfCommitUncertain(result, "operator");
         process.exitCode = 1;
       }
 
@@ -311,6 +322,7 @@ catalogCommand
         logger.info({ outputs: result.outputs, evidenceRef: result.evidenceRef, confidence }, "catalog invoke: success");
       } else {
         logger.warn({ ...result, confidence }, "catalog invoke: did not succeed");
+        warnIfCommitUncertain(result, "catalog invoke");
         process.exitCode = 1;
       }
     },
