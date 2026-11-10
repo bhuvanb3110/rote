@@ -1,10 +1,23 @@
-# Fleet services (docs/FLEET_BRIEF.md). Step 5: Postgres only. Step 6 adds the mock bank, the API
-# and the workers; Day 3 adds Jaeger, Prometheus and Grafana.
+# Fleet services (docs/FLEET_BRIEF.md). Step 5: Postgres. Step 6: the mock bank, the API and N
+# workers (one image, see Dockerfile). Day 3 adds Jaeger, Prometheus and Grafana.
 #
-#   docker compose up -d postgres     # start (data persists in the named volume)
-#   docker compose down               # stop, keep data
-#   docker compose down -v            # stop and DELETE the data volume (explicit reset)
+#   docker compose up -d postgres            # just the database (what `npm test` needs)
+#   docker compose up -d --build             # everything; ROTE_WORKERS (default 4) workers
+#   docker compose down                      # stop, keep data
+#   docker compose down -v                   # stop and DELETE the data volumes (explicit reset)
 name: rote
+
+x-worker-credentials: &worker-credentials
+  # Fake, per-tenant bank credentials (src/worker/credentials.ts). Set them in .env (never committed);
+  # .env.example lists the names. Empty defaults on purpose, so `docker compose up -d postgres` works
+  # without them; the WORKER refuses to start (naming the missing variable) if any is unset.
+  ROTE_CRED_TENANT_A_USERNAME: ${ROTE_CRED_TENANT_A_USERNAME:-}
+  ROTE_CRED_TENANT_A_PASSWORD: ${ROTE_CRED_TENANT_A_PASSWORD:-}
+  ROTE_CRED_TENANT_B_USERNAME: ${ROTE_CRED_TENANT_B_USERNAME:-}
+  ROTE_CRED_TENANT_B_PASSWORD: ${ROTE_CRED_TENANT_B_PASSWORD:-}
+  ROTE_CRED_TENANT_C_USERNAME: ${ROTE_CRED_TENANT_C_USERNAME:-}
+  ROTE_CRED_TENANT_C_PASSWORD: ${ROTE_CRED_TENANT_C_PASSWORD:-}
+
 services:
   postgres:
     # Pinned major (docs/plans/step-05.md §1): a major upgrade changes the on-disk format and the
@@ -26,5 +39,83 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
+
+  # The mock bank: EXACTLY ONE container. Its sessions and its ledger are in-process memory
+  # (mock-app/data.ts), so this one process is the single source of truth and a restart wipes it.
+  # Never scaled, never restarted, never touched by the chaos scripts.
+  bank:
+    image: rote-fleet:local
+    build: .
+    command: ["node", "dist/mock-app/index.js"]
+    environment:
+      MOCK_APP_PORT: "4100"
+    ports:
+      # Loopback only: the host-side ledger check reads /control/ledger, which is unauthenticated.
+      - "127.0.0.1:4100:4100"
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4100/control/ledger').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  api:
+    image: rote-fleet:local
+    command: ["node", "dist/src/cli/index.js", "catalog", "serve", "--port", "8080", "--queue"]
+    environment:
+      ROTE_DATABASE_URL: postgres://rote:${ROTE_PG_PASSWORD:-rote_dev_only}@postgres:5432/rote
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres: { condition: service_healthy }
+      bank: { condition: service_healthy }
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  worker:
+    image: rote-fleet:local
+    # Default CMD: node dist/src/worker/main.js
+    deploy:
+      replicas: ${ROTE_WORKERS:-4}
+    # tini as PID 1: forwards SIGTERM to node and reaps Chromium's child processes.
+    init: true
+    # The worker's own grace (ROTE_SHUTDOWN_GRACE_MS, 30 s) fits inside this.
+    stop_grace_period: 45s
+    # So an out-of-memory kill is attributed (OOMKilled: true in docker inspect) and never mistaken for
+    # a chaos kill (D9). Reviewer decision B6.
+    mem_limit: 700m
+    # Step 6: no restarts. A worker that dies leaves its job `running` (no recovery until Day 2), and the
+    # Day-1 exit check reports it as lost. Day 2 decides restarts for chaos.
+    restart: "no"
+    environment:
+      <<: *worker-credentials
+      ROTE_DATABASE_URL: postgres://rote:${ROTE_PG_PASSWORD:-rote_dev_only}@postgres:5432/rote
+      # In-container forwarder 127.0.0.1:4100 -> bank:4100 (reviewer decision B1, D26): every
+      # approved artifact targets http://localhost:4100 and stays byte-identical.
+      ROTE_BANK_FORWARD: bank:4100
+      ROTE_EVIDENCE_DIR: /evidence
+      ROTE_LEASE_SECONDS: "300"
+      ROTE_SHUTDOWN_GRACE_MS: "30000"
+      ROTE_HEALTH_FILE: /tmp/rote-worker-alive
+    volumes:
+      - worker-evidence:/evidence
+    depends_on:
+      postgres: { condition: service_healthy }
+      bank: { condition: service_healthy }
+    healthcheck:
+      # Healthy = the loop touched its health file in the last 120 s (one job, even a slow one, plus a poll).
+      test: ["CMD", "node", "-e", "const s=require('fs').statSync('/tmp/rote-worker-alive');process.exit(Date.now()-s.mtimeMs<120000?0:1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+
 volumes:
   pgdata:
+  worker-evidence:

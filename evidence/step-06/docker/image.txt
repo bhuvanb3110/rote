@@ -1,0 +1,7 @@
+== image (docker image inspect) ==
+rote-fleet:local id=sha256:e7b0887fb1740cd6f2b34197b0fda2b8e55ae5708fee43c0c38bb9626b84e8dd size_bytes=3576721338 created=2026-11-10T04:53:54.03950177Z
+docker image ls: rote-fleet:local 3.58GB
+
+(base image is not tagged in the local image store; its resolved digest, from first-build.txt:)
+first build wall time: FIRST BUILD WALL TIME: 283 s
+mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
