@@ -47,6 +47,10 @@ import { TENANTS, TENANT_A, tenantUrl, type TenantConfig } from "./tenants.js";
 const TRANSIENT_RATE = 0.3;
 
 let transientEnabled = false;
+// One-shot (/control/transient/next): the NEXT authenticated tenant request gets the interstitial
+// (before any handler runs, so nothing is written), then the flag clears. Deterministic and
+// cross-process, unlike the random 30% mode.
+let transientNextArmed = false;
 let unexpectedDialogEnabled = false;
 // Bank fault knobs for the fleet's "bank slow or down" scenarios (docs/DECISIONS.md D6):
 //   "on"          -- every tenant route (except /login) returns 503 BEFORE any write.
@@ -108,10 +112,15 @@ function createTenantRouter(tenant: TenantConfig): Router {
     next();
   });
 
-  // Random transient interstitial, toggled globally via /control/transient/on|off.
+  // Transient interstitial: one-shot via /control/transient/next, or random via /control/transient/on|off.
   router.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path === "/login") {
       next();
+      return;
+    }
+    if (transientNextArmed) {
+      transientNextArmed = false;
+      res.status(200).send(renderTransientInterstitial(tenant, req.originalUrl));
       return;
     }
     if (transientEnabled && Math.random() < TRANSIENT_RATE) {
@@ -346,8 +355,16 @@ app.get("/control/session-timeout", (req, res) => {
   res.redirect(req.headers.referer ?? "/");
 });
 
+// Registered before /control/transient/:state, which would otherwise read "next" as "off".
+app.get("/control/transient/next", (_req, res) => {
+  transientNextArmed = true;
+  res.type("text/plain").send("transient interstitial: next request");
+});
+
+// "off" also disarms a pending /control/transient/next, so a test's cleanup clears both.
 app.get("/control/transient/:state", (req, res) => {
   transientEnabled = req.params.state === "on";
+  if (!transientEnabled) transientNextArmed = false;
   res.type("text/plain").send(`transient interstitial: ${transientEnabled ? "on" : "off"}`);
 });
 

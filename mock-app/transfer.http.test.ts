@@ -427,6 +427,38 @@ describe("older controls work without a session cookie (registered before the te
     }
   });
 
+  it("/control/transient/next: exactly the next authenticated request gets the interstitial, before any write", async () => {
+    const INTERSTITIAL = "System temporarily unavailable";
+    const armed = await fetch(`${base}/control/transient/next`, { redirect: "manual" }); // cookie-less
+    expect(armed.status).toBe(200);
+    expect(await armed.text()).toBe("transient interstitial: next request");
+    try {
+      // Neither /login nor an unauthenticated request (redirected by the auth gate) consumes it.
+      expect((await fetch(`${base}/member/10001`, { redirect: "manual" })).status).toBe(302);
+      const c = await Client.login(TENANTS[0]!);
+      expect(await (await c.get("/member/10001")).text()).toContain(INTERSTITIAL);
+      expect(await (await c.get("/member/10001")).text()).not.toContain(INTERSTITIAL);
+
+      // Armed right before Submit: the confirm POST is answered by the interstitial, nothing is
+      // written, and the draft survives, so re-posting it (what a reload does) commits.
+      await c.fill("10001", { toMemberId: "10002", amount: "4", memo: "rote-next" });
+      await fetch(`${base}/control/transient/next`);
+      const first = await c.post("/member/10001/transfer/confirm");
+      expect(await first.text()).toContain(INTERSTITIAL);
+      expect(await ledger()).toHaveLength(0);
+      const again = await c.post("/member/10001/transfer/confirm");
+      expect(await again.text()).toContain("Transfer Submitted");
+      expect(await ledger()).toHaveLength(1);
+
+      // transient/off disarms a pending "next".
+      await fetch(`${base}/control/transient/next`);
+      await fetch(`${base}/control/transient/off`);
+      expect(await (await c.get("/member/10001")).text()).not.toContain(INTERSTITIAL);
+    } finally {
+      await fetch(`${base}/control/transient/off`);
+    }
+  });
+
   it("cookie-less GET /control/unexpected-dialog/off answers 200", async () => {
     const res = await fetch(`${base}/control/unexpected-dialog/off`, { redirect: "manual" });
     expect(res.status).toBe(200);
