@@ -2,7 +2,7 @@
   "capabilityId": "transfer",
   "approvalStatus": "approved",
   "history": [],
-  "approvedAt": "2026-11-09T23:38:32.272Z",
-  "approvedReason": "Hand-authored (docs/DECISIONS.md D3), approved in fleet Step 3 (docs/plans/step-03.md). Basis: src/replay/transfer.test.ts passed (success on tenants a/b/c with confirmationRef equal to the ledger row id; needs_human and 0 rows without approveRisky; all eight known outcomes with an empty ledger; write-then-error leaves exactly 1 row; errors/on writes nothing; transient retries; live gate risky only on step-11 on every tenant). Evidence: evidence/transfer-replay/ - unattended replay under this approval on all three tenants, ledger-checked by script.",
-  "approvedVersion": "1.0.0"
+  "approvedAt": "2026-11-10T01:53:24.537Z",
+  "approvedReason": "Re-approved for 1.1.0 in fleet Step 5 (approvals are version-bound, docs/DECISIONS.md D15; supersedes the Step 3 approval of 1.0.0, commit f1f2e8b). 1.1.0 = Step 4's scoped business-outcome recognizers + REQUIRED_FIELD_MISSING (b9ecaa2, D14). Basis: evidence/transfer-replay-1.1.0/ (commit 4119e11) - unattended invokeCapability replay of transfer 1.1.0 on tenants a/b/c, ledger-checked by script, RESULT: PASS (3 rows, confirmationRef == ledger id each tenant); and src/replay/transfer.test.ts + fleet.test.ts passing at 1.1.0 (npm test 20 files, 199 passed).",
+  "approvedVersion": "1.1.0"
 }
