@@ -10,8 +10,17 @@ import type {
 } from "./types.js";
 
 export interface WebSurfaceOptions {
-  /** Defaults to false (headed) — human handoff needs a real window to take over in. */
+  /**
+   * Defaults to false (headed) — human handoff needs a real window to take over in. Ignored when
+   * `browser` is given: that browser was already launched headed or headless.
+   */
   headless?: boolean;
+  /**
+   * An already-running browser to reuse (the fleet's one-browser-per-worker). The surface opens a
+   * fresh context + page on it, and close() closes ONLY that context, never the browser. Omit it
+   * to launch and own a browser, exactly as before.
+   */
+  browser?: Browser;
 }
 
 const MAX_ARIA_SNAPSHOT_CHARS = 4000;
@@ -74,18 +83,31 @@ export class WebSurface implements Surface {
   private readonly provenanceLog: LocatorProvenanceEntry[] = [];
   private lastReadTextValue: string | null = null;
   private screenshotRetryCount = 0;
+  /** False when the browser was passed in: then close() must leave it running for the next job. */
+  private readonly ownsBrowser: boolean;
 
-  private constructor(browser: Browser, context: BrowserContext, page: Page) {
+  private constructor(browser: Browser, context: BrowserContext, page: Page, ownsBrowser = true) {
     this.browser = browser;
     this.context = context;
     this.page = page;
+    this.ownsBrowser = ownsBrowser;
   }
 
   static async launch(options: WebSurfaceOptions = {}): Promise<WebSurface> {
+    if (options.browser) {
+      const context = await options.browser.newContext();
+      try {
+        const page = await context.newPage();
+        return new WebSurface(options.browser, context, page, false);
+      } catch (err) {
+        await context.close().catch(() => undefined);
+        throw err;
+      }
+    }
     const browser = await chromium.launch({ headless: options.headless ?? false });
     const context = await browser.newContext();
     const page = await context.newPage();
-    return new WebSurface(browser, context, page);
+    return new WebSurface(browser, context, page, true);
   }
 
   /** Exposed so src/escalation can hand control to a human on this SAME live session. */
@@ -111,8 +133,13 @@ export class WebSurface implements Surface {
     return this.screenshotRetryCount;
   }
 
+  /** Closes the browser if this surface launched it, otherwise only this surface's context. */
   async close(): Promise<void> {
-    await this.browser.close();
+    if (this.ownsBrowser) {
+      await this.browser.close();
+    } else {
+      await this.context.close();
+    }
   }
 
   async perceive(): Promise<Observation> {

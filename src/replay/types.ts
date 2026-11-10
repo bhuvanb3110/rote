@@ -1,3 +1,4 @@
+import type { Browser } from "playwright";
 import type { Capability } from "../artifact/index.js";
 import type { EscalationController } from "../escalation/index.js";
 
@@ -10,8 +11,19 @@ export interface ReplayOptions {
    * this is checked against that pattern and rejected if it doesn't match.
    */
   entryUrl: string;
-  /** Defaults to true -- unlike discovery, replay doesn't need a human watching. */
+  /**
+   * Defaults to true -- unlike discovery, replay doesn't need a human watching. Ignored when
+   * `browser` is given (that browser is already headed or headless); passing both is allowed,
+   * because invokeCapability always passes headless.
+   */
   headless?: boolean;
+  /**
+   * Reuse this running browser instead of launching one (fleet: one browser per worker, one
+   * context per job). Replay opens a fresh context for the run and closes only that context on
+   * every exit path, including throws; the browser stays connected. Omit it to launch and close a
+   * browser per run, as before.
+   */
+  browser?: Browser;
   evidenceBaseDir?: string;
   /**
    * Defaults to false. A risky/irreversible step is refused unless this is explicitly true --

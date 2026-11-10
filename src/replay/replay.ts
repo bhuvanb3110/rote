@@ -119,7 +119,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   }
 
   const policy = buildPolicyForOrigin(options.entryUrl);
-  const surface = await WebSurface.launch({ headless: options.headless ?? true });
+  const surface = await WebSurface.launch({ headless: options.headless ?? true, browser: options.browser });
   controller?.bind(surface, evidence);
   const outputsByStepId = new Map<string, string>();
   const stepConfidenceScores: number[] = [];
