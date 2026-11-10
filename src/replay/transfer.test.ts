@@ -270,9 +270,15 @@ describe("transfer artifacts: replay against the mock bank", () => {
     await control("errors/off");
 
     expect(result.status).not.toBe("success");
-    // Recorded for the Step 3 report and the Step 4 plan: the 503 lands after Submit, nothing
-    // recognizes it, and the run fails reading the reference on step-12.
-    expect(result).toMatchObject({ status: "failure", category: "unexpected-state", atStepId: "step-12" });
+    // Recorded in Step 3: the 503 lands after Submit, nothing recognizes it, and the run fails
+    // reading the reference on step-12. Since Step 4 the result also says the commit may have
+    // happened (commitUncertain), so no caller can mistake it for a safe-to-retry failure.
+    expect(result).toMatchObject({
+      status: "failure",
+      category: "unexpected-state",
+      atStepId: "step-12",
+      commitUncertain: { irreversibleStepId: "step-11" },
+    });
     const rows = await ledger();
     expect(rows.map((r) => r.memo)).toEqual([memo]);
     expect(await matchingCount(TENANT_A, memo)).toBe("1");

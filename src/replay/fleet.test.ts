@@ -18,6 +18,7 @@ import app from "../../mock-app/app.js";
 import { TENANTS, type TenantConfig } from "../../mock-app/tenants.js";
 import { deserializeCapability, type Capability, type ReplayResult } from "../artifact/index.js";
 import { approveCapability } from "../confidence/index.js";
+import { EscalationController } from "../escalation/index.js";
 import { buildPolicyForOrigin, policyGate } from "../safety/index.js";
 import { WebSurface } from "../surface/index.js";
 import { applyTenantOverride, deserializeTenantOverride } from "../tenant/index.js";
@@ -139,6 +140,15 @@ function recordingHooks(extra: { before?: () => Promise<void>; after?: () => Pro
     },
   };
   return { calls, hooks };
+}
+
+async function waitForPendingRequest(controller: EscalationController, timeoutMs = 20_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (controller.pendingRequest) return controller.pendingRequest;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`no intervention request within ${timeoutMs}ms`);
 }
 
 /** Every entry of the run's evidence log. */
@@ -339,5 +349,125 @@ describe("onIrreversible hooks", () => {
     const settle = (await evidenceLog(result)).find((e) => e.kind === "irreversible_settle");
     expect(settle?.detail).toMatchObject({ loaded: false, timeoutMs: 10_000 });
     expect(String(settle?.detail.reason)).toMatch(/Timeout/i);
+  }, 60_000);
+});
+
+describe("after an irreversible action has been attempted", () => {
+  const AFTER_SUBMIT = new Set(["step-11", "step-12"]);
+
+  it("transient interstitial right after Submit: no reload (no re-POST), non-success with commitUncertain, 0 rows", async () => {
+    const memo = "rote-s4-transient-after-submit";
+    const { hooks } = recordingHooks({ before: () => control("transient/next") });
+    const result = await transfer({ memo }, { onIrreversible: hooks });
+    const log = await evidenceLog(result);
+    const rows = await ledger();
+    const diagnosis = JSON.stringify({ result, rows: rows.length, recover: log.filter((e) => e.kind === "recover") });
+
+    expect(result.status, diagnosis).not.toBe("success");
+    expect(rows, diagnosis).toEqual([]);
+    expect(result, diagnosis).toMatchObject({ commitUncertain: { irreversibleStepId: "step-11" } });
+    // Proves no reload: no recovery attempt at or after the irreversible step.
+    expect(log.filter((e) => e.kind === "recover" && AFTER_SUBMIT.has(String(e.detail.stepId))), diagnosis).toEqual([]);
+    expect(result).toMatchObject({ status: "failure", atStepId: "step-11", category: "unexpected-state" });
+  }, 60_000);
+
+  it("transient interstitial BEFORE Submit still recovers (the rules apply only after the attempt)", async () => {
+    await control("transient/next"); // hits the first authenticated request: the post-login landing page
+    const result = await transfer({ memo: "rote-s4-transient-before" });
+    expect(result.status, JSON.stringify(result)).toBe("success");
+    const recovers = (await evidenceLog(result)).filter((e) => e.kind === "recover");
+    expect(recovers.map((e) => e.detail.stepId)).toEqual(["step-03"]);
+    expect((await ledger()).map((r) => r.memo)).toEqual(["rote-s4-transient-before"]);
+  }, 60_000);
+
+  it("503 right after Submit, before the write (errors/on armed in before()): failure + commitUncertain, 0 rows", async () => {
+    const { hooks } = recordingHooks({ before: () => control("errors/on") });
+    const result = await transfer({ memo: "rote-s4-503-no-write" }, { onIrreversible: hooks });
+    expect(result).toMatchObject({ status: "failure", commitUncertain: { irreversibleStepId: "step-11" } });
+    expect(await ledger()).toEqual([]);
+  }, 60_000);
+
+  it("503 right after Submit, after the write (errors/after-write): failure + commitUncertain, 1 row, lookup finds 1", async () => {
+    const memo = "rote-s4-503-after-write";
+    const { hooks } = recordingHooks({ before: () => control("errors/after-write") });
+    const result = await transfer({ memo }, { onIrreversible: hooks });
+    await control("errors/off");
+    expect(result).toMatchObject({ status: "failure", commitUncertain: { irreversibleStepId: "step-11" } });
+    if (result.status === "failure") expect(result.commitUncertain?.detail).toContain("failure (unexpected-state) at step-12");
+    expect((await ledger()).map((r) => r.memo)).toEqual([memo]);
+    expect(await matchingCount(memo)).toBe("1");
+  }, 90_000);
+
+  it("a business_outcome after the attempt carries commitUncertain too", async () => {
+    // Test-only outcome so the bank's 503 page is recognized as a business outcome after Submit.
+    const { capability: base, entryUrl } = await forTenant(transferBase, TENANT_A);
+    const capability: Capability = {
+      ...base,
+      knownOutcomes: [...base.knownOutcomes, { code: "BANK_DOWN", recognizer: { kind: "textPresent", text: "System unavailable" }, detail: "503" }],
+    };
+    const { hooks } = recordingHooks({ before: () => control("errors/on") });
+    const result = await runReplay({
+      capability,
+      entryUrl,
+      params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", memo: "rote-s4-bo-after" },
+      statusDir,
+      browser,
+      approveRisky: true,
+      onIrreversible: hooks,
+    });
+    expect(result).toMatchObject({ status: "business_outcome", code: "BANK_DOWN", commitUncertain: { irreversibleStepId: "step-11" } });
+    expect(await ledger()).toEqual([]);
+  }, 60_000);
+
+  it("business outcomes BEFORE the attempt carry no marker (a blind retry is safe)", async () => {
+    const result = await transfer({ memo: "rote-s4-bo-before", amount: "999999.00" });
+    expect(result).toMatchObject({ status: "business_outcome", code: "INSUFFICIENT_FUNDS" });
+    expect(result).not.toHaveProperty("commitUncertain");
+  }, 60_000);
+
+  it("a throw after the attempt becomes failure/unknown with the marker (not an exception)", async () => {
+    let submitted = false;
+    const realPerceive = WebSurface.prototype.perceive;
+    vi.spyOn(WebSurface.prototype, "perceive").mockImplementation(async function (this: WebSurface) {
+      if (submitted) throw new Error("page.screenshot: simulated third failure");
+      return realPerceive.call(this);
+    });
+    const { hooks } = recordingHooks({ after: async () => { submitted = true; } });
+    const result = await transfer({ memo: "rote-s4-throw-after" }, { onIrreversible: hooks });
+    expect(result).toMatchObject({
+      status: "failure",
+      category: "unknown",
+      atStepId: "step-11",
+      commitUncertain: { irreversibleStepId: "step-11" },
+    });
+    if (result.status === "failure") expect(result.observed).toContain("simulated third failure");
+    expect(await ledger()).toHaveLength(1);
+  }, 60_000);
+
+  it("operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click", async () => {
+    const { capability: base, entryUrl } = await forTenant(transferBase, TENANT_A);
+    // Give step-11 a checkpoint, so the 503-after-write page fails it ON the irreversible step.
+    const capability = withStep(base, "step-11", (s) => ({ ...s, checkpoint: { kind: "textPresent", text: "Transfer Submitted" } }));
+    const controller = new EscalationController();
+    const { calls, hooks } = recordingHooks({ before: () => control("errors/after-write") });
+    const pending = runReplay({
+      capability,
+      entryUrl,
+      params: { ...CREDS, memberId: "10001", toMemberId: "10002", amount: "12.34", memo: "rote-s4-operator" },
+      statusDir,
+      browser,
+      approveRisky: true,
+      onIrreversible: hooks,
+      controller,
+    });
+    const request = await waitForPendingRequest(controller);
+    expect(request.atStepId).toBe("step-11");
+    expect(request.reason).toContain('irreversible step "step-11" was already attempted');
+    await controller.handBack("did nothing"); // -> "retry", which must not re-click Submit
+
+    const result = await pending;
+    expect(result).toMatchObject({ status: "needs_human", atStepId: "step-11", commitUncertain: { irreversibleStepId: "step-11" } });
+    expect(calls.map((c) => c.hook)).toEqual(["before", "after"]);
+    expect(await ledger()).toHaveLength(1);
   }, 60_000);
 });

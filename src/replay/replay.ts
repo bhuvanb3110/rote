@@ -135,10 +135,80 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
     }
   };
 
+  // Set right BEFORE the irreversible action is dispatched (step-04 plan section 5). From then on
+  // the bank may have committed, so: no reload/recoverable retry, no second click of the
+  // irreversible control, throws become results, and every non-success result carries
+  // commitUncertain (added in finish(), the one place every exit goes through).
+  let irreversibleAttempted: { stepId: string } | null = null;
+  // An onIrreversible hook threw. runReplay must reject with exactly that error, even after the
+  // attempt (the fleet threw it; a ReplayResult would only invite a stale worker to record it).
+  let hookFailure: { error: unknown } | null = null;
+  let currentStepId = capability.steps[0]!.id;
+
+  async function runHook(name: "before" | "after", step: Step): Promise<void> {
+    if (!options.onIrreversible) return;
+    try {
+      await options.onIrreversible[name](step);
+    } catch (error) {
+      hookFailure = { error };
+      throw error;
+    }
+  }
+
+  /** Mentions an earlier irreversible attempt in an escalation reason, so the human knows. */
+  function pauseReason(reason: string): string {
+    return irreversibleAttempted
+      ? `${reason} (the irreversible step "${irreversibleAttempted.stepId}" was already attempted in this run -- ` +
+          `verify whether it committed before redoing anything by hand)`
+      : reason;
+  }
+
+  /**
+   * Rule 5.2: replay never clicks the irreversible control twice in one run. If the human hands
+   * back without resolving a failure of the attempted irreversible step, "retry" would re-run its
+   * click; it becomes a terminal needs_human instead. "complete"/"skip" are unchanged.
+   */
+  async function refuseRetryOfAttempted(outcome: PauseOutcome, step: Step): Promise<PauseOutcome> {
+    if (outcome.kind !== "retry" || irreversibleAttempted?.stepId !== step.id) return outcome;
+    return {
+      kind: "exit",
+      result: await finish({
+        status: "needs_human",
+        reason:
+          `Step "${step.id}" is irreversible and was already attempted in this run; replay never repeats it. ` +
+          `Verify whether it committed (e.g. via the history) before any retry.`,
+        atStepId: step.id,
+        contextRef: evidenceRef,
+      }),
+    };
+  }
+
+  function describeOutcome(result: Exclude<ReplayResult, { status: "success" }>): string {
+    switch (result.status) {
+      case "business_outcome":
+        return `business_outcome ${result.code}: ${result.detail}`;
+      case "needs_human":
+        return `needs_human at ${result.atStepId}: ${result.reason}`;
+      case "failure":
+        return `failure (${result.category}) at ${result.atStepId}: ${result.observed}`;
+    }
+  }
+
   async function finish(result: ReplayResult): Promise<ReplayResult> {
-    const validated = ReplayResultSchema.parse(result);
+    const marked: ReplayResult =
+      irreversibleAttempted && result.status !== "success"
+        ? {
+            ...result,
+            commitUncertain: {
+              irreversibleStepId: irreversibleAttempted.stepId,
+              detail: `Attempted the irreversible step, then the run ended in ${describeOutcome(result)}`.slice(0, 500),
+            },
+          }
+        : result;
+    const validated = ReplayResultSchema.parse(marked);
     const confidence = computeRunConfidence(stepConfidenceScores);
-    await evidence.append({ turn: -1, kind: "result", detail: { status: validated.status, confidence } });
+    const commitUncertain = validated.status === "success" ? undefined : validated.commitUncertain;
+    await evidence.append({ turn: -1, kind: "result", detail: { status: validated.status, confidence, commitUncertain } });
     if (validated.status === "success") {
       await recordConfidenceRun(capability.id, confidence, runId, { statusDir: options.statusDir });
     }
@@ -152,6 +222,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
     let stepIndex = 0;
     stepLoop: while (stepIndex < capability.steps.length) {
       const step = capability.steps[stepIndex]!;
+      currentStepId = step.id;
       const executable = buildExecutableAction(step, params);
 
       const currentUrl = surface.playwrightPage.url();
@@ -224,7 +295,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         });
         // A throw here (the fleet's fencing check) prevents the click; the top-level catch closes
         // the context and rethrows it unchanged.
-        await options.onIrreversible?.before(step);
+        await runHook("before", step);
       }
 
       let observation: Observation | null = null;
@@ -245,6 +316,9 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
             // Watch BEFORE the click so its navigation can't be missed; see IrreversibleHooks.after
             // for the contract this wait implements.
             const settle = surface.watchNextNavigation(IRREVERSIBLE_SETTLE_TIMEOUT_MS);
+            // Before act(), on purpose: if the click is dispatched and then anything goes wrong
+            // (or the process dies inside it), the run already says "may have committed".
+            irreversibleAttempted = { stepId: step.id };
             try {
               await surface.act(executable);
             } catch (err) {
@@ -256,7 +330,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
                 kind: "irreversible_settle",
                 detail: { stepId: step.id, timeoutMs: IRREVERSIBLE_SETTLE_TIMEOUT_MS, ...settled },
               });
-              await options.onIrreversible?.after(step);
+              await runHook("after", step);
             }
           } else {
             try {
@@ -303,6 +377,30 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         }
 
         const recoverable = await findRecoverableRule(surface, observation, capability.recoverables);
+        if (recoverable && irreversibleAttempted) {
+          // Rule 5.1: no backoff, no reload, no re-recognize once the irreversible action was
+          // attempted. The interstitial may be the answer to the irreversible POST, and reloading a
+          // POST response re-posts the form: after Submit, that is a second transfer.
+          await evidence.append({
+            turn: stepIndex,
+            kind: "blocked",
+            detail: {
+              stepId: step.id,
+              reason: `recoverable rule ("${recoverable.action}") NOT applied after the irreversible step was attempted`,
+            },
+            screenshotFile,
+          });
+          return await finish({
+            status: "failure",
+            atStepId: step.id,
+            expected: step.intent,
+            observed:
+              `Recoverable state (${describeCheckpoint(recoverable.recognizer)}) after the irreversible step ` +
+              `"${irreversibleAttempted.stepId}" was attempted; not retried, because a reload could re-submit it.`,
+            category: "unexpected-state",
+            evidenceRef,
+          });
+        }
         if (recoverable) {
           attempts += 1;
           const maxAttempts = recoverable.maxAttempts ?? 3;
@@ -386,21 +484,24 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         });
         if (!evalResult.passed) {
           const category = isSessionTimeoutState(finalObservationForStep, step) ? "session-timeout" : "unexpected-state";
-          const outcome = await pauseOrFail(
-            controller,
-            surface,
-            capability,
+          const outcome = await refuseRetryOfAttempted(
+            await pauseOrFail(
+              controller,
+              surface,
+              capability,
+              step,
+              pauseReason(`checkpoint failed: ${evalResult.detail}`),
+              () =>
+                finish({
+                  status: "failure",
+                  atStepId: step.id,
+                  expected: describeCheckpoint(step.checkpoint!),
+                  observed: evalResult.detail,
+                  category,
+                  evidenceRef,
+                }),
+            ),
             step,
-            `checkpoint failed: ${evalResult.detail}`,
-            () =>
-              finish({
-                status: "failure",
-                atStepId: step.id,
-                expected: describeCheckpoint(step.checkpoint!),
-                observed: evalResult.detail,
-                category,
-                evidenceRef,
-              }),
           );
           if (outcome.kind === "exit") return outcome.result;
           if (outcome.kind === "complete") break stepLoop;
@@ -412,21 +513,24 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         }
       } else if (actionError) {
         const category = isSessionTimeoutState(finalObservationForStep, step) ? "session-timeout" : "unexpected-state";
-        const outcome = await pauseOrFail(
-          controller,
-          surface,
-          capability,
+        const outcome = await refuseRetryOfAttempted(
+          await pauseOrFail(
+            controller,
+            surface,
+            capability,
+            step,
+            pauseReason(`no locator resolved / action failed: ${actionError.message}`),
+            () =>
+              finish({
+                status: "failure",
+                atStepId: step.id,
+                expected: step.intent,
+                observed: actionError!.message,
+                category,
+                evidenceRef,
+              }),
+          ),
           step,
-          `no locator resolved / action failed: ${actionError.message}`,
-          () =>
-            finish({
-              status: "failure",
-              atStepId: step.id,
-              expected: step.intent,
-              observed: actionError!.message,
-              category,
-              evidenceRef,
-            }),
         );
         if (outcome.kind === "exit") return outcome.result;
         if (outcome.kind === "complete") break stepLoop;
@@ -460,7 +564,27 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
     }
     return await finish({ status: "success", outputs, evidenceRef });
   } catch (err) {
-    await closeSurface();
-    throw err;
+    // Hook errors reject unchanged, even after the attempt. Before the attempt, any throw rejects
+    // exactly as it always did.
+    if (hookFailure || !irreversibleAttempted) {
+      await closeSurface();
+      throw hookFailure ? (hookFailure as { error: unknown }).error : err;
+    }
+    // Rule 5.3: after the attempt, a throw (Playwright error, a third screenshot failure, a
+    // locator crash) becomes a result, so the caller sees commitUncertain instead of an exception
+    // it might blindly retry.
+    try {
+      return await finish({
+        status: "failure",
+        atStepId: currentStepId,
+        expected: "the run to continue normally after the irreversible step",
+        observed: `Threw after the irreversible step was attempted: ${err instanceof Error ? err.message : String(err)}`,
+        category: "unknown",
+        evidenceRef,
+      });
+    } catch (finishErr) {
+      await closeSurface();
+      throw finishErr;
+    }
   }
 }
