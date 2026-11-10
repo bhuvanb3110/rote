@@ -84,6 +84,29 @@ Recorded as found; each names its planned fix or the step that owns it.
    reviewer.
 5. **`signal` is not observed while paused for a human.** With an `EscalationController`,
    `waitForAutomation()` does not race the abort. Fleet workers never pass a controller.
+6. **An approval is bound to the version string, not the content** (D15, Step 5). An artifact edited
+   *without* a version bump still inherits its approval. The guard test
+   `src/catalog/committedApprovals.test.ts` catches a bump without re-approval, not an edit without a
+   bump. A content hash would catch both but breaks on formatting-only edits; not done.
+7. **With one hot tenant, a dequeuer can return `null` while a slot is free** (D18, Step 5). It skips
+   a tenant whose row another dequeuer holds (`SKIP LOCKED`), so in a burst some dequeuers come back
+   empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
+   interval. The Day-3 load test measures whether it matters.
+
+## Fleet Step 5: Postgres is required (2026-11-09)
+
+- `docker compose up -d postgres` starts `postgres:17` (resolved digest
+  `postgres@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f`, PostgreSQL 17.11)
+  on `127.0.0.1:55432`, data in the named volume `pgdata`. Health: `pg_isready`.
+- `npm test` needs it and fails loudly without it (`PostgresUnreachableError`); `npm run test:unit`
+  runs everything except `*.db.test.ts`. Tests use the `rote_test` database (created on demand), one
+  schema per test file (D20); the dev database is `rote`.
+- `npm run db:migrate` applies `db/migrations/*.sql` to `ROTE_DATABASE_URL` (default
+  `postgres://rote:rote_dev_only@127.0.0.1:55432/rote`; `.env.example` lists the variables).
+- The queue lives in `src/queue/` (enqueue, dequeue, migrations, row schemas); design in
+  `docs/plans/step-05.md`, decisions D16–D23.
+- **Approvals are version-bound** (D15). All five committed status files name their version; the
+  transfer pair was re-approved for 1.1.0 on new evidence (`evidence/transfer-replay-1.1.0/`).
 
 ## The seven questions
 
@@ -135,6 +158,10 @@ own member ($4532.10 / $812.55). Two further details from re-reading the code:
 - The replay path does one `readFile` of `status/<id>.json` per run (`checkApproval`); an approved
   capability is never written. All three committed capabilities are grandfathered `approved`, and
   the new transfer artifacts must be approved with a recorded reason before the fleet can run them.
+  *Updated in Step 5: approvals are now bound to the artifact version (D15); all five status files
+  record `approvedVersion`, and a run of a capability approved for a different version is refused.
+  A capability approved for another version is recorded like a draft (it is written), so the fleet
+  rule stays: run only capabilities approved for their current version, never `approveUnattended`.*
 
 ### 3. Where are irreversible steps marked?
 
@@ -233,6 +260,7 @@ Jaeger, Prometheus and Grafana — see the open question in the Day-1 handoff. I
    are stale: `REPORT.md` (~line 39 "a single process is the simpler… choice", ~line 336
    "scaling infra CLAUDE.md says not to build") and the comment above `writeCapabilityStatus`
    in `src/confidence/store.ts:43-47`. Not edited in this step; fix when the fleet README lands.
+   *(The `store.ts` comment was fixed in Step 5 Part A; `REPORT.md` still waits for the fleet README.)*
 8. **Mock-bank state is per-process and in memory** (`mock-app/data.ts`, `app.ts` module-level
    flags like `transientEnabled`). Under Compose the bank is one container; a restart wipes
    sessions *and* the ledger, so chaos scripts must never restart it mid-run.

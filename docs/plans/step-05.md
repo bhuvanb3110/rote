@@ -540,3 +540,46 @@ Part A lands first and its decision takes the next free number, **D15**. The six
 **D17**, D17 (tenant lock) → **D18**, D18 (enqueue) → **D19**, D19 (test isolation) → **D20**, D20
 (states) → **D21**. New entries from the decisions above follow: **D22** (database clock, decision 7)
 and **D23** (credentials never in `jobs.params`, decision 1).
+
+## Built (2026-11-09)
+
+Built in the planned order, Part A first. Decisions: D15 (Part A), D16–D23 (Part B; numbering
+above). Evidence: `evidence/transfer-replay-1.1.0/`, `evidence/step-05-queue/`. Where the build went
+beyond or differed from the text above:
+
+**Part A.**
+- Backfill decided: **all five** committed status files got `approvedVersion: "1.0.0"` from git
+  history (each grandfathered artifact has one commit, always 1.0.0; the transfer pair was approved at
+  1.0.0 in f1f2e8b). So the gate refused transfer 1.1.0 until re-approval, and no committed file relies
+  on the grandfathered path (it stays, tested). D15.
+- Runs record their version, and the promotion streak counts only runs of the version being promoted;
+  an approval for another version no longer blocks recording runs (so a re-versioned draft can earn
+  approval again). The catalog lists a stale approval as `draft`. `catalog approve` reads the version
+  from the artifact on disk.
+- The evidence script writes `evidence/transfer-replay-<version>/` and records the gate's decision
+  from the committed `status/` first (`approval.txt`). The 1.1.0 run needed `--pre-approval`
+  (`approveUnattended` with a throwaway `statusDir`): the evidence an approval cites necessarily
+  predates the approval. Then both were re-approved with `catalog approve … --reason` citing it.
+- New guard test `src/catalog/committedApprovals.test.ts`: every committed artifact is approved for
+  exactly its current version. Shown to fail on the pre-re-approval status files.
+
+**Part B.**
+- **Enqueue validates params strictly** (not in the plan): credentials first (typed), then the
+  reserved `memo` of a capability with an irreversible step (`ReservedParamError`; the worker types
+  `memo_key` there, D5), then the capability's other inputs, unknown keys rejected. D23. Open question
+  for the reviewer.
+- Schema slightly stricter than drafted: `trace_id NOT NULL`, format checks on `tenants.id` and
+  `request_hash`, `params` must be a JSON object, `job_attempts.attempt >= 1` and `fencing_token >= 1`.
+- Dequeue cap test: "8 concurrent → exactly 2 get a job, 6 null" is not a guaranteed property (a
+  dequeuer that finds the tenant row locked skips it and can return `null` while a slot is free). The
+  test asserts 1–2 per concurrent burst, never more than 2 sampled, and exactly 2 after draining, over
+  10 rounds. REPO_NOTES "Known limitations" 7.
+- The between-(4)-and-(5) failure is injected with a test-only `CHECK` on `job_attempts` (no test hook
+  in production code).
+- The `DO NOTHING` counter-example behaves exactly as §4 predicts: B gets zero rows.
+- The evidence script runs at the **real** dev cap (2 per tenant) with workers that hold each job
+  5–15 ms, so the cap is under pressure (the 16-dequeuer *test* raises caps to 100, as planned, to test
+  uniqueness). Max active per tenant: 2, over 2045 samples.
+- `createTestSchema` takes `migrate: false` instead of a generic `setup` callback.
+- One flake: 13 browser tests failed in the first `npm test` right after the first container start;
+  the immediate rerun passed. Cause not established (`evidence/step-05-queue/flakes.md`).

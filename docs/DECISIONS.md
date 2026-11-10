@@ -366,3 +366,192 @@ carry over silently. The missing-version path stays for files written before thi
 any outside this repo), but no committed file uses it any more; it is tested, not relied on.
 
 **Date.** 2026-11-09
+
+## D16: `pg` (node-postgres) as the driver
+
+(Drafted as D15 in docs/plans/step-05.md §10; renumbered because D15 went to version-bound
+approvals, which landed first.)
+
+**Decision.** `pg` 8.23 with an explicit `Pool` per process and one checked-out client per
+transaction, through a single helper, `withTransaction` (`src/queue/db.ts`). `int8` is parsed to
+`number` by a per-pool type parser that throws above `Number.MAX_SAFE_INTEGER`.
+
+**Alternatives considered.** `postgres` (postgres.js): faster, with a tagged-template API and
+`sql.begin()` transactions. `pg-promise`. A query builder (Kysely, Knex).
+
+**Why.** The queue's correctness lives in a few hand-written transactions (D2). `pg` keeps each one
+literal: a SQL string, a parameter array, and `BEGIN`/`COMMIT` on a client you can see. postgres.js's
+tagged templates build SQL from fragments and pin connections implicitly inside `sql.begin`, which
+hides exactly what this project needs to show and defend. `pg` is the most widely deployed Node
+driver, so its `SKIP LOCKED` usage and pool error handling are well trodden, and its throughput is far
+beyond what a few browser workers generate. Cost: CommonJS (imports fine from ESM) and `int8` as
+strings, handled by the guarded parser (a rounded fencing token could compare equal to another).
+
+**Date.** 2026-11-09
+
+## D17: Plain `.sql` migrations and a small runner, no ORM
+
+(Drafted as D16.)
+
+**Decision.** Forward-only numbered files in `db/migrations/`; `src/queue/migrate.ts` (~130 lines)
+applies each pending file in its own transaction together with its `schema_migrations` row, under a
+session advisory lock keyed on `current_schema()`, with SHA-256 checksums computed after CRLF → LF.
+An applied file that was edited or deleted fails the run. `.gitattributes` pins `*.sql` to LF.
+`rote db migrate` / `npm run db:migrate`; Step 6's workers and API run it at startup.
+
+**Alternatives considered.** An ORM with migrations (Prisma, Drizzle, TypeORM); node-pg-migrate;
+Knex migrations; graphile-migrate.
+
+**Why.** The schema is part of the design being reviewed: constraints, partial indexes and a
+generated column read best as the SQL Postgres runs. An ORM would add a second schema language, a
+generator and a runtime the project doesn't otherwise need (CLAUDE.md is schema-first with Zod). The
+runner is small enough to test fully: concurrent starts apply once, a failing file rolls back whole
+and releases the lock, CRLF and LF checkouts agree (all in `migrate.db.test.ts`).
+
+**Date.** 2026-11-09
+
+## D18: The per-tenant cap is a recount under a tenant row lock; a tenant that yields nothing is excluded and the claim retried
+
+(Drafted as D17; adjusted for reviewer decision 6.)
+
+**Decision.** Dequeue (`src/queue/dequeue.ts`), one transaction per try: (1) claim a tenant row with
+queued work and a probable free slot, `FOR UPDATE OF t SKIP LOCKED`, oldest waiting job first;
+(2) recount active jobs (`running`, `committing`, `verifying`) in a fresh statement; (3) pick the
+oldest queued job `FOR UPDATE SKIP LOCKED`; (4) lease it (attempt + 1, fencing_token + 1, expiry =
+`now()` + lease); (5) insert the attempt row. If (2) finds the tenant full or (3) finds no job (its
+rows locked by another transaction), the try is rolled back and (1) runs again **excluding that
+tenant**; each retry excludes one more tenant, so the loop is bounded by the tenant count.
+
+**Alternatives considered.**
+- A count in the same transaction with no lock: write skew (two dequeuers each count 1 under cap 2
+  and both lease). Forced in `dequeue.db.test.ts`: 3 active under cap 2.
+- `pg_try_advisory_xact_lock(hashtext('tenant:'||id))`: equivalent serialization, but hash collisions
+  can make two tenants share a lock, and the lock is invisible in the schema.
+- `SERIALIZABLE`: correct, but turns contention on a popular tenant into serialization-failure retry
+  loops.
+- Returning `null` when the claimed tenant yields nothing (the plan as first drafted): the reviewer
+  found the starvation bug, where a tenant whose queued jobs were all exhausted (or row-locked) was
+  claimed first and dequeue returned `null` while other tenants had work.
+
+**Why.** It is correct under `READ COMMITTED` and deterministic, and it reuses the `SKIP LOCKED`
+primitive the queue already depends on. A tenant being claimed by someone else is skipped, not waited
+on. Exclude-and-retry means a dequeue never returns `null` while an unlocked tenant with room still
+has a dequeueable job, and exhaustion can no longer cause it at all: the schema forbids a queued job
+with no attempts left (D21). Measured (`evidence/step-05-queue/check.txt`): 300 jobs, 16 dequeue loops,
+cap 2, max active per tenant 2 over 2045 samples, 0 duplicate ids. Known cost: a dequeuer that finds a
+tenant's row locked by another dequeuer skips it, so with one hot tenant it can return `null` while a
+slot is momentarily free; the worker's next poll picks it up (REPO_NOTES "Known limitations" 7).
+
+**Date.** 2026-11-09
+
+## D19: Enqueue is one `INSERT … ON CONFLICT (tenant_id, idempotency_key) DO UPDATE` (no-op) `RETURNING`; keys are unique per tenant
+
+(Drafted as D18; adjusted for reviewer decision 3.)
+
+**Decision.** `src/queue/enqueue.ts`: a single statement that inserts or returns the existing job for
+`(tenant_id, idempotency_key)`, with `(xmax = 0) AS created` to choose 201 vs 200 in Step 6. A
+returned row whose `request_hash` differs from the caller's → `IdempotencyKeyConflict` (409), the
+original job untouched. `UNIQUE (tenant_id, idempotency_key)`, not a global unique key.
+
+**Alternatives considered.**
+- `DO NOTHING` + `SELECT` in one statement: loses the race. Forced in `enqueue.db.test.ts`: B blocks
+  on A's uncommitted insert, A commits, and B's statement returns **zero rows** (its `SELECT` reads the
+  snapshot from before A committed). Pinned by a test.
+- `DO NOTHING`, then a second statement: works under `READ COMMITTED` but is two round trips.
+- An advisory lock on the key.
+- A globally unique key (the brief's wording; plan open question 3): tenant B would get a 409 on a key
+  tenant A had used, which tells B something about A's traffic, a cross-tenant leak.
+
+**Why.** One statement returns the winning row to every concurrent caller (20 connections × 25
+rounds: one job per round, every caller got its id). Per-tenant keys keep tenants independent; the
+same key in two tenants is two jobs (tested). Cost: one dead tuple per duplicate request.
+
+**Date.** 2026-11-09
+
+## D20: Test isolation is one Postgres schema per test file in a separate `rote_test` database; `npm run test:unit` skips the DB files
+
+(Drafted as D19; plus reviewer decision 9.)
+
+**Decision.** `src/queue/testDb.ts` creates `rote_test` on demand (42P04/23505 = already exists), a
+schema `t_<file>_<random>` per DB test file with a pool whose `search_path` is that schema, runs the
+real migration runner into it, and drops it in `afterAll`. DB test files are named `*.db.test.ts`.
+Without Postgres they fail loudly with `PostgresUnreachableError` ("run `docker compose up -d
+postgres`", password redacted); there is no skip condition. `npm test` is the full suite;
+`npm run test:unit` = `vitest run --exclude "**/*.db.test.ts"`.
+
+**Alternatives considered.** Roll back a transaction per test (breaks the multi-connection
+concurrency tests); a database per file from a template (slower, and fails if the template has an open
+connection); a fresh container per run (slow on a 4 GB Docker VM and hides migration problems behind a
+fresh init); skipping DB tests when Postgres is down (hides a red build).
+
+**Why.** Parallel vitest files can't see each other's rows, every file exercises the migrations, and
+setup costs milliseconds. The unit split lets pure code changes be checked without Docker while
+`npm test` stays the gate.
+
+**Date.** 2026-11-09
+
+## D21: States are `text` + `CHECK`; `business_outcome` is a terminal state; a queued job always has an attempt left
+
+(Drafted as D20; plus reviewer decisions 2 and 6.)
+
+**Decision.** `jobs.state` ∈ `queued, running, committing, verifying, succeeded, business_outcome,
+failed, needs_human`. `CHECK (state <> 'queued' OR attempt < max_attempts)`
+(`jobs_queued_has_attempts_left`). **Day-2 recovery moves an exhausted job to `failed`, never to
+`queued`**; the constraint rejects the latter (tested).
+
+**Alternatives considered.** A Postgres `enum` (`ALTER TYPE … ADD VALUE` can't be used in the
+transaction that adds it); recording a bank refusal as `succeeded` or `failed` with the code in
+`result`; filtering exhausted jobs in the dequeue query only (the plan as drafted, which caused the
+starvation bug in D18).
+
+**Why.** `CHECK` constraints evolve in an ordinary transactional migration. A refused transfer is
+neither a success nor a failure: CLAUDE.md calls that distinction load-bearing for replay results, and
+the step-04 reviewer rule makes a business outcome final, no retry, so the job table says so without
+parsing `result`. Making "queued ⇒ dequeueable" a database invariant removes a whole class of
+"looks like work, yields nothing" states instead of patching each query.
+
+**Date.** 2026-11-09
+
+## D22: Every lease-time comparison uses the database clock
+
+(Reviewer decision 7.)
+
+**Decision.** Lease expiry is set as `now() + make_interval(secs => $n)` in SQL, and every later
+comparison (expired-lease recovery `lease_expires_at < now()`, heartbeat extension, the commit-intent
+token-and-lease check) is computed in SQL against the database's `now()`. A worker never sends a
+timestamp it computed. Day 2 must keep this rule.
+
+**Alternatives considered.** Workers compute `Date.now() + lease` and send it; workers compare a
+fetched `lease_expires_at` with their own clock.
+
+**Why.** Containers' clocks drift and can be wrong (a paused container resumes with a stale view, a VM
+clock jumps). With one clock, the database's, "is this lease alive" has one answer for every worker;
+with many, a live lease can look expired to one worker (two workers run the job) and a dead one alive
+to another (a job is stuck). Tested: a worker whose JS clock is an hour ahead still gets a ~30 s lease
+by the database's clock; no dequeue statement takes a timestamp parameter.
+
+**Date.** 2026-11-09
+
+## D23: Job params hold business params only: credentials and the irreversible memo are never stored
+
+(Reviewer decision 1, plus one addition for review.)
+
+**Decision.** Enqueue rejects params naming any input the capability marks `redact: true`
+(`CredentialsInParamsError`, checked first, never echoes the values). `request_hash` is computed over
+the stored params, so it covers only non-secret ones. The remaining params are validated **strictly**
+against the capability's other inputs (an unknown key is `InvalidParamsError`). Addition: for a
+capability with an irreversible step (`step.risk === "risky"`), the `memo` input is reserved for the
+job's `memo_key` (D5) and a client-supplied memo is `ReservedParamError`; a read-only capability (the
+history lookup) keeps `memo` as an ordinary param. The worker (Step 6) injects credentials per tenant
+from env and the memo from `memo_key`.
+
+**Alternatives considered.** Store credentials encrypted in `jobs.params` (key management in scope,
+and still credentials at rest in every row dump); store them and strip on read (a dump still holds
+them); accept unknown keys (a stray `pwd` would be stored under a name nothing redacts); silently
+overwrite a client memo (the client's value disappears without a word).
+
+**Why.** Credentials must never land in artifacts, logs or storage (CLAUDE.md redaction rule); a queue
+table is storage. Strict validation makes "the queue never stores a secret" checkable from the
+capability's own declared inputs instead of from a deny-list of names.
+
+**Date.** 2026-11-09

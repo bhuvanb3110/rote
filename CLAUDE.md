@@ -35,12 +35,15 @@ session when stuck -> stay inside safety guardrails.
 
 ## Repo layout
 surface/ agent/ artifact/ replay/ safety/ escalation/ evidence/ catalog/ cli/ mock-app/
+queue/ (src/queue: Postgres job queue) db/migrations/ (forward-only SQL, never edited once applied)
 
 ## Fleet build — working agreement
 Applies to all work under docs/FLEET_BRIEF.md. Repo facts live in docs/REPO_NOTES.md.
 - Plan before coding. Present the plan for review; build only after it is approved.
 - Small commits, each with passing tests.
-- All existing tests must pass after every step. Run `npm test` before committing. The old
+- All existing tests must pass after every step. Run `npm test` before committing. From Step 5 on it
+  needs Postgres (`docker compose up -d postgres`) and fails loudly without it; `npm run test:unit`
+  runs everything except `*.db.test.ts`, for checking pure code changes without Docker. The old
   screenshot flake is fixed (D8); if any test flakes, rerun to confirm and report it, never hide it.
 - Never push on a red test run.
 - Each step's plan is saved to docs/plans/step-NN.md and committed; the next step reads it.

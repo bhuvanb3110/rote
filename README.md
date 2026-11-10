@@ -27,6 +27,21 @@ npm run mock
 
 This listens on `http://localhost:4100` (fake seed data — see [mock-app/README.md](mock-app/README.md)).
 
+### Running the tests
+
+From fleet Step 5 on, the full suite includes the Postgres job-queue tests, so start Postgres first
+(Docker Desktop or any Docker engine with Compose):
+
+```
+docker compose up -d postgres     # postgres:17 on 127.0.0.1:55432, data in the pgdata volume
+npm test                          # full suite; fails loudly (never skips) without Postgres
+npm run test:unit                 # everything except the *.db.test.ts files, no Docker needed
+npm run db:migrate                # apply db/migrations to the dev database (ROTE_DATABASE_URL)
+```
+
+The tests use a separate `rote_test` database (created on demand) with one schema per test file;
+they never touch the dev `rote` database. `docker compose down -v` deletes the data volume.
+
 ## Replay needs no API key
 
 This is a deliberate design point, not an omission: `src/replay/replay.ts` never imports the
@@ -142,6 +157,13 @@ A freshly discovered capability starts in `draft` and is refused for **unattende
 high-confidence runs; every promotion decision is logged to a per-capability history file and is
 auditable, never silent. (The 3 artifacts committed under `artifacts/` predate this gate and are
 grandfathered `approved`, which is why every command above works with no extra flag.)
+
+**Approvals are bound to the artifact version** (docs/DECISIONS.md D15). Every approval records
+`approvedVersion`, and an artifact whose `version` differs from it is refused (`needs_human`:
+"approved for 1.0.0, artifact is 1.1.0; re-approve"), so editing and re-versioning an artifact never
+silently inherits its old approval. `catalog approve <id>` takes the version from the artifact on
+disk. A status file with no `approvedVersion` (written before this rule) is still allowed and the
+gate says it is grandfathered; all committed status files now name their version.
 
 ```
 npx tsx src/cli/index.ts replay --artifact artifacts/member-lookup.json --params '{\"username\":\"operator\",\"password\":\"operator\",\"memberId\":\"10001\"}' --approve-unattended
