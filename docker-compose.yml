@@ -1,0 +1,30 @@
+# Fleet services (docs/FLEET_BRIEF.md). Step 5: Postgres only. Step 6 adds the mock bank, the API
+# and the workers; Day 3 adds Jaeger, Prometheus and Grafana.
+#
+#   docker compose up -d postgres     # start (data persists in the named volume)
+#   docker compose down               # stop, keep data
+#   docker compose down -v            # stop and DELETE the data volume (explicit reset)
+name: rote
+services:
+  postgres:
+    # Pinned major (docs/plans/step-05.md §1): a major upgrade changes the on-disk format and the
+    # named volume would refuse to start. The resolved digest is recorded in evidence/step-05-queue/.
+    image: postgres:17
+    environment:
+      POSTGRES_USER: rote
+      # Local-only dev value; override in .env (never committed). See .env.example.
+      POSTGRES_PASSWORD: ${ROTE_PG_PASSWORD:-rote_dev_only}
+      POSTGRES_DB: rote
+    ports:
+      # Loopback only (not reachable from the LAN); 55432 so it never collides with a native 5432.
+      - "127.0.0.1:${ROTE_PG_PORT:-55432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rote -d rote"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+volumes:
+  pgdata:
