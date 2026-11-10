@@ -18,6 +18,24 @@
 - Not mitigated in this step (no test-concurrency change made silently). Tracked across the remaining
   full runs below; open question for the reviewer.
 
-## Later full runs in Step 6
+## Every full `npm test` run in Step 6
 
-See the handoff report; every full run's log is in this folder.
+| # | When | Log | Result |
+| --- | --- | --- | --- |
+| 1 | baseline, before any code | `npm-test-baseline.txt` | 29 files, 271/271 |
+| 2 | Part A, first try | **overwritten (not kept)** | RED: 50 failed in 5 files: existing browser tests replaying port-relaxed artifact copies against the committed approvals, refused by the new digest check (expected; the tests were then fixed) |
+| 3 | Part A, second try | **overwritten (not kept)** | RED: catalog.test.ts `beforeAll` failed (my bug: `statusDir` pointed at the artifacts temp dir); 3 tests not run |
+| 4 | Part A, commit | `npm-test-part-a.txt` | 30 files, 285/285 |
+| 5 | worker commit 1 | `npm-test-commit-worker-1.txt` | 31 files, 297/297 |
+| 6 | worker commit 2 | `npm-test-commit-worker-2.txt` | 33 files, 319/319 |
+| 7 | worker commit 3 | `npm-test-commit-worker-3-run1-FAILED.txt` | **FLAKE**: 15 failed in fleet.test.ts, `ERR_INSUFFICIENT_RESOURCES` (above) |
+| 8 | worker commit 3, rerun | `npm-test-commit-worker-3-run2.txt` | 36 files, 338/338 |
+| 9 | API commit | `npm-test-commit-api.txt` | 37 files, 350/350 |
+| 10 | Docker commit | `npm-test-commit-docker.txt` | 37 files, 350/350 |
+| 11-12 | Day-1 exit commit (run twice; the second after a script edit) | `npm-test-commit-day1.txt` (second run; the first was overwritten, it was also 350/350) | 37 files, 350/350 |
+| 13-15 | final x3 | `npm-test-final-x3-run1..3.txt` | 37 files, 350/350 each |
+
+Runs 2 and 3 were written to `npm-test-part-a.txt` and overwritten by the next run; that broke the
+rule "keep full, unfiltered logs of every full test run". Their results above are from the output I
+read at the time. From run 4 on, every log is kept (run 11's log was overwritten by run 12, both
+green). Flakes: 1 in 15 runs (run 7).
