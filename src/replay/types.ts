@@ -29,6 +29,17 @@ export interface IrreversibleHooks {
   after(step: Step): Promise<void>;
 }
 
+/**
+ * A callback after each step that completed normally (docs/DECISIONS.md D34): its checkpoint passed,
+ * or it had none and its action raised no error. Main path only: not after a step a human resolved
+ * ("skip"), not for a step whose run ended there. Every step, the irreversible one included. The
+ * crash-point matrix kills a worker here. A throw rejects runReplay with that same error, unwrapped,
+ * after closing the context, even after the irreversible step (like IrreversibleHooks).
+ */
+export interface StepHooks {
+  after(step: Step, index: number): Promise<void>;
+}
+
 export interface ReplayOptions {
   capability: Capability;
   params: Record<string, unknown>;
@@ -91,6 +102,8 @@ export interface ReplayOptions {
   statusDir?: string;
   /** Callbacks around the irreversible action (the fleet's commit intent / fault injection). */
   onIrreversible?: IrreversibleHooks;
+  /** Called after each normally completed step (StepHooks). Absent: no change at all. */
+  onStep?: StepHooks;
   /**
    * Aborts the run (fleet: the heartbeat lost the lease). Already aborted at entry → rejects with
    * `signal.reason` before any evidence, browser or context is created. Aborted mid-run → replay

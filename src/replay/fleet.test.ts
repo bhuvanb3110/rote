@@ -589,3 +589,66 @@ describe("signal: abort always rejects, closes the context at once, records noth
     expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0]![1]);
   }, 30_000);
 });
+
+describe("onStep hook (D34): additive, once per passed step, a throw rejects", () => {
+  it("absent: nothing changes (every other test in this file runs without it)", async () => {
+    const result = await transfer({ memo: "onstep-absent" });
+    expect(result.status).toBe("success");
+    expect(await ledger()).toHaveLength(1);
+  });
+
+  it("called once per step that completed, in order, with its index; the bank's row exists from step-11 on", async () => {
+    const calls: Array<{ stepId: string; index: number; rows: number }> = [];
+    const result = await transfer(
+      { memo: "onstep-order" },
+      { onStep: { after: async (step, index) => void calls.push({ stepId: step.id, index, rows: (await ledger()).length }) } },
+    );
+    expect(result.status).toBe("success");
+    expect(calls.map((c) => c.stepId)).toEqual(transferBase.steps.map((s) => s.id));
+    expect(calls.map((c) => c.index)).toEqual(transferBase.steps.map((_, i) => i));
+    expect(calls.find((c) => c.stepId === "step-10")!.rows).toBe(0);
+    expect(calls.find((c) => c.stepId === "step-11")!.rows).toBe(1);
+  });
+
+  it("a throw before the irreversible step rejects with that same error, closes the context, runs no further step (0 rows)", async () => {
+    const boom = new Error("fault at after-step-03");
+    const seen: string[] = [];
+    await expect(
+      transfer(
+        { memo: "onstep-throw-early" },
+        {
+          onStep: {
+            after: async (step) => {
+              seen.push(step.id);
+              if (step.id === "step-03") throw boom;
+            },
+          },
+        },
+      ),
+    ).rejects.toBe(boom);
+    expect(seen).toEqual(["step-01", "step-02", "step-03"]);
+    expect(await ledger()).toHaveLength(0);
+    expect(browser.contexts()).toHaveLength(0);
+  });
+
+  it("a throw AFTER the irreversible step still rejects with that error (a hook error, not a result): exactly 1 row", async () => {
+    const boom = new Error("fault at after-step-12");
+    await expect(
+      transfer({ memo: "onstep-throw-late" }, { onStep: { after: async (step) => { if (step.id === "step-12") throw boom; } } }),
+    ).rejects.toBe(boom);
+    expect(await ledger()).toHaveLength(1);
+    expect(browser.contexts()).toHaveLength(0);
+  });
+
+  it("not called for a step that failed its checkpoint", async () => {
+    const seen: string[] = [];
+    const result = await transfer(
+      { memo: "onstep-fail", memberId: "99999" },
+      { onStep: { after: async (step) => void seen.push(step.id) } },
+    );
+    expect(result.status).not.toBe("success");
+    const failedAt = result.status === "failure" ? result.atStepId : undefined;
+    if (failedAt) expect(seen).not.toContain(failedAt);
+    expect(seen.length).toBeLessThan(transferBase.steps.length);
+  });
+});

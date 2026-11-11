@@ -25,6 +25,7 @@ export interface InvokeCapabilityOptions {
   // invokeCapability, not runReplay, so tenant overrides are resolved the same way everywhere.
   browser?: ReplayOptions["browser"];
   onIrreversible?: ReplayOptions["onIrreversible"];
+  onStep?: ReplayOptions["onStep"];
   signal?: ReplayOptions["signal"];
   evidenceBaseDir?: ReplayOptions["evidenceBaseDir"];
   statusDir?: ReplayOptions["statusDir"];
@@ -63,6 +64,7 @@ export async function invokeCapability(options: InvokeCapabilityOptions): Promis
     approveUnattended: options.approveUnattended ?? false,
     browser: options.browser,
     onIrreversible: options.onIrreversible,
+    onStep: options.onStep,
     signal: options.signal,
     evidenceBaseDir: options.evidenceBaseDir,
     statusDir: options.statusDir,

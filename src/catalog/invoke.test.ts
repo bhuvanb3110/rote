@@ -119,6 +119,17 @@ describe("invokeCapability passes the fleet options through to runReplay", () =>
     expect(await ledger()).toEqual([]);
   });
 
+  it("onStep reaches replay too (D34): once per step of the tenant-b transfer, in order", async () => {
+    const seen: string[] = [];
+    const result = await invokeTransfer("rote-s7-invoke-onstep", {
+      browser,
+      statusDir,
+      onStep: { after: async (step, index) => void seen.push(`${index}:${step.id}`) },
+    });
+    expect(result.status, JSON.stringify(result)).toBe("success");
+    expect(seen).toEqual(Array.from({ length: 12 }, (_, i) => `${i}:step-${String(i + 1).padStart(2, "0")}`));
+  }, 60_000);
+
   it("an aborted signal rejects with its reason before any browser", async () => {
     const launch = vi.spyOn(WebSurface, "launch");
     const ac = new AbortController();

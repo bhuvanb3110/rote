@@ -171,6 +171,17 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
     }
   }
 
+  /** StepHooks.after (D34); a throw is recorded as a hook failure, so it rejects unchanged. */
+  async function runStepHook(step: Step, index: number): Promise<void> {
+    if (!options.onStep) return;
+    try {
+      await options.onStep.after(step, index);
+    } catch (error) {
+      hookFailure = { error };
+      throw error;
+    }
+  }
+
   /** Mentions an earlier irreversible attempt in an escalation reason, so the human knows. */
   function pauseReason(reason: string): string {
     return irreversibleAttempted
@@ -566,6 +577,9 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         continue stepLoop;
       }
 
+      // The step completed normally (D34). Absent hook: a no-op.
+      await runStepHook(step, stepIndex);
+      options.signal?.throwIfAborted();
       stepIndex += 1;
     }
 
