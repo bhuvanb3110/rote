@@ -1,0 +1,28 @@
+[
+  {
+    "id": "6ae3bcc6-d0c8-452d-b671-c5c7de61f815",
+    "idempotency_key": "crash-after-step-10",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "running",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": "fault-after-step-10",
+    "lease_expires_at": "2026-11-11T18:29:31.657Z",
+    "fencing_token": 1,
+    "trace_id": "564db74878939fe88bd0cd498b5ced68",
+    "commit_intent_at": null,
+    "outcome": null,
+    "error": null,
+    "result": null,
+    "memo_key": "rote-6ae3bcc6-d0c8-452d-b671-c5c7de61f815",
+    "created_at": "2026-11-11T18:29:00.895Z",
+    "updated_at": "2026-11-11T18:29:01.657Z"
+  }
+]

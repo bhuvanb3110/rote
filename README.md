@@ -10,7 +10,7 @@ refuses to run an unproven capability unattended.
 
 ## Setup
 
-Prerequisites: Node 20+.
+Prerequisites: Node 22+ (CI uses 22 LTS; `engines` says `>=22`).
 
 ```
 npm install

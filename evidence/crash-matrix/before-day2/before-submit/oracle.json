@@ -1,0 +1,35 @@
+{
+  "jobs": 1,
+  "ledgerRows": 0,
+  "drainTimedOut": true,
+  "byState": {
+    "running": 1
+  },
+  "counts": {
+    "ok": 0,
+    "DUPLICATE": 0,
+    "MISSING_COMMIT": 0,
+    "UNRECORDED_COMMIT": 0,
+    "MISMATCH": 0,
+    "LOST": 1,
+    "PENDING": 0,
+    "ORPHAN": 0
+  },
+  "findings": [
+    {
+      "jobId": "293302e2-286a-4e6a-aafe-165a97c85d07",
+      "tenant": "tenant-a",
+      "state": "running",
+      "outcome": null,
+      "attempt": 1,
+      "memoKey": "rote-293302e2-286a-4e6a-aafe-165a97c85d07",
+      "leaseOwner": "fault-before-submit",
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still running after the drain timeout, lease_owner fault-before-submit (no ledger row)"
+    }
+  ],
+  "orphans": [],
+  "pass": false
+}

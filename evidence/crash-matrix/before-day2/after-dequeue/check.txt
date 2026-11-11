@@ -1,0 +1,8 @@
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              a721a2c1-3fa5-4e63-9544-06a480d94b2b tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-dequeue (no ledger row)
+RESULT: FAIL

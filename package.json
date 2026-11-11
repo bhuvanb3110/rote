@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -19,6 +19,9 @@
     "evidence:transfer": "tsx scripts/evidence-transfer-replay.ts",
     "evidence:queue": "tsx scripts/evidence-queue.ts",
     "evidence:day1": "tsx scripts/evidence-day1-exit.ts",
+    "oracle": "tsx src/cli/index.ts oracle check",
+    "chaos": "tsx scripts/chaos.ts",
+    "crash-matrix": "tsx scripts/crash-matrix.ts",
     "worker": "tsx src/worker/main.ts",
     "db:migrate": "tsx src/cli/index.ts db migrate",
     "test": "vitest run",

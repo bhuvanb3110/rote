@@ -1,0 +1,5 @@
+{"level":40,"time":1794421784616,"service":"worker","workerId":"fault-before-submit","faultPoint":"before-submit","msg":"worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)"}
+{"level":30,"time":1794421784617,"service":"worker","workerId":"fault-before-submit","playwrightVersion":"1.62.1","leaseSeconds":30,"shutdownGraceMs":10000,"evidenceBaseDir":"C:\\Users\\hp\\Downloads\\rote\\evidence\\crash-matrix\\before-day2\\before-submit\\worker-evidence","db":"postgres://rote:***@127.0.0.1:55432/rote_test?options=-c+search_path%3Dt_crash_before_submit_4aa01473","tenants":["tenant-a","tenant-b","tenant-c"],"msg":"worker: ready"}
+{"level":30,"time":1794421784617,"service":"worker","workerId":"fault-before-submit","leaseSeconds":30,"msg":"worker: started"}
+{"level":30,"time":1794421784645,"service":"worker","workerId":"fault-before-submit","jobId":"293302e2-286a-4e6a-aafe-165a97c85d07","tenant":"tenant-a","capability":"transfer","attempt":1,"msg":"worker: job leased"}
+ROTE_FAULT firing at before-submit (pid 4212)

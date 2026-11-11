@@ -1,0 +1,149 @@
+Crash-point matrix, started 2026-11-11T18:21:55.610Z
+points: after-dequeue, after-step-01, after-step-02, after-step-03, after-step-04, after-step-05, after-step-06, after-step-07, after-step-08, after-step-09, after-step-10, before-submit, after-submit, after-step-12, before-complete, after-complete
+tenant: tenant-a; lease: 30 s; drain timeout per point: 40000 ms; workers: child processes (node --import tsx src/worker/main.ts)
+
+== after-dequeue: fault fired (exit 1); drain timed out after 40769 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              a721a2c1-3fa5-4e63-9544-06a480d94b2b tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-dequeue (no ledger row)
+RESULT: FAIL
+== after-step-01: fault fired (exit 1); drain timed out after 40737 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              c9ecd3b6-985f-4ece-af7e-ee1d690692f1 tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-step-01 (no ledger row)
+RESULT: FAIL
+== after-step-02: fault fired (exit 1); drain timed out after 40752 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              8ba869ca-f378-4f76-8c43-9795b6157c4c tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-step-02 (no ledger row)
+RESULT: FAIL
+== after-step-03: fault fired (exit 1); drain timed out after 40735 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              1b204965-e414-42d7-8668-1350c7d2164c tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-step-03 (no ledger row)
+RESULT: FAIL
+== after-step-04: fault fired (exit 1); drain timed out after 40765 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              8eb44d09-cf7f-4e05-b1f0-9efd42075ea2 tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-step-04 (no ledger row)
+RESULT: FAIL
+== after-step-05: fault fired (exit 1); drain timed out after 40767 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              85e3324e-ec9e-47bc-aa0b-aeee8b534d7b tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-step-05 (no ledger row)
+RESULT: FAIL
+== after-step-06: fault fired (exit 1); drain timed out after 40737 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              51e4d747-3a36-4639-b4cf-0d3513974405 tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-step-06 (no ledger row)
+RESULT: FAIL
+== after-step-07: fault fired (exit 1); drain timed out after 40706 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              dbb594b0-b40b-40df-a552-1e7d28008433 tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-step-07 (no ledger row)
+RESULT: FAIL
+== after-step-08: fault fired (exit 1); drain timed out after 40711 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              977935d6-c4d1-40a6-bab6-00fbe2cc6570 tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-step-08 (no ledger row)
+RESULT: FAIL
+== after-step-09: fault fired (exit 1); drain timed out after 40732 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              202b9903-e494-4888-a562-a00e56eedb0d tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-step-09 (no ledger row)
+RESULT: FAIL
+== after-step-10: fault fired (exit 1); drain timed out after 40705 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              6ae3bcc6-d0c8-452d-b671-c5c7de61f815 tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-after-step-10 (no ledger row)
+RESULT: FAIL
+== before-submit: fault fired (exit 1); drain timed out after 40768 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 0; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 0); orphan rows: 0
+findings (1):
+  LOST              293302e2-286a-4e6a-aafe-165a97c85d07 tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner fault-before-submit (no ledger row)
+RESULT: FAIL
+== after-submit: fault fired (exit 1); drain timed out after 40748 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 1); orphan rows: 0
+findings (1):
+  LOST              8c4d4e33-c828-42a8-97f2-21941c2f00fe tenant-a running attempt=1 rows=1: still running after the drain timeout, lease_owner fault-after-submit (lost after commit: ledger row TXN-000001 exists)
+RESULT: FAIL
+== after-step-12: fault fired (exit 1); drain timed out after 40743 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 1); orphan rows: 0
+findings (1):
+  LOST              39874ad8-0126-440b-b0c5-16cc57087e90 tenant-a running attempt=1 rows=1: still running after the drain timeout, lease_owner fault-after-step-12 (lost after commit: ledger row TXN-000001 exists)
+RESULT: FAIL
+== before-complete: fault fired (exit 1); drain timed out after 40720 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: yes
+job states: running=1
+verdicts: ok=0, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=1, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 1 (of which after commit: 1); orphan rows: 0
+findings (1):
+  LOST              9545ac2b-71b8-434f-b900-51a0b4397d7a tenant-a running attempt=1 rows=1: still running after the drain timeout, lease_owner fault-before-complete (lost after commit: ledger row TXN-000001 exists)
+RESULT: FAIL
+== after-complete: fault fired (exit 1); drain ended after 231 ms
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+
+points green: 1/16
+RESULT: FAIL

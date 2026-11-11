@@ -1,0 +1,5 @@
+{"level":40,"time":1794421913937,"service":"worker","workerId":"fault-before-complete","faultPoint":"before-complete","msg":"worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)"}
+{"level":30,"time":1794421913938,"service":"worker","workerId":"fault-before-complete","playwrightVersion":"1.62.1","leaseSeconds":30,"shutdownGraceMs":10000,"evidenceBaseDir":"C:\\Users\\hp\\Downloads\\rote\\evidence\\crash-matrix\\before-day2\\before-complete\\worker-evidence","db":"postgres://rote:***@127.0.0.1:55432/rote_test?options=-c+search_path%3Dt_crash_before_complete_080675ca","tenants":["tenant-a","tenant-b","tenant-c"],"msg":"worker: ready"}
+{"level":30,"time":1794421913938,"service":"worker","workerId":"fault-before-complete","leaseSeconds":30,"msg":"worker: started"}
+{"level":30,"time":1794421913964,"service":"worker","workerId":"fault-before-complete","jobId":"9545ac2b-71b8-434f-b900-51a0b4397d7a","tenant":"tenant-a","capability":"transfer","attempt":1,"msg":"worker: job leased"}
+ROTE_FAULT firing at before-complete (pid 6012)
