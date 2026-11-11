@@ -742,3 +742,63 @@ Submit cannot be recovered: Step 6 runs no chaos, and a dead worker's job stays 
 reported as lost by the exit check, never papered over.
 
 **Date.** 2026-11-09
+
+## D30: Approvals also cover tenant overrides, by digest, per tenant
+
+(Step 7 reviewer decision A1. Closes the "still open" part of REPO_NOTES known limitation 6.)
+
+**Decision.** Every approval also records `approvedOverrideDigests`: tenantId → SHA-256 of the
+canonical JSON of the schema-validated override (`tenantOverrideDigest`, `src/tenant/digest.ts`;
+same canonicalization as D24), for every `overrides/<capabilityId>.<tenantId>.json` of that
+capability (`tenantOverrideDigests`; a file whose name and content name different tenants is an
+error). `catalog approve` records them (`approvalKeyWithOverrides`). A tenant run passes the override
+it applied to replay as the additive `ReplayOptions.approvalOverride` (`invokeCapability`, the CLI's
+`replay`/`operator --tenant`), and `checkApproval` refuses, after the version and content checks:
+- the tenant is not in the map: "tenant override for "<t>" exists but was not approved (the approval
+  covers: …)";
+- its digest differs: "tenant override for "<t>" changed since approval; re-approve", with both
+  digests.
+Other tenants' runs are decided by their own files, so one edited override stops one tenant. A status
+with **no map** is grandfathered: allowed, and the reason says the override was not checked. An
+approval written **without** overrides (auto-promotion, which knows only the base artifact, or a
+caller using `approvalKey`) records `{}`, so it approves no override: tenant runs are refused until a
+`catalog approve` names them (fail closed). `isApprovalCurrent` compares the override map only when
+the key names one, so the catalog listing and the run recorder still ask only about the base. The
+async API's enqueue-time 422 check (D27) loads the tenant's override too (only for a plain tenant
+name, never building a path from anything else; a missing file is left to the worker's preflight).
+
+**Backfill.** `scripts/backfill-approval-override-digests.ts` (output
+`evidence/step-07/approval-override-backfill.txt`, `RESULT: PASS`) adds only the map, and only where
+git shows every override of the capability unchanged since the approval: the approval commit is the
+one that introduced the status file's current `approvedAt` (`git log -S`, so the D24 digest backfill,
+a later metadata write, does not count as the approval), and each override's last change must be its
+ancestor with no uncommitted edits. All nine committed overrides passed (member-lookup's three:
+515b032/4fd7661 before the approval d05edca; the transfer pair's six: 776c86b before dbc3648); the two
+`open-sub-account*` capabilities have no override files and got `{}`.
+
+**Tests.** `src/tenant/digest.test.ts` (formatting-only changes keep the digest, value changes don't;
+capability ids that are prefixes of others; name/content mismatch); `src/confidence/overrideApproval.test.ts`
+(every approved tenant allowed; one override edited → refused for that tenant only, the other two and
+the base unaffected; a never-approved override refused; re-approval restores it; grandfathered map;
+`{}` from a base-only approval; through `invokeCapability` the refusal is `needs_human` before any
+browser); `asyncApi.db.test.ts` (422 for the edited tenant, 201 for another); the guard test
+`committedApprovals.test.ts` now asserts that each committed approval's map equals the digests of the
+committed override files, and that every tenant's gate decision says the override digest matches.
+
+**Alternatives considered.**
+- *One digest over the artifact plus all its overrides.* Simpler to store, but an edit to tenant-b's
+  override would stop tenants a and c too, and the refusal could not say which file changed.
+- *Fold each override into a per-tenant effective-artifact digest.* Hashes what replay executes, but
+  the approval could no longer be checked for a base run, and the reason could not separate "the
+  artifact changed" from "the override changed".
+- *Grandfather an approval written without overrides* (leave the map absent). Auto-promotion would
+  then silently produce approvals that check no override at all; failing closed costs one
+  `catalog approve`.
+- *Check overrides only at enqueue.* The run-time check stays authoritative (an override can change
+  between enqueue and run), as for the artifact (D27).
+
+**Why.** An override is executable content: it replaces locators (and can replace the success
+condition and entry URL) for one tenant. D24 made an approval a claim about specific content; without
+the overrides it was a claim about the base only, while tenant runs executed something else.
+
+**Date.** 2026-11-11

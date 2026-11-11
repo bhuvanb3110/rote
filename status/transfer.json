@@ -5,5 +5,10 @@
   "approvedAt": "2026-11-10T01:53:24.537Z",
   "approvedReason": "Re-approved for 1.1.0 in fleet Step 5 (approvals are version-bound, docs/DECISIONS.md D15; supersedes the Step 3 approval of 1.0.0, commit f1f2e8b). 1.1.0 = Step 4's scoped business-outcome recognizers + REQUIRED_FIELD_MISSING (b9ecaa2, D14). Basis: evidence/transfer-replay-1.1.0/ (commit 4119e11) - unattended invokeCapability replay of transfer 1.1.0 on tenants a/b/c, ledger-checked by script, RESULT: PASS (3 rows, confirmationRef == ledger id each tenant); and src/replay/transfer.test.ts + fleet.test.ts passing at 1.1.0 (npm test 20 files, 199 passed).",
   "approvedVersion": "1.1.0",
-  "approvedDigest": "0689465c1c14e45ebd4daa711fa82515e2bbbaf6be39e8e5ab2d29890bdf469f"
+  "approvedDigest": "0689465c1c14e45ebd4daa711fa82515e2bbbaf6be39e8e5ab2d29890bdf469f",
+  "approvedOverrideDigests": {
+    "tenant-a": "6f9c6855942b3f7d0bf32c769444fcb38f40b3bf254a2aa2f3e41bb3eebd5fbc",
+    "tenant-b": "6ddbb1423620254eb444506237bddfd6fcedb10cd8a4363e941fab9db403ca2a",
+    "tenant-c": "b43b59895db732ad6e183512e63e9fbad56346bcdd2981920db71e71541243fe"
+  }
 }

@@ -119,7 +119,11 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         `capability ${capability.id} ${capability.version}.`,
     );
   }
-  const approval = await checkApproval(approvalArtifact, options);
+  const approval = await checkApproval(approvalArtifact, {
+    approveUnattended: options.approveUnattended,
+    statusDir: options.statusDir,
+    tenantOverride: options.approvalOverride,
+  });
   if (!approval.allowed) {
     await evidence.append({ turn: -1, kind: "blocked", detail: { reason: approval.reason } });
     const gated = ReplayResultSchema.parse({

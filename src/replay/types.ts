@@ -1,6 +1,7 @@
 import type { Browser } from "playwright";
 import type { Capability, Step } from "../artifact/index.js";
 import type { EscalationController } from "../escalation/index.js";
+import type { TenantOverride } from "../tenant/index.js";
 
 /**
  * Callbacks around the one irreversible action in a run (a step the live gate OR the artifact
@@ -80,6 +81,12 @@ export interface ReplayOptions {
    * throws before anything runs).
    */
   approvalArtifact?: Capability;
+  /**
+   * The tenant override that was applied to produce `capability` (a tenant run). The approval gate
+   * refuses unless the approval covers exactly this override (its digest, D30). invokeCapability and
+   * the CLI's `--tenant` pass it. Omit for a run of the base artifact (no override check).
+   */
+  approvalOverride?: TenantOverride;
   /** Defaults to "status" -- where per-capability approval/confidence sidecar files live. */
   statusDir?: string;
   /** Callbacks around the irreversible action (the fleet's commit intent / fault injection). */

@@ -7,9 +7,9 @@ import { runDiscovery } from "../agent/index.js";
 import { runReplay } from "../replay/index.js";
 import { commitUncertainWarning, deserializeCapability, type Capability, type ReplayResult } from "../artifact/index.js";
 import { EscalationController, createOperatorConsole } from "../escalation/index.js";
-import { resolveTenant } from "../tenant/index.js";
+import { resolveTenant, type TenantOverride } from "../tenant/index.js";
 import { createCatalogApp, findCapability, invokeCapability, listCapabilities, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
-import { approvalKey, approveCapability, readRunConfidence } from "../confidence/index.js";
+import { approvalKeyWithOverrides, approveCapability, readRunConfidence } from "../confidence/index.js";
 import { createPool, databaseUrlFromEnv, migrate, redactDatabaseUrl } from "../queue/index.js";
 
 const logger = pino();
@@ -113,8 +113,9 @@ program
 
       let capability: Capability;
       let entryUrl: string;
+      let override: TenantOverride | undefined;
       try {
-        ({ capability, entryUrl } = await resolveTenant(baseCapability, opts.tenant, opts.url));
+        ({ capability, entryUrl, override } = await resolveTenant(baseCapability, opts.tenant, opts.url));
       } catch (err) {
         logger.error({ err, tenant: opts.tenant }, "replay: failed to load/apply tenant override");
         process.exitCode = 1;
@@ -128,6 +129,7 @@ program
       const result = await runReplay({
         capability,
         approvalArtifact: baseCapability, // the approval covers the artifact, not the tenant-merged copy (D24)
+        approvalOverride: override, // ...and this tenant's override, by digest (D30)
         params,
         entryUrl,
         headless: !opts.headed,
@@ -197,8 +199,9 @@ program
 
       let capability: Capability;
       let entryUrl: string;
+      let override: TenantOverride | undefined;
       try {
-        ({ capability, entryUrl } = await resolveTenant(baseCapability, opts.tenant, opts.url));
+        ({ capability, entryUrl, override } = await resolveTenant(baseCapability, opts.tenant, opts.url));
       } catch (err) {
         logger.error({ err, tenant: opts.tenant }, "operator: failed to load/apply tenant override");
         process.exitCode = 1;
@@ -219,6 +222,7 @@ program
       const result = await runReplay({
         capability,
         approvalArtifact: baseCapability, // the approval covers the artifact, not the tenant-merged copy (D24)
+        approvalOverride: override, // ...and this tenant's override, by digest (D30)
         params,
         entryUrl,
         headless: false, // a human must be able to see and click the SAME window
@@ -348,12 +352,14 @@ catalogCommand
       return;
     }
     try {
-      const status = await approveCapability(id, { ...approvalKey(capability), reason: opts.reason });
+      // The approval also names every tenant override file of the capability, by digest (D30).
+      const status = await approveCapability(id, { ...(await approvalKeyWithOverrides(capability)), reason: opts.reason });
       logger.info(
         {
           capabilityId: status.capabilityId,
           approvedVersion: status.approvedVersion,
           approvedDigest: status.approvedDigest,
+          approvedOverrideDigests: status.approvedOverrideDigests,
           approvedAt: status.approvedAt,
           reason: status.approvedReason,
         },

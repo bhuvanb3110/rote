@@ -43,7 +43,7 @@ export async function invokeCapability(options: InvokeCapabilityOptions): Promis
     );
   }
 
-  const { capability: effective, entryUrl } = await resolveTenant(
+  const { capability: effective, entryUrl, override } = await resolveTenant(
     capability,
     options.tenant,
     options.entryUrl ?? DEFAULT_ENTRY_URL,
@@ -54,6 +54,8 @@ export async function invokeCapability(options: InvokeCapabilityOptions): Promis
     capability: effective,
     // The approval covers the artifact as committed, not the tenant-merged copy (D24).
     approvalArtifact: capability,
+    // ...and the tenant's override must be one the approval covers (D30).
+    approvalOverride: override,
     params: parsedParams.data,
     entryUrl,
     headless: options.headless ?? true,

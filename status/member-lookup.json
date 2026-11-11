@@ -5,5 +5,10 @@
   "approvedAt": "2026-09-03T20:53:01.785Z",
   "approvedReason": "Grandfathered: pre-existing artifact committed before the confidence/approval gate, with verified evidence runs already committed under evidence/ (replay-success, replay-business-outcome, replay-tenant-b, replay-hostile-tenant).",
   "approvedVersion": "1.0.0",
-  "approvedDigest": "a827770c59486fa19fe971a40b06850cd27e5d856ac242a8b069c370c22fb680"
+  "approvedDigest": "a827770c59486fa19fe971a40b06850cd27e5d856ac242a8b069c370c22fb680",
+  "approvedOverrideDigests": {
+    "tenant-a": "92f37d17d878bce2504e5b89c507ed919b33580834e285c2546b2f6972bb8415",
+    "tenant-b": "bdd67b245e645509db743094ab59c987b1fe0ad9afd48625fe570529eb5e9086",
+    "tenant-c": "1307c4cb417dbc94c7052fc98dad867fa8d873d5a3ff4491955c00795864cc86"
+  }
 }

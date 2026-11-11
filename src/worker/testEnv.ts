@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Browser } from "playwright";
 import app from "../../mock-app/app.js";
 import { deserializeCapability, type Capability } from "../artifact/index.js";
-import { approvalKey, approveCapability } from "../confidence/index.js";
+import { approvalKeyWithOverrides, approveCapability } from "../confidence/index.js";
 import { enqueue, TERMINAL_STATES, type JobRow, type Pool } from "../queue/index.js";
 import { createTestSchema, resetQueueTables, type TestSchema } from "../queue/testDb.js";
 import { createRedactor, loadTenantCredentials } from "./credentials.js";
@@ -90,7 +90,12 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
     override.entryUrl = `${baseUrl}${TENANT_PREFIX[tenant]}/`;
     await writeFile(path.join(overridesDir, `transfer.${tenant}.json`), JSON.stringify(override));
   }
-  await approveCapability("transfer", { ...approvalKey(transfer), statusDir, reason: "test-only approval of the relaxed copy" });
+  // Approves the relaxed copy AND the relaxed per-tenant overrides the jobs run with (D30).
+  await approveCapability("transfer", {
+    ...(await approvalKeyWithOverrides(transfer, overridesDir)),
+    statusDir,
+    reason: "test-only approval of the relaxed copy",
+  });
 
   const credentials = loadTenantCredentials(FAKE_ENV, Object.keys(TENANT_PREFIX), ["password", "username"]);
   const redact = createRedactor(credentials);

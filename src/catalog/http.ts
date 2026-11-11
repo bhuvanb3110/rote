@@ -15,7 +15,10 @@
 // NOT AUTHENTICATION: the `tenant` in a request is whatever the caller says. Scoping GET /jobs/:id by
 // ?tenant= only stops one tenant from reading another's job by id; this project has no auth by scope.
 import express, { type Express, type Request, type Response } from "express";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { checkApproval } from "../confidence/index.js";
+import { DEFAULT_OVERRIDES_DIR, deserializeTenantOverride, type TenantOverride } from "../tenant/index.js";
 import {
   CredentialsInParamsError,
   enqueue,
@@ -37,6 +40,25 @@ export interface CatalogQueueOptions {
   artifactsDir?: string;
   /** Where the enqueue-time approval check reads status/ (default "status"). */
   statusDir?: string;
+  /** Where the enqueue-time approval check reads the tenant override (default "overrides", D30). */
+  overridesDir?: string;
+}
+
+const TENANT_ID_RE = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * The tenant's override of this capability, for the enqueue-time approval check (D30), or undefined
+ * when there is none (the worker's preflight then fails the job as invalid_job) or the tenant id is
+ * not a plain name (never used to build a path; the tenant FK answers 404 for it).
+ */
+async function enqueueTimeOverride(capabilityId: string, tenant: string, overridesDir: string): Promise<TenantOverride | undefined> {
+  if (!TENANT_ID_RE.test(tenant)) return undefined;
+  try {
+    return deserializeTenantOverride(await readFile(path.join(overridesDir, `${capabilityId}.${tenant}.json`), "utf8"));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw err;
+  }
 }
 
 export interface CatalogAppOptions {
@@ -113,7 +135,11 @@ async function handleAsyncInvoke(queue: CatalogQueueOptions, req: Request, res: 
     throw err;
   }
   // Fail fast (reviewer decision B4); the worker's run-time check is still the authoritative one.
-  const approval = await checkApproval(capability, { statusDir: queue.statusDir });
+  // The tenant's override must be approved too (D30).
+  const approval = await checkApproval(capability, {
+    statusDir: queue.statusDir,
+    tenantOverride: await enqueueTimeOverride(capability.id, body.tenant, queue.overridesDir ?? DEFAULT_OVERRIDES_DIR),
+  });
   if (!approval.allowed) {
     res.status(422).json({ error: approval.reason });
     return;

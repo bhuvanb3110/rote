@@ -3,6 +3,7 @@
 // the capability's proven-ness, not of any one step), refusal producing a needs_human result the
 // same way an unapproved risky action already does.
 import { capabilityDigest, type Capability } from "../artifact/index.js";
+import { tenantOverrideDigest, type TenantOverride } from "../tenant/index.js";
 import { readCapabilityStatus, DEFAULT_STATUS_DIR } from "./store.js";
 
 export interface ApprovalDecision {
@@ -14,6 +15,11 @@ export interface ApprovalCheckOptions {
   /** Defaults to false, same polarity as ReplayOptions.approveRisky. */
   approveUnattended?: boolean;
   statusDir?: string;
+  /**
+   * The tenant override this run applies (a tenant run), checked against the approval's
+   * approvedOverrideDigests (D30). Omit for a run of the base artifact.
+   */
+  tenantOverride?: TenantOverride;
 }
 
 /**
@@ -60,13 +66,49 @@ export async function checkApproval(capability: Capability, options: ApprovalChe
     };
   }
 
+  // D30: a tenant run executes the base artifact WITH its override, so the override must be part of
+  // what was approved. Refusals name the tenant; other tenants' runs are decided by their own files.
+  let overrideNote = "";
+  const override = options.tenantOverride;
+  if (override) {
+    if (override.capabilityId !== id) {
+      throw new Error(`tenantOverride is for capability "${override.capabilityId}", not "${id}".`);
+    }
+    const tenant = override.tenantId;
+    const overrideDigest = tenantOverrideDigest(override);
+    const approved = status.approvedOverrideDigests;
+    if (approved === undefined) {
+      overrideNote =
+        ` The approval records no approvedOverrideDigests (it predates override-bound approvals), so ` +
+        `tenant "${tenant}"'s override was not checked (grandfathered); re-approve to bind it.`;
+    } else if (!Object.hasOwn(approved, tenant)) {
+      return {
+        allowed: false,
+        reason:
+          `Capability "${id}" ${version}: tenant override for "${tenant}" exists but was not approved ` +
+          `(the approval covers: ${Object.keys(approved).sort().join(", ") || "no overrides"}); re-approve ` +
+          `(see "catalog approve") before unattended replay for this tenant. Override digest ${overrideDigest}.`,
+      };
+    } else if (approved[tenant] !== overrideDigest) {
+      return {
+        allowed: false,
+        reason:
+          `Capability "${id}" ${version}: tenant override for "${tenant}" changed since approval; re-approve ` +
+          `(see "catalog approve") before unattended replay for this tenant. Approved override digest ` +
+          `${approved[tenant]}, override digest ${overrideDigest}.`,
+      };
+    } else {
+      overrideNote = ` Tenant "${tenant}" override digest matches.`;
+    }
+  }
+
   if (status.approvedVersion === undefined) {
     return {
       allowed: true,
       reason:
         `Capability "${id}" is approved for unattended replay under a grandfathered approval ` +
         `that records no approvedVersion (it predates version-bound approvals); artifact is ` +
-        `${version}. Re-approve to bind it to a version and its content.`,
+        `${version}. Re-approve to bind it to a version and its content.${overrideNote}`,
     };
   }
   if (status.approvedDigest === undefined) {
@@ -75,11 +117,11 @@ export async function checkApproval(capability: Capability, options: ApprovalChe
       reason:
         `Capability "${id}" is approved for unattended replay at version ${version} under a ` +
         `grandfathered approval that records no approvedDigest (it predates content-bound ` +
-        `approvals), so only the version was checked. Re-approve to bind it to its content.`,
+        `approvals), so only the version was checked. Re-approve to bind it to its content.${overrideNote}`,
     };
   }
   return {
     allowed: true,
-    reason: `Capability "${id}" is approved for unattended replay at version ${version} (content digest matches).`,
+    reason: `Capability "${id}" is approved for unattended replay at version ${version} (content digest matches).${overrideNote}`,
   };
 }

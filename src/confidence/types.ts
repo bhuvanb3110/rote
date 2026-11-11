@@ -51,6 +51,14 @@ export const CapabilityStatusSchema = z.object({
    * reason says so).
    */
   approvedDigest: DigestSchema.optional(),
+  /**
+   * tenantId -> tenantOverrideDigest() of every tenant override file of this capability, as it was
+   * when the approval was given (docs/DECISIONS.md D30). A tenant run is refused if its override's
+   * digest differs or its tenant is absent from the map ({} = no override approved). Optional so
+   * older files still parse: a missing map means the overrides are not checked (grandfathered, and
+   * the gate's reason says so).
+   */
+  approvedOverrideDigests: z.record(z.string().min(1), DigestSchema).optional(),
 });
 export type CapabilityStatus = z.infer<typeof CapabilityStatusSchema>;
 

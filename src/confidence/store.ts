@@ -6,6 +6,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { capabilityDigest, type Capability } from "../artifact/index.js";
+import { DEFAULT_OVERRIDES_DIR, tenantOverrideDigests } from "../tenant/index.js";
 import {
   deserializeCapabilityStatus,
   serializeCapabilityStatus,
@@ -56,17 +57,32 @@ async function writeCapabilityStatus(status: CapabilityStatus, statusDir: string
 }
 
 /**
- * What an approval is bound to: the artifact's version (D15) and the SHA-256 of its canonical JSON
- * (D24). Every approval records both; every check compares both.
+ * What an approval is bound to: the artifact's version (D15), the SHA-256 of its canonical JSON
+ * (D24), and the digests of its tenant overrides (D30). Every approval records all three; every
+ * check compares version and digest, and a tenant run also compares its own override's digest.
  */
 export interface ApprovalKey {
   version: string;
   digest: string;
+  /**
+   * tenantId -> tenantOverrideDigest of each override approved with it. An approval written
+   * without this approves NO override ({}): tenant runs are then refused until a re-approval that
+   * names them (fail closed; e.g. auto-promotion, which only knows the base artifact).
+   */
+  overrideDigests?: Record<string, string>;
 }
 
-/** The approval key of an artifact as it is now. */
+/** The approval key of an artifact as it is now, without its overrides (approves base runs only). */
 export function approvalKey(capability: Capability): ApprovalKey {
   return { version: capability.version, digest: capabilityDigest(capability) };
+}
+
+/** The full approval key: the artifact plus every override file of it in `overridesDir` (D30). */
+export async function approvalKeyWithOverrides(
+  capability: Capability,
+  overridesDir: string = DEFAULT_OVERRIDES_DIR,
+): Promise<ApprovalKey> {
+  return { ...approvalKey(capability), overrideDigests: await tenantOverrideDigests(capability.id, overridesDir) };
 }
 
 /**
@@ -78,8 +94,17 @@ export function isApprovalCurrent(status: CapabilityStatus, key: ApprovalKey): b
   return (
     status.approvalStatus === "approved" &&
     (status.approvedVersion === undefined || status.approvedVersion === key.version) &&
-    (status.approvedDigest === undefined || status.approvedDigest === key.digest)
+    (status.approvedDigest === undefined || status.approvedDigest === key.digest) &&
+    // Only a key that names its overrides (D30) is compared on them: the catalog listing and the
+    // run recorder pass the base key and ask only about the base.
+    (key.overrideDigests === undefined || sameDigests(status.approvedOverrideDigests, key.overrideDigests))
   );
+}
+
+function sameDigests(a: Record<string, string> | undefined, b: Record<string, string>): boolean {
+  if (a === undefined) return false;
+  const keys = Object.keys(b);
+  return Object.keys(a).length === keys.length && keys.every((k) => Object.hasOwn(a, k) && a[k] === b[k]);
 }
 
 /**
@@ -114,6 +139,7 @@ function markApproved(status: CapabilityStatus, key: ApprovalKey, reason: string
   status.approvedReason = reason;
   status.approvedVersion = key.version;
   status.approvedDigest = key.digest;
+  status.approvedOverrideDigests = { ...(key.overrideDigests ?? {}) };
 }
 
 export interface RecordRunOptions extends ApprovalKey {

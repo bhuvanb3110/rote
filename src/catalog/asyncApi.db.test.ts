@@ -2,7 +2,7 @@
 // 201 / 200 / 409 / 400 / 404 / 422 / 503, GET /jobs/:id shape and tenant scoping, and no credential
 // value in any response or stored row. Uses the committed artifacts/ and status/ (transfer is
 // approved for its current version and content).
-import { mkdtemp, rm } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -146,6 +146,28 @@ describe("POST /capabilities/:id/invoke?mode=async", () => {
       expect((await pool.query("SELECT count(*)::int AS n FROM jobs")).rows[0].n).toBe(0);
     } finally {
       await rm(emptyStatus, { recursive: true, force: true });
+    }
+  });
+
+  it("422 for a tenant whose override changed since approval; other tenants still enqueue (D30)", async () => {
+    const overridesDir = await mkdtemp(path.join(tmpdir(), "rote-api-overrides-"));
+    try {
+      for (const tenant of ["tenant-a", "tenant-b"]) {
+        await copyFile(path.join("overrides", `transfer.${tenant}.json`), path.join(overridesDir, `transfer.${tenant}.json`));
+      }
+      const file = path.join(overridesDir, "transfer.tenant-b.json");
+      const raw = JSON.parse(await readFile(file, "utf8"));
+      raw.entryUrl = "http://localhost:4100/tenant-b/?edited";
+      await writeFile(file, JSON.stringify(raw));
+      const b = await serve({ queue: { pool, overridesDir } });
+      const refused = await invoke({ tenant: "tenant-b", params: PARAMS }, "key-ov-b", b);
+      expect(refused.status).toBe(422);
+      expect(refused.json.error).toContain(`tenant override for "tenant-b" changed since approval`);
+      const allowed = await invoke({ tenant: "tenant-a", params: PARAMS }, "key-ov-a", b);
+      expect(allowed.status).toBe(201);
+      expect((await pool.query("SELECT tenant_id FROM jobs")).rows).toEqual([{ tenant_id: "tenant-a" }]);
+    } finally {
+      await rm(overridesDir, { recursive: true, force: true });
     }
   });
 

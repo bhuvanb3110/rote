@@ -13,7 +13,7 @@ import { chromium, type Browser } from "playwright";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import app from "../../mock-app/app.js";
 import { deserializeCapability } from "../artifact/index.js";
-import { approvalKey, approveCapability } from "../confidence/index.js";
+import { approvalKeyWithOverrides, approveCapability } from "../confidence/index.js";
 import { WebSurface } from "../surface/index.js";
 import { invokeCapability, type InvokeCapabilityOptions } from "./invoke.js";
 
@@ -64,7 +64,8 @@ beforeAll(async () => {
   override.entryUrl = `${baseUrl}/tenant-b/`;
   await writeFile(path.join(overridesDir, "transfer.tenant-b.json"), JSON.stringify(override));
   await approveCapability("transfer", {
-    ...approvalKey(deserializeCapability(JSON.stringify(artifact))),
+    // The approval covers the relaxed artifact and the relaxed tenant-b override it is run with (D30).
+    ...(await approvalKeyWithOverrides(deserializeCapability(JSON.stringify(artifact)), overridesDir)),
     statusDir,
     reason: "test-only approval in a temp statusDir",
   });
