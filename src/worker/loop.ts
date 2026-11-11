@@ -18,6 +18,7 @@ import { redactDeep, type Redactor } from "./credentials.js";
 import { isTransientDbError } from "../queue/index.js";
 import { jobOutcomeFor, type JobOutcome } from "./outcome.js";
 import type { RunJobOptions, RunJobResult } from "./runJob.js";
+import { NO_FAULT, type FaultInjector } from "./fault.js";
 
 export interface WorkerLogger {
   info(obj: Record<string, unknown>, msg: string): void;
@@ -59,6 +60,8 @@ export interface WorkerOptions {
   /** Called after every loop iteration (health file, tests). */
   onTick?: () => void;
   onJobDone?: (done: JobDone) => void;
+  /** Test-only crash points after-dequeue / before-complete / after-complete (fault.ts, D34). */
+  fault?: FaultInjector;
   /** Seam 4 (step-06 section 7). No-op in Step 6. */
   beforeDequeue?: () => Promise<void>;
 }
@@ -154,6 +157,8 @@ export class Worker {
     this.current = { controller };
     const log = { workerId: this.options.workerId, jobId: job.id, tenant: job.tenant_id, capability: job.capability_id, attempt: job.attempt };
     this.log.info(log, "worker: job leased");
+    const fault = this.options.fault ?? NO_FAULT;
+    fault.at("after-dequeue"); // lease taken, before any browser work
     try {
       let run: RunJobResult;
       try {
@@ -171,6 +176,7 @@ export class Worker {
       });
       // Replay already redacts its result; this is the belt to that braces (credential values only).
       const outcome: JobOutcome = { ...computed, result: computed.result && redactDeep(computed.result, this.options.redact) };
+      fault.at("before-complete"); // outcome computed, completion transaction not started
       const completion = await completeJobWithRetry(
         this.options.pool,
         { jobId: job.id, fencingToken: job.fencing_token, workerId: this.options.workerId, outcome },
@@ -181,6 +187,7 @@ export class Worker {
             this.log.warn({ ...log, err: this.describe(err), retry: n }, "worker: Postgres unavailable while recording; outcome held in memory, retrying"),
         },
       );
+      if (completion?.recorded) fault.at("after-complete"); // the completion transaction committed
       const recorded = completion === null ? null : completion.recorded;
       const fields = { ...log, state: outcome.state, outcome: outcome.outcome, error: outcome.error, recorded, ms: Date.now() - started };
       if (recorded === true) this.log.info(fields, "worker: job recorded");

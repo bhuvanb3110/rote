@@ -19,6 +19,7 @@ import { hasIrreversibleStep, MEMO_INPUT, type JobRow } from "../queue/index.js"
 import { DEFAULT_OVERRIDES_DIR, resolveTenant } from "../tenant/index.js";
 import type { TenantCredentials } from "./credentials.js";
 import type { RunEnd } from "./outcome.js";
+import { NO_FAULT, type FaultInjector } from "./fault.js";
 
 export interface RunJobContext {
   credentials: TenantCredentials;
@@ -28,6 +29,8 @@ export interface RunJobContext {
   overridesDir?: string;
   /** Approvals (status/). Default "status". */
   statusDir?: string;
+  /** Test-only crash points inside the run (fault.ts, D34). Default: none. */
+  fault?: FaultInjector;
 }
 
 /** The job cannot run as given; never retried. */
@@ -105,14 +108,20 @@ export async function runJob(ctx: RunJobContext, job: JobRow, options: RunJobOpt
   }
 
   let irreversibleStarted = false;
+  const fault = ctx.fault ?? NO_FAULT;
   const onIrreversible = {
     // Seam 1 (step-06 section 7): Day 2 writes the fenced commit intent here and throws on a lost lease.
     before: async (_step: Step) => {
       irreversibleStarted = true;
+      fault.at("before-submit");
     },
-    // Seam 2: Day 2's crash-after-submit fault flag and the crash-point matrix.
-    after: async (_step: Step) => undefined,
+    // Seam 2: the bank has answered the click (D12); crash-after-submit fires here.
+    after: async (_step: Step) => {
+      fault.at("after-submit");
+    },
   };
+  // Only a fault-injecting worker passes onStep at all: a normal worker's replay is unchanged.
+  const onStep = fault.point ? { after: async (step: Step) => fault.at(`after-${step.id}`) } : undefined;
   try {
     const result = await invokeCapability({
       id: prepared.capability.id,
@@ -126,6 +135,7 @@ export async function runJob(ctx: RunJobContext, job: JobRow, options: RunJobOpt
       statusDir: ctx.statusDir,
       approveRisky: true,
       onIrreversible,
+      onStep,
       headless: true,
     });
     return { end: { kind: "result", result }, irreversibleStarted };
