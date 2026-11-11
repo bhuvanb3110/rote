@@ -240,3 +240,61 @@ jobs:
 3. **Node in CI:** 22 LTS (proposed) vs the builder's 25.9.0. Pin 22 in `engines` too?
 4. **The `ERR_INSUFFICIENT_RESOURCES` flake:** leave as is and keep recording it, or cap vitest's
    parallelism (`maxWorkers`) locally as well as in CI?
+
+## Reviewer decisions (2026-11-10)
+
+The reviewer **approved** this plan with the decisions below. Where they differ from the sections
+above, these win; everything else in this file stands. The reviewer independently re-ran the Step 6
+suite on Postgres 16: 349/350, with only the version-17 assertion failing, as expected.
+
+### Part A, built first: small fixes
+
+A1. **Approvals cover tenant overrides.** Each approval records, per tenant override file of that
+    capability, the SHA-256 of its canonical JSON (`approvedOverrideDigests: { "tenant-b": "…" }`).
+    The run-time check for a tenant run refuses if that tenant's override changed since approval, or
+    exists but was not approved. A missing map falls back as today (grandfathered, stated in the
+    reason). Backfill all five status files only where git shows the override unchanged since the
+    approval. Extend the guard test. Tests: an override edit is refused for that tenant only; other
+    tenants are unaffected. A D-entry; the REPO_NOTES gap (limitation 6, "still open") closed.
+A2. **The `ERR_INSUFFICIENT_RESOURCES` flake:** limit concurrency ONLY for the test files that launch
+    Chromium (e.g. a separate vitest project with a low max concurrency, chosen by measurement),
+    keeping unit and DB tests fully parallel. Prove it: 10 full runs, all logs kept, plus the total
+    duration before vs after. A D-entry.
+A3. Fix the two pre-existing TypeScript errors in the mock-app test files, and make `tsc --noEmit`
+    cover those files (and `scripts/`) so CI catches them.
+
+### Part B: Step 7 as planned, with these decisions
+
+1. **Open question 1, chaos defaults:** 100 jobs, 4 workers, kills every 5–15 s, one 45 s pause:
+   approved. The drain timeout is a flag. The committed `before-day2` run uses `--drain-timeout 3m`,
+   because its jobs are expected to be LOST and a 10-minute wait proves nothing. The default stays
+   10 min for Day 2.
+2. **Open question 2, Docker in CI:** build the image on EVERY push to `main` and `fleet/**`, as a
+   separate job (build only, no push, with the build cache), so a broken Dockerfile fails fast. The
+   repo is public, so Actions minutes are free.
+3. **Open question 3, Node:** 22 LTS in CI; `engines: ">=22"` in `package.json`. The builder stays on
+   Node 25 locally. Also run the unit tests on Node 25 in CI only if it is cheap; otherwise skip.
+4. **Open question 4, the flake:** see A2.
+5. **Record for Day 2:** Step 6's lease is 300 s because there is no heartbeat yet; Day 2 restores the
+   brief's 30 s lease with 10 s heartbeats. The crash-point matrix then ADDS points inside recovery:
+   during the history lookup (after the lookup's login, after the lookup read the count, before
+   writing the verify result) and during requeue. Plan those points now; they are built on Day 2.
+
+Everything else stands: the oracle module + CLI with all verdicts and the orphan check, the Day-1
+exit script refactored onto it (re-run once, same PASS), the seeded chaos harness with kills, the
+pause, the supervisor and full evidence, the committed `before-day2` run with a README saying it is
+EXPECTED TO FAIL and why 0 duplicates proves nothing yet, the `onStep` hook + `ROTE_FAULT` /
+`ROTE_FAULT_ENABLE`, the crash-matrix harness with its red evidence, and the CI workflow with a
+README badge and uploaded logs.
+
+### Also required
+
+- Memory: the laptop has 8 GB. Never run the full test suite while the 4-worker fleet is up; stop the
+  fleet containers when not in use.
+- `npm test` before every commit; never commit or push on red. Full suite 3 times at the end, all logs
+  kept unfiltered. After pushing, check the CI run on GitHub and report its result; if CI fails, fix
+  it in this step.
+- Then write `docs/plans/step-08.md` (commit it; don't build it): Day 2 crash safety, with exact SQL
+  for every transaction (heartbeat, commit intent, recovery, verify), the zombie case stated honestly,
+  tests for each rule, how the matrix and chaos turn green, the fast-check property tests, and a split
+  into reviewable steps if Day 2 is too big for one.
