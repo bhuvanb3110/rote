@@ -1,5 +1,7 @@
 # rote
 
+[![ci](https://github.com/bhuvanb3110/rote/actions/workflows/ci.yml/badge.svg?branch=fleet/day-1)](https://github.com/bhuvanb3110/rote/actions/workflows/ci.yml?query=branch%3Afleet%2Fday-1)
+
 Computer-use automation for legacy bank/credit-union back-office web apps that have no API. An
 LLM discovers a UI task once and compiles it into a typed, versioned **Capability** artifact;
 that artifact then **replays deterministically, with no LLM in the loop**, and escalates to a
@@ -41,6 +43,20 @@ npm run db:migrate                # apply db/migrations to the dev database (ROT
 
 The tests use a separate `rote_test` database (created on demand) with one schema per test file;
 they never touch the dev `rote` database. `docker compose down -v` deletes the data volume.
+
+`npm run typecheck` checks every file, tests and `scripts/` included (the build config excludes tests).
+The 11 test files that launch Chromium run in their own vitest project, at most 3 at a time
+(`vitest.browser-files.ts`, D31; a guard test keeps the list complete); everything else runs fully
+parallel. Never run the suite while the 4-worker fleet is up on an 8 GB machine.
+
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`, D35) on every push and pull request to `main` and
+`fleet/**`: **test** (Node 22, a `postgres:17` service, Playwright Chromium from the lockfile,
+`npm run typecheck`, the full `npm test`, the full log uploaded as the `npm-test-log` artifact on every
+run), **unit-node25** (the pure unit tests on Node 25) and **docker** (builds the fleet image, never
+pushed, with the Actions cache). Not in CI: the Day-1 exit, chaos and the crash-point matrix; they need
+the Compose stack or minutes of wall time and run as scripts with committed evidence (next section).
 
 ## Replay needs no API key
 
