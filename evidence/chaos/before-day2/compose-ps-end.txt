@@ -1,0 +1,8 @@
+NAME              IMAGE              COMMAND                  SERVICE    CREATED         STATUS                   PORTS
+rote-api-1        rote-fleet:local   "node dist/src/cli/i…"   api        5 minutes ago   Up 5 minutes (healthy)   127.0.0.1:8080->8080/tcp
+rote-bank-1       rote-fleet:local   "node dist/mock-app/…"   bank       5 minutes ago   Up 5 minutes (healthy)   127.0.0.1:4100->4100/tcp
+rote-postgres-1   postgres:17        "docker-entrypoint.s…"   postgres   41 hours ago    Up 2 hours (healthy)     127.0.0.1:55432->5432/tcp
+rote-worker-1     rote-fleet:local   "node dist/src/worke…"   worker     5 minutes ago   Up 3 minutes (healthy)   
+rote-worker-2     rote-fleet:local   "node dist/src/worke…"   worker     5 minutes ago   Up 4 minutes (healthy)   
+rote-worker-3     rote-fleet:local   "node dist/src/worke…"   worker     5 minutes ago   Up 3 minutes (healthy)   
+rote-worker-4     rote-fleet:local   "node dist/src/worke…"   worker     5 minutes ago   Up 3 minutes (healthy)   
