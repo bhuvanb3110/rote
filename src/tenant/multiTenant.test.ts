@@ -15,6 +15,7 @@ import { approvalKey, approveCapability } from "../confidence/index.js";
 import { runReplay } from "../replay/index.js";
 import { applyTenantOverride } from "./apply.js";
 import { deserializeTenantOverride } from "./types.js";
+import { listenOnSafePort } from "../testing/listen.js";
 
 let server: Server;
 let baseUrl: string;
@@ -50,7 +51,7 @@ async function readEvidenceEntries(evidenceRef: string): Promise<Array<Record<st
 
 beforeAll(async () => {
   server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
   const { port } = server.address() as AddressInfo;
   baseUrl = `http://localhost:${port}`;
   capability = await loadRelaxedCapability();

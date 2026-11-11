@@ -3,8 +3,8 @@
 // value in any response or stored row. Uses the committed artifacts/ and status/ (transfer is
 // approved for its current version and content).
 import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import type { Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import { createServer, type Server } from "node:http";
+import { listenOnSafePort } from "../testing/listen.js";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -24,10 +24,11 @@ const servers: Server[] = [];
 const responses: string[] = [];
 
 async function serve(options: CatalogAppOptions): Promise<string> {
-  const s = createCatalogApp(options).listen(0);
-  await new Promise<void>((resolve) => s.once("listening", () => resolve()));
+  const s = createServer(createCatalogApp(options));
+  // fetch refuses the Fetch standard's bad ports; never listen on one (D31).
+  const port = await listenOnSafePort(s);
   servers.push(s);
-  return `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
+  return `http://127.0.0.1:${port}`;
 }
 
 async function call(url: string, init: { method?: string; key?: string; body?: unknown } = {}) {

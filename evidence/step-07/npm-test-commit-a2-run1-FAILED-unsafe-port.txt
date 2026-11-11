@@ -1,0 +1,466 @@
+
+> rote@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.10 C:/Users/hp/Downloads/rote
+
+ ❯ |browser| src/replay/fleet.test.ts (25 tests | 25 failed) 25000ms
+     × two sequential runs on one browser both succeed; the browser stays up with 0 contexts 439ms
+     × two concurrent runs on one browser get their own balances (contexts share no cookies) 253ms
+     × a run that throws after its context opened still closes that context and leaves the browser up 187ms
+     × headless is ignored (not rejected) when a browser is passed 144ms
+     × gate says safe, artifact says risky: refused without approveRisky (0 rows); runs with it (1 row) 193ms
+     × artifact says safe, gate says risky: still irreversible (today's behavior, pinned) 195ms
+     × gate-blind Submit with approveRisky still goes through onIrreversible.before 636ms
+     × before then after, once each, on step-11; after() runs once the bank answered (ledger already has the row) 145ms
+     × before() throws: runReplay rejects with that same error, the click never happens, after() never runs 260ms
+     × after() throws: runReplay rejects with that error and the click happened (exactly 1 row) 164ms
+     × no hooks for an all-safe capability, nor for a transfer without approveRisky 144ms
+     × no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs 141ms
+     × transient interstitial right after Submit: no reload (no re-POST), non-success with commitUncertain, 0 rows 149ms
+     × transient interstitial BEFORE Submit still recovers (the rules apply only after the attempt) 1ms
+     × 503 right after Submit, before the write (errors/on armed in before()): failure + commitUncertain, 0 rows 136ms
+     × 503 right after Submit, after the write (errors/after-write): failure + commitUncertain, 1 row, lookup finds 1 154ms
+     × a business_outcome after the attempt carries commitUncertain too 138ms
+     × business outcomes BEFORE the attempt carry no marker (a blind retry is safe) 149ms
+     × a throw after the attempt becomes failure/unknown with the marker (not an exception) 168ms
+     × operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click 20088ms
+     × already aborted: rejects with signal.reason before any evidence, browser or context 19ms
+     × abort during a slow step (bank latency 3 s): AbortError well under 3 s, shared browser up with 0 contexts, 0 rows 8ms
+     × abort inside after() (the click happened): still rejects with AbortError, 1 row, aborted entry names step-11 215ms
+     × abort without a shared browser closes the browser replay launched, and still rejects 5ms
+     × the abort listener is removed when the run ends (no leak on a long-lived worker) 144ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 25 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > two sequential runs on one browser both succeed; the browser stays up with 0 contexts
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:218:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > two sequential runs on one browser both succeed; the browser stays up with 0 contexts
+ FAIL  |browser| src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > two concurrent runs on one browser get their own balances (contexts share no cookies)
+ FAIL  |browser| src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > a run that throws after its context opened still closes that context and leaves the browser up
+ FAIL  |browser| src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > headless is ignored (not rejected) when a browser is passed
+ FAIL  |browser| src/replay/fleet.test.ts > irreversibility hardening: gate risky OR artifact risky > gate says safe, artifact says risky: refused without approveRisky (0 rows); runs with it (1 row)
+ FAIL  |browser| src/replay/fleet.test.ts > irreversibility hardening: gate risky OR artifact risky > artifact says safe, gate says risky: still irreversible (today's behavior, pinned)
+ FAIL  |browser| src/replay/fleet.test.ts > irreversibility hardening: gate risky OR artifact risky > gate-blind Submit with approveRisky still goes through onIrreversible.before
+ FAIL  |browser| src/replay/fleet.test.ts > onIrreversible hooks > before then after, once each, on step-11; after() runs once the bank answered (ledger already has the row)
+ FAIL  |browser| src/replay/fleet.test.ts > onIrreversible hooks > before() throws: runReplay rejects with that same error, the click never happens, after() never runs
+ FAIL  |browser| src/replay/fleet.test.ts > onIrreversible hooks > after() throws: runReplay rejects with that error and the click happened (exactly 1 row)
+ FAIL  |browser| src/replay/fleet.test.ts > onIrreversible hooks > no hooks for an all-safe capability, nor for a transfer without approveRisky
+ FAIL  |browser| src/replay/fleet.test.ts > onIrreversible hooks > no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > transient interstitial right after Submit: no reload (no re-POST), non-success with commitUncertain, 0 rows
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > transient interstitial BEFORE Submit still recovers (the rules apply only after the attempt)
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > transient interstitial BEFORE Submit still recovers (the rules apply only after the attempt)
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > 503 right after Submit, before the write (errors/on armed in before()): failure + commitUncertain, 0 rows
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > 503 right after Submit, after the write (errors/after-write): failure + commitUncertain, 1 row, lookup finds 1
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > a business_outcome after the attempt carries commitUncertain too
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > business outcomes BEFORE the attempt carry no marker (a blind retry is safe)
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > a throw after the attempt becomes failure/unknown with the marker (not an exception)
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click
+ FAIL  |browser| src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > already aborted: rejects with signal.reason before any evidence, browser or context
+ FAIL  |browser| src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort during a slow step (bank latency 3 s): AbortError well under 3 s, shared browser up with 0 contexts, 0 rows
+ FAIL  |browser| src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort during a slow step (bank latency 3 s): AbortError well under 3 s, shared browser up with 0 contexts, 0 rows
+ FAIL  |browser| src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort inside after() (the click happened): still rejects with AbortError, 1 row, aborted entry names step-11
+ FAIL  |browser| src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort without a shared browser closes the browser replay launched, and still rejects
+ FAIL  |browser| src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort without a shared browser closes the browser replay launched, and still rejects
+ FAIL  |browser| src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > the abort listener is removed when the run ends (no leak on a long-lived worker)
+TypeError: fetch failed
+Caused by: Error: bad port
+ ❯ control src/replay/fleet.test.ts:48:21
+ ❯ src/replay/fleet.test.ts:196:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > two concurrent runs on one browser get their own balances (contexts share no cookies)
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:235:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > headless is ignored (not rejected) when a browser is passed
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:251:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > irreversibility hardening: gate risky OR artifact risky > gate says safe, artifact says risky: refused without approveRisky (0 rows); runs with it (1 row)
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:269:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > irreversibility hardening: gate risky OR artifact risky > artifact says safe, gate says risky: still irreversible (today's behavior, pinned)
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:286:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > irreversibility hardening: gate risky OR artifact risky > gate-blind Submit with approveRisky still goes through onIrreversible.before
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:302:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > onIrreversible hooks > before then after, once each, on step-11; after() runs once the bank answered (ledger already has the row)
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:319:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > onIrreversible hooks > before() throws: runReplay rejects with that same error, the click never happens, after() never runs
+AssertionError: expected Error: page.goto: net::ERR_UNSAFE_PORT at… { log: [ '…' ] } to be Error: fencing token mismatch: lease lost // Object.is equality
+
+- Expected
++ Received
+
+- Error {
+-   "message": "fencing token mismatch: lease lost",
++ PlaywrightError {
++   "message": "page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
++ Call log:
++ [2m  - navigating to \"http://localhost:2049/\", waiting until \"load\"[22m
++ ",
++   "log": [
++     "  - navigating to \"http://localhost:2049/\", waiting until \"load\"",
++   ],
++   "name": "Error",
+  }
+
+ ❯ src/replay/fleet.test.ts:333:89
+    331|     const fencing = new Error("fencing token mismatch: lease lost");
+    332|     const { calls, hooks } = recordingHooks({ before: async () => { th…
+    333|     await expect(transfer({ memo: "rote-s4-before-throws" }, { onIrrev…
+       |                                                                                         ^
+    334|     expect(calls.map((c) => c.hook)).toEqual(["before"]);
+    335|     expect(await ledger()).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > onIrreversible hooks > after() throws: runReplay rejects with that error and the click happened (exactly 1 row)
+AssertionError: expected Error: page.goto: net::ERR_UNSAFE_PORT at… { log: [ '…' ] } to be Error: simulated crash after submit // Object.is equality
+
+- Expected
++ Received
+
+- Error {
+-   "message": "simulated crash after submit",
++ PlaywrightError {
++   "message": "page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
++ Call log:
++ [2m  - navigating to \"http://localhost:2049/\", waiting until \"load\"[22m
++ ",
++   "log": [
++     "  - navigating to \"http://localhost:2049/\", waiting until \"load\"",
++   ],
++   "name": "Error",
+  }
+
+ ❯ src/replay/fleet.test.ts:341:88
+    339|     const crash = new Error("simulated crash after submit");
+    340|     const { calls, hooks } = recordingHooks({ after: async () => { thr…
+    341|     await expect(transfer({ memo: "rote-s4-after-throws" }, { onIrreve…
+       |                                                                                        ^
+    342|     expect(calls.map((c) => [c.hook, c.ledgerRows])).toEqual([["before…
+    343|     expect((await ledger()).map((r) => r.memo)).toEqual(["rote-s4-afte…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > onIrreversible hooks > no hooks for an all-safe capability, nor for a transfer without approveRisky
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:349:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > onIrreversible hooks > no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:363:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > transient interstitial right after Submit: no reload (no re-POST), non-success with commitUncertain, 0 rows
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:380:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > 503 right after Submit, before the write (errors/on armed in before()): failure + commitUncertain, 0 rows
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:404:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > 503 right after Submit, after the write (errors/after-write): failure + commitUncertain, 1 row, lookup finds 1
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:412:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > a business_outcome after the attempt carries commitUncertain too
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:428:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > business outcomes BEFORE the attempt carry no marker (a blind retry is safe)
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:442:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > a throw after the attempt becomes failure/unknown with the marker (not an exception)
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:455:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > after an irreversible action has been attempted > operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click
+Error: no intervention request within 20000ms
+ ❯ waitForPendingRequest src/replay/fleet.test.ts:166:9
+    164|     await new Promise((resolve) => setTimeout(resolve, 50));
+    165|   }
+    166|   throw new Error(`no intervention request within ${timeoutMs}ms`);
+       |         ^
+    167| }
+    168|
+ ❯ src/replay/fleet.test.ts:482:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort inside after() (the click happened): still rejects with AbortError, 1 row, aborted entry names step-11
+AssertionError: expected Error: page.goto: net::ERR_UNSAFE_PORT at… { log: [ '…' ] } to match object { name: 'AbortError' }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "name": "AbortError",
++ PlaywrightError {
++   "name": "Error",
+  }
+
+ ❯ src/replay/fleet.test.ts:551:8
+    549|       await expect(
+    550|         transfer({ memo: "rote-s4-abort-after" }, { signal: ac.signal,…
+    551|       ).rejects.toMatchObject({ name: "AbortError" });
+       |        ^
+    552|       expect(calls.map((c) => c.hook)).toEqual(["before", "after"]);
+    553|       expect(await ledger()).toHaveLength(1); // the verifier's job, n…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/48]⎯
+
+ FAIL  |browser| src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > the abort listener is removed when the run ends (no leak on a long-lived worker)
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+    216|     switch (action.kind) {
+    217|       case "navigate": {
+    218|         await this.page.goto(action.url);
+       |                         ^
+    219|         return;
+    220|       }
+ ❯ runReplay src/replay/replay.ts:242:19
+ ❯ src/replay/fleet.test.ts:585:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/48]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: page.goto: net::ERR_UNSAFE_PORT at http://localhost:2049/
+Call log:
+[2m  - navigating to "http://localhost:2049/", waiting until "load"[22m
+
+ ❯ WebSurface.act src/surface/webSurface.ts:218:25
+ ❯ runReplay src/replay/replay.ts:242:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { log: [ '  - navigating to "http://localhost:2049/", waiting until "load"' ] }
+This error originated in "src/replay/fleet.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 failed | 39 passed (40)
+      Tests  25 failed | 349 passed (374)
+     Errors  1 error
+   Start at  12:29:52
+   Duration  74.77s (transform 2.71s, setup 0ms, import 24.35s, tests 211.93s, environment 13ms)
+
+exit=1 wall_seconds=75.7

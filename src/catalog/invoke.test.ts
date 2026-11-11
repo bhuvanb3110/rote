@@ -16,6 +16,7 @@ import { deserializeCapability } from "../artifact/index.js";
 import { approvalKeyWithOverrides, approveCapability } from "../confidence/index.js";
 import { WebSurface } from "../surface/index.js";
 import { invokeCapability, type InvokeCapabilityOptions } from "./invoke.js";
+import { listenOnSafePort } from "../testing/listen.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
@@ -47,7 +48,7 @@ function invokeTransfer(memo: string, extra: Partial<InvokeCapabilityOptions>) {
 
 beforeAll(async () => {
   server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
   baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
   browser = await chromium.launch({ headless: true });
 

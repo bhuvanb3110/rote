@@ -15,6 +15,7 @@ import { listCapabilities } from "./registry.js";
 import { invokeCapability } from "./invoke.js";
 import { approvalKey, approveCapability } from "../confidence/index.js";
 import { deserializeCapability } from "../artifact/index.js";
+import { listenOnSafePort } from "../testing/listen.js";
 
 describe("catalog list() derives typed contracts from the real artifacts on disk", () => {
   it("lists all saved capabilities with schema-accurate inputSchema/outputSchema", async () => {
@@ -51,7 +52,7 @@ describe("catalog invoke() calls the real replay path", () => {
 
   beforeAll(async () => {
     server = createServer(app);
-    await new Promise<void>((resolve) => server.listen(0, resolve));
+    await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
     const { port } = server.address() as AddressInfo;
     baseUrl = `http://localhost:${port}`;
 

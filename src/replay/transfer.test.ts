@@ -21,6 +21,7 @@ import { approvalKey, approveCapability } from "../confidence/index.js";
 import { buildPolicyForOrigin, policyGate } from "../safety/index.js";
 import { applyTenantOverride, deserializeTenantOverride } from "../tenant/index.js";
 import { runReplay } from "./replay.js";
+import { listenOnSafePort } from "../testing/listen.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
@@ -126,7 +127,7 @@ function alternateTransient(): void {
 
 beforeAll(async () => {
   server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
   baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
   transferBase = await loadArtifact("transfer");
   lookupBase = await loadArtifact("transfer-history-lookup");

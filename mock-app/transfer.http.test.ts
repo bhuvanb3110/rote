@@ -7,13 +7,14 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import app from "./app.js";
 import { TENANTS, type TenantConfig } from "./tenants.js";
 import { MEMO_MAX_LENGTH } from "./transfer.js";
+import { listenOnSafePort } from "../src/testing/listen.js";
 
 let server: Server;
 let base: string;
 
 beforeAll(async () => {
   server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
   base = `http://localhost:${(server.address() as AddressInfo).port}`;
 });
 

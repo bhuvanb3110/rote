@@ -15,6 +15,7 @@ import { deserializeTenantOverride } from "../tenant/types.js";
 import { applyTenantOverride } from "../tenant/apply.js";
 import { approvalKey, approveCapability, readCapabilityStatus } from "../confidence/index.js";
 import { runReplay } from "./replay.js";
+import { listenOnSafePort } from "../testing/listen.js";
 
 const FRESH_ID = "confidence-gate-test";
 const CREDS = { username: "operator", password: "operator" };
@@ -31,7 +32,7 @@ async function loadJson(relativePath: string): Promise<string> {
 
 beforeAll(async () => {
   server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
   const { port } = server.address() as AddressInfo;
   baseUrl = `http://localhost:${port}`;
 

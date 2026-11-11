@@ -24,6 +24,7 @@ import { WebSurface } from "../surface/index.js";
 import { applyTenantOverride, deserializeTenantOverride } from "../tenant/index.js";
 import { runReplay } from "./replay.js";
 import type { ReplayOptions } from "./types.js";
+import { listenOnSafePort } from "../testing/listen.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
@@ -175,7 +176,7 @@ async function evidenceLog(result: ReplayResult): Promise<Array<{ kind: string; 
 
 beforeAll(async () => {
   server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
   baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
   browser = await chromium.launch({ headless: true });
   memberLookup = relaxed(await loadArtifact("member-lookup"));

@@ -17,6 +17,7 @@ import { createTestSchema, resetQueueTables, type TestSchema } from "../queue/te
 import { createRedactor, loadTenantCredentials } from "./credentials.js";
 import { Worker, type WorkerOptions } from "./loop.js";
 import { runJob, type RunJobContext } from "./runJob.js";
+import { listenOnSafePort } from "../testing/listen.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
@@ -73,7 +74,7 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
   const db = await createTestSchema(tag);
   const pool = db.pool;
   const server: Server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
   const baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
   const browser = await chromium.launch({ headless: true });
 

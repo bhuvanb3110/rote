@@ -11,6 +11,7 @@ import { EscalationController } from "../escalation/index.js";
 import { approvalKey, approveCapability } from "../confidence/index.js";
 import { runReplay as runReplayUnapproved } from "./replay.js";
 import type { ReplayOptions } from "./types.js";
+import { listenOnSafePort } from "../testing/listen.js";
 
 let server: Server;
 let baseUrl: string;
@@ -62,7 +63,7 @@ async function loadRelaxed(relativePath: string): Promise<Capability> {
 
 beforeAll(async () => {
   server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
   const { port } = server.address() as AddressInfo;
   baseUrl = `http://localhost:${port}`;
   statusDir = await mkdtemp(path.join(tmpdir(), "rote-replay-status-"));

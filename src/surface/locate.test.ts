@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import app from "../../mock-app/app.js";
 import { WebSurface } from "./webSurface.js";
+import { listenOnSafePort } from "../testing/listen.js";
 
 let server: Server;
 let baseUrl: string;
@@ -10,7 +11,7 @@ let surface: WebSurface;
 
 beforeAll(async () => {
   server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
   const { port } = server.address() as AddressInfo;
   baseUrl = `http://localhost:${port}`;
 

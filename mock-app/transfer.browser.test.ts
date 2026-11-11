@@ -12,6 +12,7 @@ import { TENANTS } from "./tenants.js";
 import { resolveDescriptor } from "../src/surface/locate.js";
 import type { ElementDescriptor } from "../src/surface/index.js";
 import { buildPolicyForOrigin, policyGate } from "../src/safety/policy.js";
+import { listenOnSafePort } from "../src/testing/listen.js";
 
 let server: Server;
 let base: string;
@@ -19,7 +20,7 @@ let browser: Browser;
 
 beforeAll(async () => {
   server = createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
   base = `http://localhost:${(server.address() as AddressInfo).port}`;
   browser = await chromium.launch({ headless: true });
 });

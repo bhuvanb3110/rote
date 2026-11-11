@@ -802,3 +802,57 @@ condition and entry URL) for one tenant. D24 made an approval a claim about spec
 the overrides it was a claim about the base only, while tenant runs executed something else.
 
 **Date.** 2026-11-11
+
+## D31: Browser test files run in their own vitest project, at most 3 at a time; test servers never take a blocked port
+
+(Step 7 reviewer decisions A2 / open question 4.)
+
+**Decision.** `vitest.config.ts` defines two projects. **`unit-db`**: every test file that does not
+launch Chromium, at vitest's default parallelism (CPUs − 1). **`browser`**: the 11 files listed in
+`vitest.browser-files.ts`, `maxWorkers: 3`, run as a second group (vitest requires a distinct
+`sequence.groupOrder` for projects with different `maxWorkers`, so the groups run one after the
+other). `ROTE_BROWSER_TEST_WORKERS` overrides the cap for measuring. A guard test
+(`src/testing/browserProject.test.ts`) fails if a test file that launches a browser (calls
+`chromium.launch` / `WebSurface.launch`, uses the worker test env, or replays against the in-process
+mock bank) is missing from the list, or a listed file isn't one. `npm test` / `npm run test:unit` are
+unchanged commands.
+
+Also, found while proving this: `server.listen(0)` can return a port Chromium refuses
+(`net::ERR_UNSAFE_PORT`; a run got 2049) and Node's `fetch` refuses the same "bad ports".
+`src/testing/listen.ts` `listenOnSafePort()` re-listens until the port is on neither list; every test
+server reached by Chromium or `fetch` uses it (`evidence/step-07/flakes.md`).
+
+**Measurement** (`evidence/step-07/flake-cap/`; `scripts/measure-test-run.ps1` samples every
+Playwright Chromium process every 500 ms during one full run, so these runs carry the sampler's
+overhead and compare with each other, not with unsampled runs):
+
+| Browser cap | Wall (s) | Peak Chromium processes | Peak Chromium working set |
+| --- | --- | --- | --- |
+| none (before) | 117.7 | 28 | 1965 MB |
+| 2 | 124.9 | 11 | 714 MB |
+| **3** | **108.8** | **15** | **1098 MB** |
+| 4 | 102.3 | 19 | 1378 MB |
+
+Rule: the smallest cap whose run is no slower than the uncapped one. 3 qualifies and roughly halves
+peak Chromium memory; 2 is slower. (The suite grew by 2 files between these runs as Step 7 tests were
+written; the browser project was the same 11 files in each.) Proof: 10 unsampled full runs at the
+chosen cap, all logs kept, durations compared with the unsampled runs before the change (see the
+README of `evidence/step-07/flake-cap/`).
+
+**Alternatives considered.**
+- *Global `maxWorkers` (or `--no-file-parallelism`).* Also slows the ~28 unit/DB files that never
+  start a browser; the reviewer asked for full parallelism there.
+- *`maxConcurrency`.* Limits concurrent tests *inside* a file, not concurrent files; each browser file
+  already runs its tests serially, so it would change nothing.
+- *Retrying failed browser tests (`retry: n`).* Hides the flake instead of removing its cause.
+- *A shared Chromium for all test files (globalSetup).* Fewer processes, but every file would share
+  one browser's fate and its contexts; a larger change to every browser test.
+- *Rename the browser files (`*.browser.test.ts`) and select by glob.* Clearer, but churns 11 files'
+  history; the explicit list plus its guard test gives the same safety.
+
+**Why.** The Step-6 flake was `net::ERR_INSUFFICIENT_RESOURCES` from up to 7 Chromium-launching files
+at once on one 8 GB host (28 Chromium processes, ~2 GB). Capping only those files removes the
+pressure where it comes from and costs nothing measurable in wall time, because unit and DB files keep
+every core and the browser files were contending with each other anyway.
+
+**Date.** 2026-11-11
