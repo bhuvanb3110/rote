@@ -836,8 +836,11 @@ overhead and compare with each other, not with unsampled runs):
 Rule: the smallest cap whose run is no slower than the uncapped one. 3 qualifies and roughly halves
 peak Chromium memory; 2 is slower. (The suite grew by 2 files between these runs as Step 7 tests were
 written; the browser project was the same 11 files in each.) Proof: 10 unsampled full runs at the
-chosen cap, all logs kept, durations compared with the unsampled runs before the change (see the
-README of `evidence/step-07/flake-cap/`).
+chosen cap, all logs kept: **10 of 10 passed**, 378/378, no resource or port error in any log. Duration
+before vs after, as an interleaved A/B on one commit with nothing else running (`ab/`): uncapped mean
+**94.3 s**, capped **84.4 s**, faster in every round (the 10 proof runs themselves averaged 99.9 s
+while the builder was editing, so they are not used as the "after" figure; README of
+`evidence/step-07/flake-cap/`).
 
 **Alternatives considered.**
 - *Global `maxWorkers` (or `--no-file-parallelism`).* Also slows the ~28 unit/DB files that never
