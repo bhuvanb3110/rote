@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { Command } from "commander";
 import pino from "pino";
 import { runDiscovery } from "../agent/index.js";
@@ -11,6 +12,7 @@ import { resolveTenant, type TenantOverride } from "../tenant/index.js";
 import { createCatalogApp, findCapability, invokeCapability, listCapabilities, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
 import { approvalKeyWithOverrides, approveCapability, readRunConfidence } from "../confidence/index.js";
 import { createPool, databaseUrlFromEnv, migrate, redactDatabaseUrl } from "../queue/index.js";
+import { collectAndCheck, DEFAULT_BANK_URL, oracleJson, readJobIdsFile } from "../oracle/index.js";
 
 const logger = pino();
 const program = new Command();
@@ -421,6 +423,40 @@ dbCommand
     } catch (err) {
       logger.error({ err, database: redactDatabaseUrl(url) }, "db migrate: failed");
       process.exitCode = 1;
+    } finally {
+      await pool.end();
+    }
+  });
+
+const oracleCommand = program.command("oracle").description("The ledger oracle: judge jobs by the bank's own ledger (D32)");
+
+oracleCommand
+  .command("check")
+  .description(
+    "Read jobs from Postgres and GET /control/ledger from the bank, print the oracle report " +
+      "(ends in RESULT: PASS or RESULT: FAIL) and exit 1 on FAIL",
+  )
+  .option("--database-url <url>", "Postgres URL (default: ROTE_DATABASE_URL or the Compose dev database)")
+  .option("--bank <url>", "mock bank base URL", DEFAULT_BANK_URL)
+  .option("--job-ids <file>", "only these jobs (one uuid per line, or a JSON array); default: every job")
+  .option("--drain-timed-out", "the run's drain timed out: non-terminal jobs are LOST (default: PENDING)", false)
+  .option("--out <dir>", "also write oracle.json and check.txt here")
+  .action(async (opts: { databaseUrl?: string; bank: string; jobIds?: string; drainTimedOut: boolean; out?: string }) => {
+    const url = opts.databaseUrl ?? databaseUrlFromEnv();
+    const pool = createPool({ connectionString: url, max: 2 });
+    try {
+      const jobIds = opts.jobIds ? await readJobIdsFile(opts.jobIds) : undefined;
+      const run = await collectAndCheck({ pool, bankUrl: opts.bank, jobIds, drainTimedOut: opts.drainTimedOut });
+      process.stdout.write(`${run.report.text}\n`);
+      if (opts.out) {
+        await mkdir(opts.out, { recursive: true });
+        await writeFile(path.join(opts.out, "oracle.json"), oracleJson(run));
+        await writeFile(path.join(opts.out, "check.txt"), `${run.report.text}\n`);
+      }
+      if (!run.report.pass) process.exitCode = 1;
+    } catch (err) {
+      logger.error({ err, database: redactDatabaseUrl(url) }, "oracle check: could not run");
+      process.exitCode = 2;
     } finally {
       await pool.end();
     }
