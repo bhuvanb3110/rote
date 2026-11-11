@@ -859,3 +859,131 @@ pressure where it comes from and costs nothing measurable in wall time, because 
 every core and the browser files were contending with each other anyway.
 
 **Date.** 2026-11-11
+
+## D32: The ledger oracle: one module, one verdict table, DUPLICATE dominates, ORPHAN as the reverse check
+
+(Step 7 plan section 1; drafted there as D30, renumbered because Part A came first.)
+
+**Decision.** `src/oracle/ledger.ts` `checkLedger({jobs, ledger, drainTimedOut})` is pure and is the
+only definition of "0 duplicates, 0 lost": the Day-1 exit, chaos, the crash-point matrix and `rote
+oracle check` all call it. Per job, the ledger rows whose memo is its `memo_key`: 2+ → **DUPLICATE**
+whatever the state (checked first, so a duplicated job that is also lost reports the worse finding);
+1 row of another tenant → **MISMATCH**; `succeeded` needs exactly 1 row whose id is
+`result.outputs.confirmationRef` (0 → **MISSING_COMMIT**, another id → **MISMATCH**); `failed` and
+`business_outcome` need 0 (1 → **UNRECORDED_COMMIT**); `needs_human` may have 0 or 1 and is listed
+with its outcome and row count; a non-terminal job is **LOST** after the drain timed out (with its row
+count, so "lost after commit" is visible) and **PENDING** before it (the oracle ran too early; also a
+failure). Every row whose memo matches no job is an **ORPHAN** (harnesses reset the ledger first). The
+report ends in exactly `RESULT: PASS` or `RESULT: FAIL`. `src/oracle/collect.ts` reads jobs from
+Postgres and `GET /control/ledger`, both Zod-parsed; an asked-for job id that is missing is an error,
+not a skip. CLI: `rote oracle check [--database-url] [--bank] [--job-ids file] [--drain-timed-out]
+[--out dir]`, exit 0 PASS / 1 FAIL / 2 could not run.
+
+**One deviation from the plan's table, stricter:** the plan listed `business_outcome` with "0 or 1
+rows: ok", next to `needs_human`. A job can only end `business_outcome` when the bank refused and no
+commit was uncertain (a refusal seen after Submit carries `commitUncertain` and is parked as
+`needs_human`, D25; Day 2 verifies it, step-08 section 5). So a `business_outcome` job with a ledger
+row means money moved while the job says it was refused: the oracle reports UNRECORDED_COMMIT, as for
+`failed`. Raised in the handoff for the reviewer.
+
+**Alternatives considered.** Keep each harness's own checks (the Day-1 exit had them inline): three
+copies would drift. Judge by `job_attempts` or worker logs: the brief says correctness is judged only
+by the bank's ledger. Treat a non-terminal job before the drain as ok: a harness bug could then report
+PASS for a run it never waited for.
+
+**Why.** The verdicts are the brief's ledger check made exact, plus the three ways a run can be wrong
+that the brief's list leaves implicit: a commit the job denies, a reference that points at the wrong
+row, a row nobody owns.
+
+**Date.** 2026-11-11
+
+## D33: Chaos is seeded on the schedule, not the interleaving; the harness is the supervisor
+
+(Step 7 plan section 2; reviewer decision B1. Drafted as D31.)
+
+**Decision.** `src/chaos/schedule.ts` builds the whole schedule from the seed with mulberry32 before
+anything runs: kill times (gaps uniform in 5–15 s over `--duration`, default 150 s), victims (replica
+1..N), one `docker pause` of 45 s at a seeded time and replica. Draw order is fixed (the pause first),
+so the seed alone reproduces the schedule. A kill drawn for the replica being paused (from the restart
+delay before the pause to its end), or for a replica still down, goes to the next replica that is up,
+and the redirect is recorded. `scripts/chaos.ts` prints and saves the seed and the schedule first,
+resets the queue tables and the bank ledger, enqueues `--jobs` (100) through the API, executes the
+schedule with `docker kill --signal=KILL` / `docker pause` / `docker unpause`, records before each kill
+or pause which jobs the victim holds (`lease_owner` starts with the container's hostname), restarts
+each killed replica with `docker start` after 2 s (Compose keeps `restart: "no"`: the harness is the
+supervisor, so every restart is in its event log), never touches Postgres or the bank, drains until
+every job is terminal or `--drain-timeout` passes (default 10 min; the committed Day-1 run uses 3 min,
+reviewer decision B1), and judges with the oracle (D32). Evidence: the seed, the schedule, the events,
+the oracle report, jobs, attempts, the ledger, `docker stats`, compose logs, `docker inspect` of the
+workers (OOM attribution, D9) and a credential grep. Workers, API and bank are stopped at the end
+(8 GB laptop) unless `--keep-up`.
+
+**Alternatives considered.** Random decisions at run time (not reproducible); seeding the job order as
+well (the interleaving still depends on container start-up and Chromium timing, so it would promise a
+reproducibility it can't deliver); Compose `restart: on-failure` as the supervisor (restarts would be
+invisible in the harness's events, and a crash loop would hide); `kill -9` of the node process inside
+the container (leaves Chromium and tini running; `docker kill` is a real container death).
+
+**Why.** A failing chaos seed must be re-runnable with the same kills at the same times, and every lost
+job must be attributable to the kill that orphaned it. Saying plainly that the seed does not fix the
+interleaving keeps the claim honest.
+
+**Date.** 2026-11-11
+
+## D34: Crash points through an additive `onStep` hook and a doubly gated fault flag; self-SIGKILL in a child process
+
+(Step 7 plan section 3. Drafted as D32.)
+
+**Decision.** `ReplayOptions.onStep?: { after(step, index) }` (optional; absent = no change at any call
+site) runs after a step completed normally (its checkpoint passed, or it had none and no error), on
+the main path only (not after a human "skip"). A throw from it is handled like an `onIrreversible`
+hook error: `runReplay` closes the context and rejects with that error, unwrapped, even after the
+irreversible step (D11). `invokeCapability` passes it through. The worker reads `ROTE_FAULT=<point>`
+once at start (`src/worker/fault.ts`) and **refuses to start** unless `ROTE_FAULT_ENABLE=1` is also set
+(it also refuses `ROTE_FAULT_ENABLE` without a point, and any unknown point). At its point the worker
+writes one line to stderr synchronously (`ROTE_FAULT firing at <point>`) and calls
+`process.kill(process.pid, "SIGKILL")`: no cleanup, no `finally`, no completion. Points:
+`after-dequeue` (lease taken, before any browser work), `after-step-NN` (`onStep.after`),
+`before-submit` (`onIrreversible.before`), `after-submit` (`onIrreversible.after`: the bank has
+answered), `before-complete` (outcome computed, completion not started), `after-complete`.
+`scripts/crash-matrix.ts` runs each point in isolation: a fresh test schema, a fresh in-process bank on
+:4100, one job, the faulty worker as a child process, a check that it died at that point, then a clean
+worker and the oracle.
+
+**Alternatives considered.** Throwing an exception at the point (cleanup code and `finally` blocks would
+run, which a real crash never does); killing the worker from outside at a guessed time (not
+deterministic); a fault flag read per job from the database (any client could then set it); a single
+environment variable (one stray variable in a deployment would make it kill itself).
+
+**Why.** A crash point must behave exactly like a crash and fire exactly where named, every time. The
+hook keeps replay unforked; the double gate keeps the mechanism out of real deployments.
+
+**Date.** 2026-11-11
+
+## D35: CI: GitHub Actions; Node 22 with a postgres:17 service; Node 25 unit tests; a separate image build
+
+(Step 7 plan section 4; reviewer decisions B2, B3 and A3. Drafted as D33.)
+
+**Decision.** `.github/workflows/ci.yml`, on every push and pull request to `main` and `fleet/**`,
+three jobs. **test**: ubuntu-24.04, Node 22 LTS, a `postgres:17` service on 55432 with a health check,
+`npm ci`, `npx playwright install --with-deps chromium` (the version from the lockfile printed first),
+`npm run typecheck`, `npm test` through `tee`, the full log uploaded as an artifact on every run, pass
+or fail. **unit-node25**: Node 25, the builder's local Node, running the `unit-db` project without the
+`*.db.test.ts` files (no browser, no Postgres; about a minute, so cheap per decision B3). **docker**:
+Buildx and `docker/build-push-action` with `push: false` and the GitHub Actions cache, so a broken
+Dockerfile fails fast on every push. `package.json` `engines.node` is `>=22`. `npm run typecheck`
+(`tsconfig.typecheck.json`) covers every file including tests, `scripts/` and the vitest config, which
+the build config excludes; CI runs it, so the two errors fixed in A3 cannot come back unseen. A README
+badge for `fleet/day-1`. Not in CI: the Day-1 exit, chaos and the crash-point matrix (they need the
+Compose stack or minutes of wall time; committed evidence instead); the matrix joins CI once it is
+green (Day 2).
+
+**Alternatives considered.** Node 25 for the whole suite (not an LTS line; the builder keeps it
+locally); Postgres 16 (Compose pins 17 and a test asserts it); the image build only on `main` (the
+plan's first proposal; the reviewer wants every push, minutes being free on a public repo); pushing the
+image to a registry (nothing consumes it yet).
+
+**Why.** The suite is the gate for every commit; CI makes it the gate for every push, on a clean Linux
+machine where the crash tests' `SIGKILL` is a real signal.
+
+**Date.** 2026-11-11

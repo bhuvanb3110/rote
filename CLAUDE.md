@@ -37,6 +37,8 @@ session when stuck -> stay inside safety guardrails.
 surface/ agent/ artifact/ replay/ safety/ escalation/ evidence/ catalog/ cli/ mock-app/
 queue/ (src/queue: Postgres job queue) db/migrations/ (forward-only SQL, never edited once applied)
 worker/ (src/worker: fleet worker process) Dockerfile + docker-compose.yml (bank, api, workers)
+oracle/ (src/oracle: the ledger oracle, D32) chaos/ (src/chaos: seeded chaos schedule) testing/ (test helpers)
+scripts/ chaos.ts, crash-matrix.ts, evidence-day1-exit.ts (+ scripts/lib) .github/workflows/ci.yml (D35)
 
 ## Fleet build — working agreement
 Applies to all work under docs/FLEET_BRIEF.md. Repo facts live in docs/REPO_NOTES.md.

@@ -99,6 +99,35 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
+## Fleet Step 7: the judges, CI, and three fixes (2026-11-11)
+
+- **Approvals cover tenant overrides** (D30): `status/*.json` record `approvedOverrideDigests`; a tenant
+  run whose override changed or was never approved is refused for that tenant only. Known limitation 6
+  is closed.
+- **Tests:** `npm test` = two vitest projects. `unit-db` (everything that doesn't launch Chromium,
+  full parallelism) then `browser` (the 11 files in `vitest.browser-files.ts`, at most 3 at a time,
+  D31). The Step-6 `ERR_INSUFFICIENT_RESOURCES` flake: 0 in 10 full runs after the cap, and the suite
+  got faster (interleaved A/B: 94.3 s → 84.4 s). Test servers use `listenOnSafePort`
+  (`src/testing/listen.ts`) because the OS once handed out port 2049, which Chromium and `fetch` refuse.
+- **Run the suite from PowerShell, not Git Bash, on Windows:** Git Bash gives vitest a lower-case `c:/`
+  cwd and every file fails with "Vitest failed to find the runner" (`evidence/step-07/flakes.md`).
+  `scripts/npm-test-log.ps1 -Log <file>` keeps a full raw log with the exit code and wall time.
+- `npm run typecheck` (`tsconfig.typecheck.json`) covers tests, `scripts/` and the vitest config; the
+  two mock-app test errors are fixed. CI runs it.
+- **The oracle** `src/oracle/` + `rote oracle check` / `npm run oracle` (D32). The Day-1 exit uses it.
+- **The chaos harness** `npm run chaos` (`scripts/chaos.ts`, `src/chaos/schedule.ts`, D33) and **the
+  crash-point matrix** `npm run crash-matrix` (`scripts/crash-matrix.ts`, D34). Both RED today, by
+  design: `evidence/chaos/before-day2/`, `evidence/crash-matrix/before-day2/`. The matrix binds :4100
+  itself, so stop the Compose bank first; chaos needs the Compose stack and stops it at the end.
+- **Replay** gained the additive `onStep` hook (D34); **the worker** gained `ROTE_FAULT` /
+  `ROTE_FAULT_ENABLE` (test-only, refused unless both are set).
+- **CI** `.github/workflows/ci.yml` (D35): Node 22 + postgres:17 full suite, Node 25 unit tests, an
+  image build. `engines.node` is `>=22`.
+- On Windows, `child.kill("SIGTERM")` is a hard terminate, and `process.kill(pid, "SIGKILL")` shows up
+  as exit code 1, not a signal; the crash matrix records which it saw. CI (Linux) has real signals.
+- Not changed: the Compose lease is still 300 s with no heartbeat (Step 6). Day 2 restores 30 s / 10 s
+  (docs/plans/step-08.md).
+
 ## Fleet Step 6: worker, async API, Docker stack (2026-11-10)
 
 - `src/worker/`: `main.ts` (entrypoint), `loop.ts` (poll loop, graceful stop), `runJob.ts`
@@ -116,7 +145,7 @@ Recorded as found; each names its planned fix or the step that owns it.
 - Day-1 exit: `npm run evidence:day1` → `evidence/fleet-day1-exit/check.txt`, `RESULT: PASS`.
 - **Known flake (Step 6):** `net::ERR_INSUFFICIENT_RESOURCES` from Chromium in
   `src/replay/fleet.test.ts` once under the full parallel suite; the rerun passed
-  (`evidence/step-06/flakes.md`). Not mitigated; open question.
+  (`evidence/step-06/flakes.md`). *Mitigated in Step 7 (D31): browser files capped at 3 concurrent.*
 - Test files under `mock-app/` have two pre-existing TypeScript errors (`transfer.browser.test.ts`
   lines 89 and 121, `Object is of type 'unknown'`). They are invisible to `npm run build` because
   `tsconfig.json` excludes `*.test.ts`, and vitest does not typecheck. Present on HEAD before Step 6;

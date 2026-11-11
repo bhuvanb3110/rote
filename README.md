@@ -250,7 +250,45 @@ curl "http://127.0.0.1:8080/jobs/<jobId>?tenant=tenant-a"
 
 Measured (evidence/fleet-day1-exit/check.txt, `RESULT: PASS`): 100 transfer jobs on 4 workers in
 102.6 s, all succeeded on the first attempt, exactly one ledger row per job, 0 duplicates, 0 lost.
-Peak memory per worker was about 260 MiB.
+Peak memory per worker was about 260 MiB. Re-run on the shared ledger oracle in Step 7
+(evidence/fleet-day1-exit-oracle/): `RESULT: PASS` again, 84.0 s.
+
+## The judges: the ledger oracle, chaos and the crash-point matrix (Day 1: expected to fail)
+
+Correctness is judged only by the mock bank's own ledger, matched to jobs by `memoKey` (D32). One
+module decides every verdict, for every harness:
+
+```
+npm run oracle -- --drain-timed-out --out <dir>   # any time: jobs in Postgres vs GET /control/ledger
+npm run chaos -- --seed <n>                       # Compose fleet, seeded kills + a 45 s pause (D33)
+npm run crash-matrix                              # kill a worker at each of 16 transfer boundaries (D34)
+```
+
+- **Oracle verdicts:** DUPLICATE (2+ rows for a job, whatever its state), MISSING_COMMIT
+  (`succeeded`, no row), UNRECORDED_COMMIT (`failed`/`business_outcome`, but a row), MISMATCH (wrong
+  `confirmationRef` or tenant), LOST (non-terminal after the drain, with its row count), ORPHAN (a row
+  no job owns). `needs_human` may have 0 or 1 row and is listed. The report ends in `RESULT: PASS` or
+  `RESULT: FAIL`.
+- **Chaos** (`scripts/chaos.ts`): the seed fixes the schedule (kill times, victims, the pause), not
+  the interleaving. The harness is the supervisor (`docker start` after each kill), never touches
+  Postgres or the bank, and stops the fleet at the end.
+- **Crash-point matrix** (`scripts/crash-matrix.ts`): per point a fresh test schema, an in-process bank
+  on :4100 (stop the Compose bank first), one job, a worker child process with
+  `ROTE_FAULT=<point> ROTE_FAULT_ENABLE=1` that SIGKILLs itself there, then a clean worker and the
+  oracle. The fault flag is refused without the enable flag, so it can never fire by accident.
+
+**Today these fail, on purpose, and the failures are the "before" evidence** (the brief: write them
+now, even though they will fail):
+
+| Judge | Result (Step 7) | Why |
+| --- | --- | --- |
+| `evidence/chaos/before-day2/` (seed 2024306878) | **RESULT: FAIL**: 61 ok, **39 LOST** (one after commit), 0 duplicates | a killed worker's job stays `running` forever and holds its tenant slot; tenant-a stalled after 16 s |
+| `evidence/crash-matrix/before-day2/` | **1/16 green**: LOST at every point but `after-complete`; 1 ledger row from `after-submit` on | the lease expires (30 s, the drain was 40 s) but nothing recovers it |
+
+**0 duplicates here proves nothing.** A duplicate needs a second runner of the same job, and before Day
+2 nothing ever re-runs a dead worker's job. Day 2 (docs/plans/step-08.md: heartbeat, the fenced commit
+intent, recovery, verify through the history page) is what these same scripts must then judge green.
+
 
 ## Saved demonstration runs
 

@@ -298,3 +298,48 @@ README badge and uploaded logs.
   for every transaction (heartbeat, commit intent, recovery, verify), the zombie case stated honestly,
   tests for each rule, how the matrix and chaos turn green, the fast-check property tests, and a split
   into reviewable steps if Day 2 is too big for one.
+
+## Built (2026-11-11)
+
+Built in the order Part A (A1, A3, A2), then B. Decisions D30–D35 (the plan's D30–D33 were renumbered
+because Part A took D30 and D31). Evidence: `evidence/step-07/` (every full `npm test` log,
+unfiltered, with exit code and wall time; the override-digest backfill; the flake record),
+`evidence/step-07/flake-cap/`, `evidence/fleet-day1-exit-oracle/`, `evidence/crash-matrix/before-day2/`,
+`evidence/chaos/before-day2/`. Where the build went beyond or differed from the text above:
+
+**Part A.**
+- A1: the override digest uses the same canonical JSON as D24, over the schema-validated override.
+  The run-time check needs the override that was applied, so `ReplayOptions` gained the additive
+  `approvalOverride` (`invokeCapability` and the CLI's `--tenant` pass it). An approval written without
+  overrides (auto-promotion; `approvalKey`) records `{}` and approves none: fail closed, not
+  grandfathered. The async API's 422 enqueue check reads the tenant's override too. The backfill's
+  "since approval" is the commit that introduced the status file's current `approvedAt` (`git log -S`),
+  not its last write (which was the D24 digest backfill).
+- A2: vitest 4 runs projects with different `maxWorkers` as separate groups (`sequence.groupOrder`), so
+  `unit-db` runs first and `browser` (cap 3) second. The cap was chosen by measurement (2, 3, 4 vs
+  uncapped). Proving it surfaced a second, unrelated latent bug: a run got ephemeral port 2049, which
+  Chromium refuses (`ERR_UNSAFE_PORT`); fixed with `listenOnSafePort`. The 10 proof runs were slower
+  than the "before" runs because the builder was editing during them, so before/after duration was
+  re-measured as an interleaved A/B with nothing else running.
+- A3: `tsconfig.typecheck.json` + `npm run typecheck`; also covers `vitest.config.ts`.
+- The first baseline attempt ran from Git Bash and failed every file ("Vitest failed to find the
+  runner", a lower-case `c:/` cwd); kept, explained in `evidence/step-07/flakes.md`. Four measurement
+  logs were written as UTF-16 by PowerShell 5.1 and re-encoded to UTF-8 (text unchanged); later logs go
+  through `cmd.exe` redirection.
+
+**Part B.**
+- Oracle: one stricter verdict than the table above: `business_outcome` with a ledger row is
+  UNRECORDED_COMMIT, not ok (D32 explains; open question for the reviewer). Non-terminal jobs before
+  the drain ended are PENDING (also a failure), so an oracle run too early can't pass.
+- Chaos: `--duration` (150 s) bounds the kill window; a kill drawn for the replica about to be or being
+  paused, or one still down, moves to the next replica (recorded). The before-day2 run's attribution
+  of orphaned jobs listed every later kill of a restarted replica (same hostname); the script was fixed
+  afterwards to name only the first, and the run's README says so.
+- Crash matrix: the "before" run uses `--lease-seconds 30 --drain-timeout 40s`, so the dead worker's
+  lease has expired before the oracle runs: the failure shown is "no recovery", not "lease too long".
+  `after-complete` is green today (the completion committed before the kill), as the Day-2 table
+  expects.
+- Docker helpers shared by the Day-1 exit and chaos (`scripts/lib/compose.ts`); both now recreate
+  workers on a changed image (`up -d --no-deps --scale worker=N worker`) instead of `--no-recreate`.
+- CI: `actions/checkout@v4`, `setup-node@v4` (npm cache), `upload-artifact@v4`, Buildx +
+  `build-push-action@v6` with the GHA cache.
