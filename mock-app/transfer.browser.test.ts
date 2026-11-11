@@ -56,6 +56,18 @@ async function locator(page: Page, descriptor: ElementDescriptor) {
   return handle.locator;
 }
 
+interface LedgerEntry {
+  tenantId: string;
+  memo: string;
+  amount: number;
+}
+
+/** GET /control/ledger. Response.json() is typed unknown, so the shape is stated once, here. */
+async function ledgerEntries(): Promise<LedgerEntry[]> {
+  const body = (await (await fetch(`${base}/control/ledger`)).json()) as { entries: LedgerEntry[] };
+  return body.entries;
+}
+
 const fill = async (page: Page, d: ElementDescriptor, value: string) =>
   (await locator(page, d)).fill(value);
 const click = async (page: Page, d: ElementDescriptor) => (await locator(page, d)).click();
@@ -86,7 +98,7 @@ describe("transfer + history through the browser, all three tenants", () => {
       // Confirm page: the summary is shown and nothing is in the ledger yet.
       await page.getByText("Confirm Transfer").first().waitFor();
       expect(await page.getByText(memo).count()).toBeGreaterThan(0);
-      expect((await (await fetch(`${base}/control/ledger`)).json()).entries).toHaveLength(
+      expect(await ledgerEntries()).toHaveLength(
         TENANTS.indexOf(tenant),
       );
 
@@ -118,11 +130,7 @@ describe("transfer + history through the browser, all three tenants", () => {
       await context.close();
     }
 
-    const entries = (await (await fetch(`${base}/control/ledger`)).json()).entries as Array<{
-      tenantId: string;
-      memo: string;
-      amount: number;
-    }>;
+    const entries = await ledgerEntries();
     expect(entries.map((e) => [e.tenantId, e.memo, e.amount])).toEqual(
       TENANTS.map((t) => [t.id, `rote-browser-${t.id}`, 12.34]),
     );

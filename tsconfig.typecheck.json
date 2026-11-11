@@ -1,0 +1,8 @@
+{
+  // Typecheck everything, tests included (tsconfig.json excludes *.test.ts so `npm run build`
+  // never emits them). `npm run typecheck`; CI runs it. Never emits.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["src/**/*", "mock-app/**/*", "examples/**/*", "scripts/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -120,7 +120,9 @@ Recorded as found; each names its planned fix or the step that owns it.
 - Test files under `mock-app/` have two pre-existing TypeScript errors (`transfer.browser.test.ts`
   lines 89 and 121, `Object is of type 'unknown'`). They are invisible to `npm run build` because
   `tsconfig.json` excludes `*.test.ts`, and vitest does not typecheck. Present on HEAD before Step 6;
-  not fixed here.
+  not fixed here. **Fixed in Step 7 (A3):** a typed `ledgerEntries()` helper (`Response.json()` is
+  `unknown` in current `@types/node`), and `npm run typecheck` (`tsconfig.typecheck.json`: everything,
+  tests and `scripts/` included, no emit) is clean and runs in CI.
 
 ## Fleet Step 5: Postgres is required (2026-11-09)
 
