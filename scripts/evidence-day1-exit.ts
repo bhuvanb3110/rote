@@ -1,24 +1,27 @@
 // Day-1 exit (docs/FLEET_BRIEF.md; docs/plans/step-06.md section 9 and its reviewer decisions):
 // 100 transfer jobs across 4 workers, all succeeded, checked by a script that reads the bank's
 // /control/ledger: exactly 1 ledger row per job (matched by memo_key), 0 duplicates, 0 lost, every
-// job in a terminal state. Writes evidence/fleet-day1-exit/ with check.txt ending in RESULT: PASS or
-// RESULT: FAIL, and exits 1 on FAIL. No tuning: whatever happens is recorded.
+// job in a terminal state. Writes --out (default evidence/fleet-day1-exit/) with check.txt ending in
+// RESULT: PASS or RESULT: FAIL, and exits 1 on FAIL. No tuning: whatever happens is recorded. Since
+// Step 7 the ledger verdicts come from the shared oracle (src/oracle, D32) and Docker helpers from
+// scripts/lib/compose.ts.
 //
-//   npm run evidence:day1        (Docker Desktop running; builds and starts the Compose stack)
+//   npm run evidence:day1 [-- --out evidence/fleet-day1-exit-oracle]   (Docker Desktop running)
 //
 // Steps: stack up (postgres, bank, api) -> reset the dev queue tables and the bank ledger -> 4 workers
 // up -> POST 100 async jobs (tenants a/b/c round-robin) -> POST the same 100 again (idempotency) ->
 // poll GET /jobs/:id until terminal (10 min drain timeout) while sampling the per-tenant active count
 // and `docker stats` -> checks -> graceful `docker compose stop worker` (exit codes recorded).
 import "dotenv/config";
-import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
+import { checkLedger, fetchLedger, readJobs, type LedgerRow } from "../src/oracle/index.js";
 import { createPool, databaseUrlFromEnv, redactDatabaseUrl } from "../src/queue/index.js";
+import { argValue, createDocker, dockerEnv, FAKE_CREDS, http, toMiB, type PsRow } from "./lib/compose.js";
 
-const run = promisify(execFile);
-const OUT = path.join("evidence", "fleet-day1-exit");
+// --out: where the evidence goes. Step 6's run is evidence/fleet-day1-exit/; the Step 7 re-run on the
+// oracle (D32) writes evidence/fleet-day1-exit-oracle/.
+const OUT = argValue("out") ?? path.join("evidence", "fleet-day1-exit");
 const API = "http://127.0.0.1:8080";
 const BANK = "http://127.0.0.1:4100";
 const JOBS = 100;
@@ -26,100 +29,13 @@ const WORKERS = 4;
 const TENANTS = ["tenant-a", "tenant-b", "tenant-c"];
 const DRAIN_TIMEOUT_MS = 10 * 60_000;
 const TERMINAL = new Set(["succeeded", "business_outcome", "failed", "needs_human"]);
-
-// Fake mock-bank credentials (the same defaults as .env.example), passed to `docker compose` via the
-// environment so .env is never read or edited here. The checks grep for exactly these values.
-const CREDS: Record<string, string> = {
-  ROTE_CRED_TENANT_A_USERNAME: process.env.ROTE_CRED_TENANT_A_USERNAME || "fleet-op-a",
-  ROTE_CRED_TENANT_A_PASSWORD: process.env.ROTE_CRED_TENANT_A_PASSWORD || "fake-pass-a",
-  ROTE_CRED_TENANT_B_USERNAME: process.env.ROTE_CRED_TENANT_B_USERNAME || "fleet-op-b",
-  ROTE_CRED_TENANT_B_PASSWORD: process.env.ROTE_CRED_TENANT_B_PASSWORD || "fake-pass-b",
-  ROTE_CRED_TENANT_C_USERNAME: process.env.ROTE_CRED_TENANT_C_USERNAME || "fleet-op-c",
-  ROTE_CRED_TENANT_C_PASSWORD: process.env.ROTE_CRED_TENANT_C_PASSWORD || "fake-pass-c",
-};
-const DOCKER_ENV = { ...process.env, ...CREDS, ROTE_WORKERS: String(WORKERS) };
+const CREDS = FAKE_CREDS;
+const { docker, dockerJson, waitHealthy } = createDocker(dockerEnv(WORKERS));
 
 const lines: string[] = [];
 function log(line: string): void {
   console.log(line);
   lines.push(line);
-}
-
-async function docker(args: string[], timeoutMs = 15 * 60_000): Promise<string> {
-  const { stdout, stderr } = await run("docker", args, { env: DOCKER_ENV, maxBuffer: 256 * 1024 * 1024, timeout: timeoutMs });
-  return stdout + (stderr ? `\n[stderr]\n${stderr}` : "");
-}
-
-async function dockerJson<T>(args: string[]): Promise<T[]> {
-  const { stdout } = await run("docker", args, { env: DOCKER_ENV, maxBuffer: 64 * 1024 * 1024 });
-  // `docker inspect` prints one pretty-printed JSON array; `ps`/`stats --format json` print one JSON
-  // object per line. (Attempt 1 of the Day-1 exit crashed here on inspect's multi-line output.)
-  try {
-    const whole = JSON.parse(stdout);
-    return Array.isArray(whole) ? whole : [whole];
-  } catch {
-    // fall through: JSON lines
-  }
-  return stdout
-    .split(/\r?\n/)
-    .filter((l) => l.trim().startsWith("{") || l.trim().startsWith("["))
-    .flatMap((l) => {
-      const parsed = JSON.parse(l);
-      return Array.isArray(parsed) ? parsed : [parsed];
-    });
-}
-
-interface PsRow {
-  Name: string;
-  Service: string;
-  State: string;
-  Health: string;
-  ExitCode: number;
-}
-
-async function waitHealthy(services: Record<string, number>, timeoutMs: number): Promise<PsRow[]> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const rows = await dockerJson<PsRow>(["compose", "ps", "--all", "--format", "json"]);
-    const ok = Object.entries(services).every(
-      ([svc, n]) => rows.filter((r) => r.Service === svc && r.State === "running" && r.Health === "healthy").length === n,
-    );
-    if (ok) return rows;
-    const dead = rows.filter((r) => r.State === "exited");
-    if (dead.length > 0) throw new Error(`containers exited while starting: ${dead.map((r) => `${r.Name}(${r.ExitCode})`).join(", ")}`);
-    if (Date.now() > deadline) throw new Error(`not healthy after ${timeoutMs} ms: ${rows.map((r) => `${r.Name}=${r.State}/${r.Health}`).join(", ")}`);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-}
-
-async function http(method: string, url: string, body?: unknown, key?: string) {
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  if (key) headers["Idempotency-Key"] = key;
-  const res = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  const text = await res.text();
-  return { status: res.status, text, json: text ? JSON.parse(text) : undefined };
-}
-
-interface LedgerRow {
-  id: string;
-  tenantId: string;
-  fromMemberId: string;
-  toMemberId: string;
-  amount: number;
-  memo: string;
-  at?: string;
-}
-
-/** "123.4MiB / 700MiB" -> MiB. */
-function toMiB(s: string): number {
-  const m = /([\d.]+)\s*([KMG]i?B|B)/i.exec(s);
-  if (!m) return NaN;
-  const n = Number(m[1]);
-  const unit = m[2]!.toUpperCase();
-  if (unit.startsWith("G")) return n * 1024;
-  if (unit.startsWith("M")) return n;
-  if (unit.startsWith("K")) return n / 1024;
-  return n / 1024 / 1024;
 }
 
 async function main(): Promise<void> {
@@ -143,11 +59,13 @@ async function main(): Promise<void> {
   await pool.query("TRUNCATE jobs, job_attempts, breakers RESTART IDENTITY CASCADE");
   const reset = await fetch(`${BANK}/control/ledger/reset`);
   if (!reset.ok) throw new Error(`ledger reset -> HTTP ${reset.status}`);
-  const ledgerBefore = ((await (await fetch(`${BANK}/control/ledger`)).json()) as { entries: LedgerRow[] }).entries;
+  const ledgerBefore = await fetchLedger(BANK);
   log(`reset: queue tables truncated; bank ledger rows before the run: ${ledgerBefore.length}`);
 
   t = Date.now();
-  await docker(["compose", "up", "-d", "--no-recreate", "worker"]);
+  // --no-deps: never recreate the bank (its ledger was just reset). Workers ARE recreated if the image
+  // changed (Step 6 used --no-recreate, which would start old containers on an old image).
+  await docker(["compose", "up", "-d", "--no-deps", "--scale", `worker=${WORKERS}`, "worker"]);
   const psUp = await waitHealthy({ postgres: 1, bank: 1, api: 1, worker: WORKERS }, 180_000);
   timings.workersUpMs = Date.now() - t;
   await writeFile(path.join(OUT, "compose-ps-up.txt"), await docker(["compose", "ps", "--all"]));
@@ -252,9 +170,11 @@ async function main(): Promise<void> {
   log(`drain: ${timings.drainMs} ms (timeout ${DRAIN_TIMEOUT_MS} ms)`);
 
   // 5. Checks, from the database and the bank's ledger.
-  const jobs = (await pool.query("SELECT * FROM jobs ORDER BY created_at, id")).rows;
+  // The ledger verdicts come from the oracle (D32), the one definition every harness shares.
+  const jobs = await readJobs(pool);
   const attempts = (await pool.query("SELECT * FROM job_attempts ORDER BY id")).rows;
-  const ledger = ((await (await fetch(`${BANK}/control/ledger`)).json()) as { entries: LedgerRow[] }).entries;
+  const ledger: LedgerRow[] = await fetchLedger(BANK);
+  const report = checkLedger({ jobs, ledger, drainTimedOut: timings.drainMs > DRAIN_TIMEOUT_MS });
 
   const byState = new Map<string, number>();
   for (const j of jobs) byState.set(j.state, (byState.get(j.state) ?? 0) + 1);
@@ -263,22 +183,6 @@ async function main(): Promise<void> {
   const notTerminal = jobs.filter((j) => !TERMINAL.has(j.state));
   const notSucceeded = jobs.filter((j) => j.state !== "succeeded");
   const retried = jobs.filter((j) => j.attempt !== 1);
-  const rowsByMemo = new Map<string, LedgerRow[]>();
-  for (const r of ledger) rowsByMemo.set(r.memo, [...(rowsByMemo.get(r.memo) ?? []), r]);
-  const duplicates = jobs.filter((j) => (rowsByMemo.get(j.memo_key)?.length ?? 0) >= 2);
-  const missingRow = jobs.filter((j) => j.state === "succeeded" && (rowsByMemo.get(j.memo_key)?.length ?? 0) === 0);
-  const lost = jobs.filter((j) => !TERMINAL.has(j.state));
-  const jobMemos = new Set(jobs.map((j) => j.memo_key));
-  const orphanRows = ledger.filter((r) => !jobMemos.has(r.memo));
-  const refMismatch = jobs.filter((j) => {
-    if (j.state !== "succeeded") return false;
-    const rows = rowsByMemo.get(j.memo_key) ?? [];
-    return rows.length !== 1 || j.result?.outputs?.confirmationRef !== rows[0]!.id;
-  });
-  const tenantMismatch = jobs.filter((j) => {
-    const rows = rowsByMemo.get(j.memo_key) ?? [];
-    return rows.length === 1 && rows[0]!.tenantId !== j.tenant_id;
-  });
   const perWorker = new Map<string, number>();
   for (const a of attempts) perWorker.set(a.worker_id, (perWorker.get(a.worker_id) ?? 0) + 1);
 
@@ -291,12 +195,16 @@ async function main(): Promise<void> {
   check(notSucceeded.length === 0, `every job succeeded (not succeeded: ${notSucceeded.length}${notSucceeded.length ? ` -- ${notSucceeded.map((j) => `${j.id}:${j.state}/${j.outcome}`).join(", ")}` : ""})`);
   check(retried.length === 0, `every job on attempt 1 (retried: ${retried.length}${retried.length ? ` -- ${retried.map((j) => `${j.id}:attempt ${j.attempt}`).join(", ")}` : ""})`);
   check(ledger.length === JOBS, `bank ledger has exactly ${JOBS} rows (found ${ledger.length})`);
-  check(duplicates.length === 0, `0 duplicates: no job's memo_key on 2+ ledger rows (duplicated: ${duplicates.length})`);
-  check(missingRow.length === 0, `every succeeded job has its ledger row (missing: ${missingRow.length})`);
-  check(lost.length === 0, `0 lost: no job left non-terminal after the drain (lost: ${lost.length}${lost.length ? ` -- ${lost.map((j) => `${j.id}:${j.state} owner ${j.lease_owner}`).join(", ")}` : ""})`);
-  check(orphanRows.length === 0, `0 ledger rows whose memo matches no job (orphans: ${orphanRows.length})`);
-  check(refMismatch.length === 0, `each succeeded job's confirmationRef equals its ledger row id (mismatched: ${refMismatch.length})`);
-  check(tenantMismatch.length === 0, `each ledger row belongs to its job's tenant (mismatched: ${tenantMismatch.length})`);
+  // Ledger checks, by the oracle: 0 DUPLICATE, 0 LOST, 0 MISSING_COMMIT, 0 UNRECORDED_COMMIT,
+  // 0 MISMATCH (confirmationRef and tenant), 0 ORPHAN.
+  const c = report.counts;
+  check(c.DUPLICATE === 0, `0 duplicates: no job's memo_key on 2+ ledger rows (oracle DUPLICATE=${c.DUPLICATE})`);
+  check(c.MISSING_COMMIT === 0, `every succeeded job has its ledger row (oracle MISSING_COMMIT=${c.MISSING_COMMIT})`);
+  check(c.LOST === 0 && c.PENDING === 0, `0 lost: no job left non-terminal after the drain (oracle LOST=${c.LOST}, PENDING=${c.PENDING})`);
+  check(c.ORPHAN === 0, `0 ledger rows whose memo matches no job (oracle ORPHAN=${c.ORPHAN})`);
+  check(c.MISMATCH === 0, `each succeeded job's confirmationRef is its ledger row id, of its own tenant (oracle MISMATCH=${c.MISMATCH})`);
+  check(c.UNRECORDED_COMMIT === 0, `no failed/business_outcome job has a ledger row (oracle UNRECORDED_COMMIT=${c.UNRECORDED_COMMIT})`);
+  check(report.pass, "the ledger oracle passes (its report follows below)");
   check(perWorker.size === WORKERS, `${WORKERS} distinct workers ran attempts (found ${perWorker.size}: ${[...perWorker].map(([w, n]) => `${w}=${n}`).join(", ")})`);
   check(attempts.length === JOBS, `${JOBS} attempt rows, one per job (found ${attempts.length})`);
   check(maxActivePerTenant <= 2, `per-tenant cap held: max active per tenant ${maxActivePerTenant} <= 2 over ${activeSamples} samples`);
@@ -338,6 +246,8 @@ async function main(): Promise<void> {
 
   // Evidence files.
   await writeFile(path.join(OUT, "ledger.json"), JSON.stringify({ entries: ledger }, null, 2));
+  const { text: oracleText, ...oracleJson } = report;
+  await writeFile(path.join(OUT, "oracle.json"), JSON.stringify(oracleJson, null, 2));
   await writeFile(path.join(OUT, "jobs.json"), JSON.stringify(jobs, null, 2));
   await writeFile(path.join(OUT, "attempts.json"), JSON.stringify(attempts, null, 2));
   await writeFile(path.join(OUT, "submitted.json"), JSON.stringify(submitted, null, 2));
@@ -376,6 +286,9 @@ async function main(): Promise<void> {
   await writeFile(path.join(OUT, "timings.json"), JSON.stringify({ ...timings, succeededJobLatencyMs: latency }, null, 2));
 
   await pool.end();
+  log("");
+  log("ledger oracle report (D32):");
+  for (const line of oracleText.split("\n")) log(`  ${line}`);
   log("");
   log(failures.length === 0 ? "RESULT: PASS" : `RESULT: FAIL (${failures.length} failed check(s))`);
   await writeFile(path.join(OUT, "check.txt"), lines.join("\n") + "\n");
