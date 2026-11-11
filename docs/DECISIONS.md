@@ -986,4 +986,14 @@ image to a registry (nothing consumes it yet).
 **Why.** The suite is the gate for every commit; CI makes it the gate for every push, on a clean Linux
 machine where the crash tests' `SIGKILL` is a real signal.
 
+**Amendment (2026-11-11, found by CI's first run).** unit-node25 failed on its first run: the DB files
+ran with no Postgres. With vitest projects (D31), a CLI `--exclude` does not reach a project's own
+`exclude` list, so `vitest run --exclude "**/*.db.test.ts"`, which is both this job's command and
+`npm run test:unit`, had silently kept the DB files since D31 (unseen locally because Postgres was
+always up). Now `vitest.config.ts` drops `*.db.test.ts` from both projects when `npm_lifecycle_event`
+is `test:unit` (npm sets it, on every OS) or `ROTE_SKIP_DB_TESTS=1` (the CI job). Guarded by
+`src/testing/unitScript.test.ts`, which lists the files vitest would run in each mode in a child
+process. Alternative considered: `cross-env` in the npm script (a new dependency, which needs its own
+reviewed step).
+
 **Date.** 2026-11-11

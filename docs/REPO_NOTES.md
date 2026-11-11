@@ -123,6 +123,9 @@ Recorded as found; each names its planned fix or the step that owns it.
   `ROTE_FAULT_ENABLE` (test-only, refused unless both are set).
 - **CI** `.github/workflows/ci.yml` (D35): Node 22 + postgres:17 full suite, Node 25 unit tests, an
   image build. `engines.node` is `>=22`.
+- **`vitest run --exclude …` does nothing to a project's file list.** `npm run test:unit` skips the DB
+  files because `vitest.config.ts` reads `npm_lifecycle_event` / `ROTE_SKIP_DB_TESTS=1`, not because of
+  a CLI flag (D35 amendment; CI's first run caught it).
 - On Windows, `child.kill("SIGTERM")` is a hard terminate, and `process.kill(pid, "SIGKILL")` shows up
   as exit code 1, not a signal; the crash matrix records which it saw. CI (Linux) has real signals.
 - Not changed: the Compose lease is still 300 s with no heartbeat (Step 6). Day 2 restores 30 s / 10 s

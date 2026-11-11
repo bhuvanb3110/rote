@@ -12,6 +12,12 @@ if (!Number.isInteger(browserWorkers) || browserWorkers < 1) {
   throw new Error(`ROTE_BROWSER_TEST_WORKERS must be a positive integer, got ${process.env.ROTE_BROWSER_TEST_WORKERS}`);
 }
 
+// `npm run test:unit` (or ROTE_SKIP_DB_TESTS=1) drops every *.db.test.ts. This must live here, not
+// on the command line: with projects, a CLI `--exclude` does not reach a project's own exclude list,
+// so `vitest run --exclude "**/*.db.test.ts"` silently kept the DB files (found by CI in Step 7).
+const skipDb = process.env.npm_lifecycle_event === "test:unit" || process.env.ROTE_SKIP_DB_TESTS === "1";
+const dbExclude = skipDb ? ["**/*.db.test.ts"] : [];
+
 export default defineConfig({
   test: {
     projects: [
@@ -20,7 +26,7 @@ export default defineConfig({
         test: {
           name: "unit-db",
           include: ["**/*.test.ts"],
-          exclude: ["**/node_modules/**", "dist/**", ...BROWSER_TEST_FILES],
+          exclude: ["**/node_modules/**", "dist/**", ...BROWSER_TEST_FILES, ...dbExclude],
           sequence: { groupOrder: 0 },
         },
       },
@@ -29,6 +35,7 @@ export default defineConfig({
         test: {
           name: "browser",
           include: BROWSER_TEST_FILES,
+          exclude: dbExclude,
           maxWorkers: browserWorkers,
           sequence: { groupOrder: 1 },
         },

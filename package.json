@@ -25,7 +25,7 @@
     "worker": "tsx src/worker/main.ts",
     "db:migrate": "tsx src/cli/index.ts db migrate",
     "test": "vitest run",
-    "test:unit": "vitest run --exclude \"**/*.db.test.ts\""
+    "test:unit": "vitest run"
   },
   "license": "ISC",
   "dependencies": {
