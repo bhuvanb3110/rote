@@ -466,3 +466,74 @@ suite with the 4-worker fleet up.
 7. **The zombie window** (section 6) is measured with a deterministic `stall-after-intent` point and
    reported as the honest limit. Is a duplicate in that targeted run acceptable as evidence of the
    limit (it would be the only expected `DUPLICATE` in the repo, in its own clearly named folder)?
+
+## Reviewer decisions (2026-11-11)
+
+The reviewer **approved** this plan with the decisions below. Where they differ from the sections
+above, these win; everything else in this file stands.
+
+### Part A, built first: small items
+
+A1. **GitHub Actions:** bump every action to its current major that runs on a supported Node (checked
+    against each action's releases with `gh`), pinned by full commit SHA with the version in a trailing
+    comment (supply-chain practice). One commit. Confirm CI is green and the Node 20 deprecation
+    warning is gone.
+A2. **Delete `vitest.uncapped.config.ts`.** Amend D31: the A/B is reproduced by checking out `b9bc8da`.
+A3. **CI: a report-only crash-matrix job** (`continue-on-error: true`, the matrix report uploaded as an
+    artifact), so the matrix runs on Linux with real signals now. It becomes required in Step 10.
+A4. **Record in the D32/D30 notes:** the `business_outcome`-with-a-ledger-row → UNRECORDED_COMMIT verdict
+    stays strict; auto-promotion approving no overrides (`{}`) is correct and intended.
+A5. **Plan note:** the `npm audit` dependency upgrades get their own step after Day 2 (not now).
+
+### Part B: Step 8 exactly as planned
+
+Migration 0002, T2 heartbeat 10 s / lease 30 s, abort on a missed heartbeat, T3 fenced commit intent, T4
+widened, T6 recovery inside the dequeue loop for `running` and `committing` with the interim T6.3
+escalate, the pure state machine. Open questions answered:
+
+1. **The split 8 / 9 / 10:** approved.
+2. **The heartbeat never revives an expired lease:** approved.
+3. **Every recovery transition bumps the fencing token, the requeue included:** approved.
+4. **One lookup retry on `transient` / `session-timeout` before "unreadable":** approved (built in Step 9).
+5. **Lookup 1.2.0 with `firstMatchRef`:** approved (built in Step 9).
+6. **Matrix at `--lease-seconds 5 --heartbeat-seconds 2`:** approved. **Added for Step 10:** one matrix
+   run at the production 30 / 10 values, saved as evidence.
+7. **The targeted `stall-after-intent` duplicate as evidence of the honest limit:** approved, in its own
+   clearly named folder (e.g. `evidence/zombie-window-limit/`) with a README, paired with reviewer
+   addition 3 below.
+
+### Reviewer additions
+
+R1. **Model-vs-real property test.** Besides the pure-model properties, a fast-check model-based
+    (command) test that runs random sequences of operations against BOTH the pure model AND the real
+    SQL (T2, T3, T4, T6 now; T5 and T7 in Step 9) on a test Postgres schema, comparing job state,
+    token, owner and lease after every command. It uses the database clock; time is simulated by
+    setting `lease_expires_at` directly or by a test-only clock offset, and the test documents which.
+    About 200 sequences, seeded, the shrunk sequence printed on failure. This catches model/SQL drift.
+R2. **Two more properties in section 7:**
+    - at most one worker holds a valid lease (`lease_owner` set and `lease_expires_at > now`) at any
+      moment;
+    - `fencing_token` is monotonic non-decreasing for every job.
+R3. **Plan now, build in Step 10: a reconcile pass.** For every job that reached `succeeded` after a
+    resubmit (any attempt after a verify decided `resubmitted`), after a delay longer than lease +
+    settle, run the history lookup once more. 2+ matches → flag the job `duplicate_suspected` →
+    `needs_human` with evidence, and count it in a `duplicates_detected_total` metric. This turns a
+    silent zombie-window duplicate into an alert; the `zombie-window-limit` evidence must show the
+    duplicate being detected. Added to the Step 10 plan section, with a D-entry draft.
+
+### Turning green in Step 8
+
+The crash-matrix points before the intent (retried, 1 row) and the points after the intent (interim
+`needs_human`, 0 or 1 row, never 2). Re-run the crash matrix and one chaos run (seeded, saved), and
+compare both against `evidence/*/before-day2` in a short before/after table in the evidence README.
+State plainly what is still red until Step 9.
+
+### Also required
+
+- Memory: 8 GB laptop. Never run the full suite while the fleet is up; stop the fleet containers when
+  not in use.
+- `npm test` before every commit; never commit or push on red. Full suite 3 times at the end, logs
+  unfiltered. After pushing, check the CI run with `gh` and report it; if CI is red, fix it in this step.
+- Then write `docs/plans/step-09.md` (commit it; don't build it): verify as in section 5, plus lookup
+  1.2.0 and its approvals, T5/T7, verifying recovery (T6.4–T6.6), the recovery-internal crash points,
+  the reverify CLI, and what Step 8 changed. Short; it points back here.
