@@ -1,8 +1,10 @@
 // Day 2 leases end to end (docs/plans/step-08.md section 8, integration): a real worker, the in-process
 // mock bank, Chromium and Postgres. The heartbeat aborts a run whose job was taken away; the fenced
-// commit intent stops a Submit by a worker that no longer holds a live lease.
+// commit intent stops a Submit by a worker that no longer holds a live lease; the next worker's loop
+// recovers a dead worker's job.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { JobRow } from "../queue/index.js";
+import { dequeue, type JobRow } from "../queue/index.js";
+import { writeCommitIntent } from "./intent.js";
 import type { JobDone } from "./loop.js";
 import { runJob, type RunJobOptions } from "./runJob.js";
 import { createWorkerTestEnv, type WorkerTestEnv } from "./testEnv.js";
@@ -154,4 +156,33 @@ describe("the fenced commit intent (T3) in a running worker", () => {
     expect((await attempts(job!.id)).map((a) => a.outcome)).toEqual(["failure", "success"]);
     expect(await env.ledger()).toHaveLength(1);
   }, 90_000);
+});
+
+describe("recovery (T6) in a running worker's loop", () => {
+  it("a dead worker's expired `running` job is requeued by the next worker's loop (T6.1) and finished: attempt 2, exactly 1 row", async () => {
+    const [job] = await env.enqueueTransfers(1, {}, ["tenant-a"]);
+    const dead = await dequeue(env.pool, { workerId: "dead-worker", leaseSeconds: 30 });
+    expect(dead!.id).toBe(job!.id);
+    await env.pool.query("UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", [job!.id]);
+    const worker = env.newWorker();
+    expect(await worker.tick()).toBe("ran"); // recovery, then this same iteration's dequeue takes it
+    const [row] = await env.jobs();
+    expect(row).toMatchObject({ id: job!.id, state: "succeeded", attempt: 2, fencing_token: 3 });
+    expect((await attempts(job!.id)).map((a) => [a.worker_id, a.outcome])).toEqual([
+      ["dead-worker", "crashed"],
+      [expect.stringMatching(/^test-worker-/), "success"],
+    ]);
+    expect(await env.ledger()).toHaveLength(1);
+  }, 60_000);
+
+  it("a dead worker's expired `committing` job is escalated (T6.3, Step 8 interim) and never re-run: needs_human, 0 rows, nothing to dequeue", async () => {
+    const [job] = await env.enqueueTransfers(1, {}, ["tenant-a"]);
+    const dead = await dequeue(env.pool, { workerId: "dead-worker", leaseSeconds: 30 });
+    await writeCommitIntent(env.pool, { jobId: dead!.id, fencingToken: dead!.fencing_token, workerId: "dead-worker", leaseSeconds: 30 });
+    await env.pool.query("UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", [job!.id]);
+    const worker = env.newWorker();
+    expect(await worker.tick()).toBe("idle");
+    expect((await env.jobs())[0]).toMatchObject({ id: job!.id, state: "needs_human", outcome: "commit_uncertain", attempt: 1, fencing_token: 2 });
+    expect(await env.ledger()).toHaveLength(0);
+  }, 60_000);
 });

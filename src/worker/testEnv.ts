@@ -17,6 +17,7 @@ import { createTestSchema, resetQueueTables, type TestSchema } from "../queue/te
 import { createRedactor, loadTenantCredentials } from "./credentials.js";
 import { Worker, type WorkerOptions } from "./loop.js";
 import { runJob, type RunJobContext } from "./runJob.js";
+import { createRecoverySweep } from "./recover.js";
 import { listenOnSafePort } from "../testing/listen.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -125,14 +126,17 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
     newWorker(overrides = {}) {
       const { ctx: ctxOverrides, ...rest } = overrides;
       const runCtx = { ...ctx, ...ctxOverrides };
+      const workerId = rest.workerId ?? `test-worker-${++seq}`;
       return new Worker({
         pool,
-        workerId: `test-worker-${++seq}`,
+        workerId,
         leaseSeconds: 300,
         getBrowser: async () => browser,
         runJob: (job, options) => runJob(runCtx, job, options),
         redact,
         shutdownGraceMs: 30_000,
+        // Like the entrypoint: recover expired leases before every dequeue (T6).
+        beforeDequeue: createRecoverySweep({ pool: rest.pool ?? pool, workerId }),
         ...rest,
       });
     },

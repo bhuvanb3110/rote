@@ -3,7 +3,9 @@
 //
 // Order: Playwright version check -> bank forwarder (ROTE_BANK_FORWARD) -> wait for Postgres ->
 // migrate (advisory lock, D17) -> credentials check (refuse to start if any is missing) -> launch
-// Chromium -> poll loop -> on SIGTERM/SIGINT a graceful stop (a second signal aborts) -> exit 0.
+// Chromium -> poll loop (recovery of expired leases before every dequeue, T6; a heartbeat on every job,
+// T2; the fenced commit intent before every Submit, T3) -> on SIGTERM/SIGINT a graceful stop (a second
+// signal aborts) -> exit 0.
 // A fatal error exits 1, loudly.
 //
 // Environment (defaults in brackets):
@@ -31,6 +33,7 @@ import { parseHostPort, startTcpForwarder, type Forwarder } from "./bankForward.
 import { createRedactor, loadTenantCredentials, redactInputNames } from "./credentials.js";
 import { isTransientDbError } from "../queue/index.js";
 import { Worker } from "./loop.js";
+import { createRecoverySweep } from "./recover.js";
 import { checkPlaywrightVersion } from "./playwrightVersion.js";
 import { createFaultInjector, parseFaultConfig } from "./fault.js";
 import { DEFAULT_HEARTBEAT_SECONDS, DEFAULT_LEASE_SECONDS, validateLeaseTiming } from "./heartbeat.js";
@@ -142,6 +145,8 @@ async function main(): Promise<void> {
     log,
     fault,
     runJob: (job, options) => runJob({ credentials, evidenceBaseDir, fault }, job, options),
+    // Seam 4: every loop iteration recovers up to 10 expired leases before it dequeues (T6, D38).
+    beforeDequeue: createRecoverySweep({ pool, workerId, log }),
     onTick: healthFile
       ? () => {
           writeFile(healthFile, new Date().toISOString()).catch(() => undefined);
