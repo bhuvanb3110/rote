@@ -154,6 +154,79 @@ describe("job_attempts and breakers constraints", () => {
   });
 });
 
+describe("0002_day2: the recovery index, job_attempts.commit_intent_at, job_verifications", () => {
+  it("jobs_lease_expiry is a partial index on (lease_expires_at, id) over the active states only", async () => {
+    const { rows } = await pool.query<{ indexdef: string }>(
+      "SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 'jobs_lease_expiry'",
+    );
+    expect(rows).toHaveLength(1);
+    const def = rows[0]!.indexdef;
+    expect(def).toMatch(/ON \S*jobs USING btree \(lease_expires_at, id\)/);
+    expect(def).toMatch(/WHERE \(state = ANY \(ARRAY\['running'::text, 'committing'::text, 'verifying'::text\]\)\)/);
+  });
+
+  it("job_attempts.commit_intent_at is a nullable timestamptz, null by default", async () => {
+    const job = await insertJob();
+    await pool.query("INSERT INTO job_attempts (job_id, attempt, worker_id, fencing_token) VALUES ($1, 1, 'w', 1)", [job.id]);
+    const row = AttemptRowSchema.parse((await pool.query("SELECT * FROM job_attempts")).rows[0]);
+    expect(row.commit_intent_at).toBeNull();
+    await pool.query("UPDATE job_attempts SET commit_intent_at = now()");
+    expect(AttemptRowSchema.parse((await pool.query("SELECT * FROM job_attempts")).rows[0]).commit_intent_at).toBeInstanceOf(Date);
+  });
+
+  const insertVerification = (cols: Record<string, unknown>) => {
+    const row = { fencing_token: 2, worker_id: "w", reason: "lease_expired_in_committing", ...cols };
+    const names = Object.keys(row);
+    return pool.query(
+      `INSERT INTO job_verifications (${names.join(", ")}) VALUES (${names.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING *`,
+      names.map((n) => (row as Record<string, unknown>)[n]),
+    );
+  };
+
+  it("job_verifications accepts a full row (lookups as int[] with a NULL entry for unreadable)", async () => {
+    const job = await insertJob();
+    const { rows } = await insertVerification({
+      job_id: job.id,
+      prior_status: "failure",
+      lookups: [0, null],
+      decision: "escalated",
+      ended_at: new Date(Date.now() + 1000),
+    });
+    expect(rows[0].lookups).toEqual([0, null]);
+    expect(rows[0].started_at).toBeInstanceOf(Date);
+  });
+
+  it("job_verifications rejects an unknown reason, prior_status or decision, a token < 1, and ended before started", async () => {
+    const job = await insertJob();
+    expect((await rejection(insertVerification({ job_id: job.id, reason: "because" }))).code).toBe("23514");
+    expect((await rejection(insertVerification({ job_id: job.id, prior_status: "success" }))).code).toBe("23514");
+    expect((await rejection(insertVerification({ job_id: job.id, decision: "maybe" }))).code).toBe("23514");
+    expect((await rejection(insertVerification({ job_id: job.id, fencing_token: 0 }))).code).toBe("23514");
+    expect(
+      (await rejection(insertVerification({ job_id: job.id, started_at: new Date(), ended_at: new Date(Date.now() - 60_000) }))).code,
+    ).toBe("23514");
+  });
+
+  it("one verification per (job, fencing token); a job id must exist; deleting the job deletes its verifications", async () => {
+    const job = await insertJob();
+    await insertVerification({ job_id: job.id });
+    expect(await rejection(insertVerification({ job_id: job.id }))).toEqual({
+      code: "23505",
+      constraint: "job_verifications_job_token_key",
+    });
+    expect((await rejection(insertVerification({ job_id: randomUUID() }))).code).toBe("23503");
+    await pool.query("DELETE FROM jobs WHERE id = $1", [job.id]);
+    expect((await pool.query("SELECT count(*)::int AS n FROM job_verifications")).rows[0].n).toBe(0);
+  });
+
+  it("resetQueueTables empties job_verifications too (TRUNCATE ... CASCADE)", async () => {
+    const job = await insertJob();
+    await insertVerification({ job_id: job.id });
+    await resetQueueTables(pool);
+    expect((await pool.query("SELECT count(*)::int AS n FROM job_verifications")).rows[0].n).toBe(0);
+  });
+});
+
 describe("Zod row schemas parse real rows", () => {
   it("JobRowSchema and AttemptRowSchema accept rows straight from SELECT *", async () => {
     const job = await insertJob();

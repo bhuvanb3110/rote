@@ -56,6 +56,8 @@ export const AttemptRowSchema = z.object({
   outcome: z.string().nullable(),
   commit_uncertain: z.boolean(),
   trace_id: z.string().nullable(),
+  /** 0002_day2: when this attempt's commit intent (T3) was written; null if it never was. */
+  commit_intent_at: z.date().nullable(),
   error: z.string().nullable(),
 });
 export type AttemptRow = z.infer<typeof AttemptRowSchema>;

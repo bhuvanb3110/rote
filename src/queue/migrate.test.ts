@@ -39,9 +39,9 @@ describe("migration files", () => {
     await expect(loadMigrations(dir)).rejects.toThrow(/share number 0001/);
   });
 
-  it("the committed 0001_init.sql is LF on disk (.gitattributes) and loads", async () => {
-    const [init] = await loadMigrations();
-    expect(init!.version).toBe("0001_init");
-    expect(init!.sql.includes("\r\n")).toBe(false);
+  it("the committed migrations are LF on disk (.gitattributes) and load in order", async () => {
+    const loaded = await loadMigrations();
+    expect(loaded.map((m) => m.version)).toEqual(["0001_init", "0002_day2"]);
+    for (const m of loaded) expect(m.sql.includes("\r\n"), m.version).toBe(false);
   });
 });
