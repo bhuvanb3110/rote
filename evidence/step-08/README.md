@@ -18,6 +18,7 @@ run failed and no test flaked in any of them.
 | `npm-test-final-x3-run1.txt` | final run 1 of 3, back to back, on 8e3387b | 56 | 501/501 | 130 s |
 | `npm-test-final-x3-run2.txt` | final run 2 of 3 | 56 | 501/501 | 118 s |
 | `npm-test-final-x3-run3.txt` | final run 3 of 3 | 56 | 501/501 | 119.8 s |
+| `npm-test-commit-ci-linux-evidence.txt` | the commit saving CI's Linux 16/16 matrix report (evidence only) | 56 | 501/501 | 124.9 s |
 
 Where one run covers two commits, the first commit's tree is the second's minus files that change no
 code under test (CI YAML, docs, a test file added on top).
