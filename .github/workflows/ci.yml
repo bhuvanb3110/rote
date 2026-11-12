@@ -4,8 +4,9 @@
 #   unit-node25 the pure unit tests (no browser, no Postgres) on Node 25, the builder's local Node.
 #   docker      builds the fleet image (build only, never pushed), with the GitHub Actions build cache,
 #               so a broken Dockerfile fails fast.
-# Not in CI (README "CI"): the Day-1 exit, chaos and the crash-point matrix. They need the Compose
-# stack or minutes of wall time; they run as scripts with committed evidence.
+#   crash-matrix the crash-point matrix, REPORT-ONLY (continue-on-error) until Step 10; report uploaded.
+# Not in CI (README "CI"): the Day-1 exit and chaos. They need the Compose stack and minutes of wall
+# time; they run as scripts with committed evidence.
 #
 # Every action is pinned by full commit SHA, its release in a trailing comment (supply-chain practice:
 # a tag can be moved, a SHA cannot). Each is the current major on a supported Node (runs.using:
@@ -88,6 +89,53 @@ jobs:
         with:
           name: unit-node25-log
           path: unit-node25.txt
+          if-no-files-found: warn
+
+  # REPORT-ONLY until Step 10 (Step 8 reviewer decision A3, D35 amendment): the crash-point matrix on
+  # Linux, where the fault worker's SIGKILL is a real signal. continue-on-error keeps a red matrix from
+  # failing the workflow; the report (matrix.md, check.txt, per-point logs) is uploaded on every run and
+  # matrix.md is written to the job summary. Step 10 removes continue-on-error and makes it required.
+  crash-matrix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: rote
+          POSTGRES_PASSWORD: rote_dev_only
+          POSTGRES_DB: rote
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rote -d rote" --health-interval 2s
+          --health-timeout 3s --health-retries 30
+    env:
+      ROTE_TEST_DATABASE_URL: postgres://rote:rote_dev_only@127.0.0.1:55432/rote_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: crash-point matrix (report-only)
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run crash-matrix -- --lease-seconds 5 --drain-timeout 30s --out crash-matrix-report 2>&1 | tee crash-matrix-stdout.txt
+      - if: always()
+        name: matrix to the job summary
+        shell: bash
+        run: cat crash-matrix-report/matrix.md >> "$GITHUB_STEP_SUMMARY" || echo "no matrix.md" >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: crash-matrix-report
+          path: |
+            crash-matrix-report/
+            crash-matrix-stdout.txt
           if-no-files-found: warn
 
   docker:

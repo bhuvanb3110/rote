@@ -762,7 +762,8 @@ Other tenants' runs are decided by their own files, so one edited override stops
 with **no map** is grandfathered: allowed, and the reason says the override was not checked. An
 approval written **without** overrides (auto-promotion, which knows only the base artifact, or a
 caller using `approvalKey`) records `{}`, so it approves no override: tenant runs are refused until a
-`catalog approve` names them (fail closed). `isApprovalCurrent` compares the override map only when
+`catalog approve` names them (fail closed). **Reviewer decision (2026-11-11, Step 8 A4):** auto-promotion
+approving no overrides (`{}`) is correct and intended; it is not a gap to close. `isApprovalCurrent` compares the override map only when
 the key names one, so the catalog listing and the run recorder still ask only about the base. The
 async API's enqueue-time 422 check (D27) loads the tenant's override too (only for a plain tenant
 name, never building a path from anything else; a missing file is left to the worker's preflight).
@@ -892,7 +893,10 @@ rows: ok", next to `needs_human`. A job can only end `business_outcome` when the
 commit was uncertain (a refusal seen after Submit carries `commitUncertain` and is parked as
 `needs_human`, D25; Day 2 verifies it, step-08 section 5). So a `business_outcome` job with a ledger
 row means money moved while the job says it was refused: the oracle reports UNRECORDED_COMMIT, as for
-`failed`. Raised in the handoff for the reviewer.
+`failed`. Raised in the handoff for the reviewer. **Reviewer decision (2026-11-11, Step 8 A4): it stays
+strict.** Day 2 keeps it consistent: Step 9's verify ends `business_outcome` only after two 0-match
+lookups (`not_committed_final`), and a refusal with a matching row becomes `succeeded` / `already_done`,
+so a correct fleet never produces `business_outcome` with a row.
 
 **Alternatives considered.** Keep each harness's own checks (the Day-1 exit had them inline): three
 copies would drift. Judge by `job_attempts` or worker logs: the brief says correctness is judged only
@@ -1018,3 +1022,13 @@ checkout v6 stores the persisted token in a separate file; upload-artifact v7 ad
 upload; the Docker actions drop inputs and env vars we never set). Alternatives considered: pin by tag
 (`@v7`; a tag can be moved to other code, a SHA cannot); Dependabot to keep the pins fresh (a new bot
 with write access to PRs, out of this step's scope; noted for the dependency step after Day 2).
+
+**Amendment (2026-11-11, Step 8 reviewer decision A3): a report-only crash-matrix job.** A fourth job,
+**crash-matrix**, runs `npm run crash-matrix -- --lease-seconds 5 …` on ubuntu-24.04 with its own
+`postgres:17` service, so the matrix runs on Linux with real signals (the fault worker's `SIGKILL`
+shows up as `signal SIGKILL`, not Windows' `exit 1`) on every push. `continue-on-error: true`: a red
+matrix does not fail the workflow while Day 2 is being built; `matrix.md` goes to the job summary and
+the whole report (per-point logs, jobs, ledgers, oracle reports) is uploaded as the
+`crash-matrix-report` artifact on every run. Step 10 removes `continue-on-error` and makes the job
+required. Alternatives considered: wait for Step 10 to add it (the first Linux run would then also be
+the gating one); run it only on `main` (Day 2 is built on `fleet/day-1`).

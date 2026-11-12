@@ -54,9 +54,12 @@ parallel. Never run the suite while the 4-worker fleet is up on an 8 GB machine.
 GitHub Actions (`.github/workflows/ci.yml`, D35) on every push and pull request to `main` and
 `fleet/**`: **test** (Node 22, a `postgres:17` service, Playwright Chromium from the lockfile,
 `npm run typecheck`, the full `npm test`, the full log uploaded as the `npm-test-log` artifact on every
-run), **unit-node25** (the pure unit tests on Node 25) and **docker** (builds the fleet image, never
-pushed, with the Actions cache). Not in CI: the Day-1 exit, chaos and the crash-point matrix; they need
-the Compose stack or minutes of wall time and run as scripts with committed evidence (next section).
+run), **unit-node25** (the pure unit tests on Node 25), **docker** (builds the fleet image, never
+pushed, with the Actions cache) and **crash-matrix** (the crash-point matrix on Linux with real
+signals, **report-only** until Step 10: `continue-on-error`, the report uploaded as the
+`crash-matrix-report` artifact and shown in the job summary). Every action is pinned by commit SHA.
+Not in CI: the Day-1 exit and chaos; they need the Compose stack and minutes of wall time and run as
+scripts with committed evidence (next section).
 
 ## Replay needs no API key
 
