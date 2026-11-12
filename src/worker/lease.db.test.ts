@@ -1,7 +1,10 @@
 // Day 2 leases end to end (docs/plans/step-08.md section 8, integration): a real worker, the in-process
-// mock bank, Chromium and Postgres. The heartbeat aborts a run whose job was taken away.
+// mock bank, Chromium and Postgres. The heartbeat aborts a run whose job was taken away; the fenced
+// commit intent stops a Submit by a worker that no longer holds a live lease.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { JobRow } from "../queue/index.js";
 import type { JobDone } from "./loop.js";
+import { runJob, type RunJobOptions } from "./runJob.js";
 import { createWorkerTestEnv, type WorkerTestEnv } from "./testEnv.js";
 
 let env: WorkerTestEnv;
@@ -65,5 +68,90 @@ describe("the heartbeat (T2) in a running worker", () => {
     const [a] = await attempts(job!.id);
     expect(a).toMatchObject({ outcome: "lease_lost", commit_uncertain: false });
     expect(a.error).toMatch(/lease lost during the run \(heartbeat\); nothing recorded on the job\. lease lost: the heartbeat matched 0 rows/);
+  }, 90_000);
+});
+
+describe("the fenced commit intent (T3) in a running worker", () => {
+  /** A worker whose commit intent first runs `meddle` (the test's stand-in for a concurrent event). */
+  const workerMeddlingBeforeIntent = (meddle: (job: JobRow) => Promise<void>, done: JobDone[]) =>
+    env.newWorker({
+      onJobDone: (d) => done.push(d),
+      runJob: (job: JobRow, options: RunJobOptions) =>
+        runJob(env.ctx, job, {
+          ...options,
+          commitIntent: async () => {
+            await meddle(job);
+            await options.commitIntent!();
+          },
+        }),
+    });
+
+  it("a normal run goes running -> committing -> succeeded; the attempt row records when its intent was written", async () => {
+    const [job] = await env.enqueueTransfers(1, {}, ["tenant-a"]);
+    const seen: string[] = [];
+    const done: JobDone[] = [];
+    const worker = workerMeddlingBeforeIntent(async (j) => {
+      seen.push((await env.pool.query("SELECT state FROM jobs WHERE id = $1", [j.id])).rows[0].state);
+    }, done);
+    expect(await worker.tick()).toBe("ran");
+    expect(seen).toEqual(["running"]);
+    const [row] = await env.jobs();
+    expect(row).toMatchObject({ id: job!.id, state: "succeeded", attempt: 1 });
+    expect(row!.commit_intent_at).toBeInstanceOf(Date);
+    const [a] = await attempts(job!.id);
+    expect(a.commit_intent_at).toEqual(row!.commit_intent_at);
+    expect(await env.ledger()).toHaveLength(1);
+  }, 60_000);
+
+  it("token bumped right before Submit (recovered): FencingError, the Submit is NEVER clicked, 0 rows; the stale requeue is fenced too", async () => {
+    const [job] = await env.enqueueTransfers(1, {}, ["tenant-a"]);
+    const done: JobDone[] = [];
+    const worker = workerMeddlingBeforeIntent(async (j) => {
+      await env.pool.query(
+        "UPDATE jobs SET fencing_token = fencing_token + 1, state = 'needs_human', outcome = 'taken-by-test', lease_owner = NULL, lease_expires_at = NULL WHERE id = $1",
+        [j.id],
+      );
+    }, done);
+    expect(await worker.tick()).toBe("ran");
+    expect(done[0]!.recorded).toBe(false);
+    expect(done[0]!.outcome.state).toBe("queued"); // no intent written: retry rule, but fenced out
+    expect(await env.ledger()).toHaveLength(0);
+    expect((await env.jobs())[0]).toMatchObject({ state: "needs_human", outcome: "taken-by-test", commit_intent_at: null });
+    const [a] = await attempts(job!.id);
+    expect(a).toMatchObject({ outcome: "lease_lost", commit_uncertain: false, commit_intent_at: null });
+  }, 60_000);
+
+  it("T3 fails with anything but a FencingError (COMMIT result unknown): no click, 0 rows, and the attempt is treated as 'may have committed' (needs_human, interim)", async () => {
+    const [job] = await env.enqueueTransfers(1, {}, ["tenant-a"]);
+    const done: JobDone[] = [];
+    const worker = workerMeddlingBeforeIntent(async () => {
+      throw new Error("Connection terminated unexpectedly"); // what pg says when the link drops mid-COMMIT
+    }, done);
+    expect(await worker.tick()).toBe("ran");
+    expect(done[0]!.recorded).toBe(true);
+    expect((await env.jobs())[0]).toMatchObject({ id: job!.id, state: "needs_human", outcome: "commit_uncertain", attempt: 1 });
+    expect(await env.ledger()).toHaveLength(0);
+    expect(await worker.tick()).toBe("idle"); // never retried blindly
+  }, 60_000);
+
+  it("lease expired before Submit but nobody recovered it: T3 refuses (no click); the worker's own requeue is recorded; attempt 2 succeeds; exactly 1 row", async () => {
+    const [job] = await env.enqueueTransfers(1, {}, ["tenant-a"]);
+    const done: JobDone[] = [];
+    let first = true;
+    const worker = workerMeddlingBeforeIntent(async (j) => {
+      if (!first) return;
+      first = false;
+      await env.pool.query("UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", [j.id]);
+    }, done);
+    expect(await worker.tick()).toBe("ran");
+    expect(done[0]!.recorded).toBe(true);
+    expect((await env.jobs())[0]).toMatchObject({ state: "queued", attempt: 1, lease_owner: null });
+    expect((await env.jobs())[0]!.error).toMatch(/FencingError: commit intent refused/);
+    expect(await env.ledger()).toHaveLength(0);
+
+    expect(await worker.tick()).toBe("ran");
+    expect((await env.jobs())[0]).toMatchObject({ id: job!.id, state: "succeeded", attempt: 2 });
+    expect((await attempts(job!.id)).map((a) => a.outcome)).toEqual(["failure", "success"]);
+    expect(await env.ledger()).toHaveLength(1);
   }, 90_000);
 });

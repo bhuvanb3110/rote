@@ -20,6 +20,7 @@ import { dequeue, type JobRow, type Pool } from "../queue/index.js";
 import { createBackoff, sleep } from "./backoff.js";
 import { completeJobWithRetry, markAttemptLeaseLost, retryTransient } from "./complete.js";
 import { Heartbeat, validateLeaseTiming } from "./heartbeat.js";
+import { writeCommitIntent } from "./intent.js";
 import { LeaseLostError } from "./leaseErrors.js";
 import { redactDeep, type Redactor } from "./credentials.js";
 import { isTransientDbError } from "../queue/index.js";
@@ -190,7 +191,21 @@ export class Worker {
       let run: RunJobResult;
       try {
         const browser = await this.options.getBrowser();
-        run = await this.options.runJob(job, { browser, signal: controller.signal });
+        run = await this.options.runJob(job, {
+          browser,
+          signal: controller.signal,
+          // T3, right before the Submit: fenced on this lease's token and owner, and on the lease
+          // still being alive by the database's clock.
+          commitIntent: async () => {
+            await writeCommitIntent(this.options.pool, {
+              jobId: job.id,
+              fencingToken: job.fencing_token,
+              workerId: this.options.workerId,
+              leaseSeconds: this.options.leaseSeconds,
+            });
+            this.log.info(log, "worker: commit intent written; clicking Submit");
+          },
+        });
       } catch (error) {
         // getBrowser failed (Chromium would not start) or a bug escaped runJob: nothing irreversible ran.
         run = { end: { kind: "thrown", error, aborted: controller.signal.aborted }, irreversibleStarted: false };

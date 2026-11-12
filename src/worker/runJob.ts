@@ -20,6 +20,7 @@ import { DEFAULT_OVERRIDES_DIR, resolveTenant } from "../tenant/index.js";
 import type { TenantCredentials } from "./credentials.js";
 import type { RunEnd } from "../fleet/stateMachine.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
+import { FencingError } from "./leaseErrors.js";
 
 export interface RunJobContext {
   credentials: TenantCredentials;
@@ -68,11 +69,21 @@ export function buildJobParams(
 export interface RunJobOptions {
   browser: Browser;
   signal: AbortSignal;
+  /**
+   * T3, the fenced commit intent (src/worker/intent.ts), run in onIrreversible.before right before
+   * the Submit. It throws FencingError when this worker is not the job's live holder, and the click
+   * never happens. The worker always passes it; a caller without it gets Step 6's behavior.
+   */
+  commitIntent?: () => Promise<void>;
 }
 
 export interface RunJobResult {
   end: RunEnd;
-  /** onIrreversible.before ran (seam 1: Day 2 writes the commit intent there). */
+  /**
+   * The Submit may have been clicked: the commit intent was written, or its COMMIT failed with an
+   * unknown result (no intent passed: onIrreversible.before ran). A FencingError (definitely not
+   * written) leaves it false.
+   */
   irreversibleStarted: boolean;
 }
 
@@ -110,10 +121,22 @@ export async function runJob(ctx: RunJobContext, job: JobRow, options: RunJobOpt
   let irreversibleStarted = false;
   const fault = ctx.fault ?? NO_FAULT;
   const onIrreversible = {
-    // Seam 1 (step-06 section 7): Day 2 writes the fenced commit intent here and throws on a lost lease.
+    // Seam 1: the fenced commit intent (T3). Only a COMMITTED intent lets the click happen: a throw
+    // here rejects runReplay before the click (D11).
     before: async (_step: Step) => {
+      if (options.commitIntent) {
+        try {
+          await options.commitIntent();
+        } catch (error) {
+          // FencingError: 0 rows, definitely not written, nothing irreversible. Anything else (the
+          // COMMIT failed or its result is unknown): the intent may have landed, so from here on this
+          // attempt is treated as "may have committed" (it still never clicks).
+          if (!(error instanceof FencingError)) irreversibleStarted = true;
+          throw error;
+        }
+      }
       irreversibleStarted = true;
-      fault.at("before-submit");
+      fault.at("before-submit"); // Day 2: after the commit intent committed
     },
     // Seam 2: the bank has answered the click (D12); crash-after-submit fires here.
     after: async (_step: Step) => {

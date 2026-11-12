@@ -1,9 +1,16 @@
-// Recording a job's outcome, FENCED (docs/plans/step-06.md section 3). One transaction:
-//   1. UPDATE jobs ... WHERE id AND fencing_token AND lease_owner AND state = 'running'
+// T4: recording a job's outcome, FENCED (docs/plans/step-06.md section 3; widened in
+// docs/plans/step-08.md section 3). One transaction:
+//   1. UPDATE jobs ... WHERE id AND fencing_token AND lease_owner AND the state guard
 //   2. UPDATE job_attempts for this (job, fencing_token): ended_at, outcome, commit_uncertain, error
-// If (1) matches 0 rows this worker no longer holds the job (Day 2: its lease expired and someone
-// else took it): NOTHING is written to jobs, and the attempt is marked lease_lost. A completion from a
-// worker that lost the job can never overwrite the new owner's state.
+// If (1) matches 0 rows this worker no longer holds the job (its lease expired and recovery moved it
+// on, bumping the token): NOTHING is written to jobs, and the attempt is marked lease_lost. A completion
+// from a worker that lost the job can never overwrite the new owner's state.
+//
+// The state guard is completionAllowed (src/fleet/stateMachine.ts) in SQL: a live owner is `running`
+// (before its commit intent) or `committing` (after it). From `running` anything; from `committing`
+// only succeeded or needs_human, so not even a buggy caller can requeue or fail a job past its intent.
+// T4 does not check the lease's expiry: a holder whose lease ran out but whom nobody recovered is still
+// the only one who ran the job, and its outcome is the truth.
 //
 // A requeue is the same statement with state = 'queued'; the jobs_queued_has_attempts_left CHECK
 // makes it impossible once attempts are exhausted (D21).
@@ -16,7 +23,8 @@ export const COMPLETE_JOB_SQL = `
 UPDATE jobs
 SET state = $4, outcome = $5, error = $6, result = $7::jsonb,
     lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
-WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3 AND state = 'running'
+WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3
+  AND (state = 'running' OR (state = 'committing' AND $4 IN ('succeeded', 'needs_human')))
 RETURNING id`;
 
 export const END_ATTEMPT_SQL = `
