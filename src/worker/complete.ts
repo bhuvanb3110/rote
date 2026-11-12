@@ -10,7 +10,7 @@
 import { withTransaction, type Pool } from "../queue/index.js";
 import { createBackoff, sleep } from "./backoff.js";
 import { isTransientDbError } from "../queue/index.js";
-import type { JobOutcome } from "./outcome.js";
+import type { JobOutcome } from "../fleet/stateMachine.js";
 
 export const COMPLETE_JOB_SQL = `
 UPDATE jobs

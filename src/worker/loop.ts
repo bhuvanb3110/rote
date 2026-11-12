@@ -16,7 +16,7 @@ import { createBackoff, sleep } from "./backoff.js";
 import { completeJobWithRetry } from "./complete.js";
 import { redactDeep, type Redactor } from "./credentials.js";
 import { isTransientDbError } from "../queue/index.js";
-import { jobOutcomeFor, type JobOutcome } from "./outcome.js";
+import { jobOutcomeFor, type JobOutcome } from "../fleet/stateMachine.js";
 import type { RunJobOptions, RunJobResult } from "./runJob.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
 

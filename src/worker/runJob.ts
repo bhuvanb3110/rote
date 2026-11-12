@@ -18,7 +18,7 @@ import { inputsToZodSchema } from "../catalog/schema.js";
 import { hasIrreversibleStep, MEMO_INPUT, type JobRow } from "../queue/index.js";
 import { DEFAULT_OVERRIDES_DIR, resolveTenant } from "../tenant/index.js";
 import type { TenantCredentials } from "./credentials.js";
-import type { RunEnd } from "./outcome.js";
+import type { RunEnd } from "../fleet/stateMachine.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
 
 export interface RunJobContext {

@@ -1,7 +1,7 @@
 // jobOutcomeFor: one case per row of docs/plans/step-06.md section 2's table.
 import { describe, expect, it } from "vitest";
 import type { ReplayResult } from "../artifact/index.js";
-import { jobOutcomeFor, MAX_ERROR_LENGTH, type OutcomeContext } from "./outcome.js";
+import { jobOutcomeFor, MAX_ERROR_LENGTH, type OutcomeContext } from "./stateMachine.js";
 
 const CU = { irreversibleStepId: "step-11", detail: "Attempted the irreversible step, then the run ended in failure" };
 const first: OutcomeContext = { attempt: 1, maxAttempts: 3, irreversibleStarted: false };

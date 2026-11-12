@@ -4,7 +4,7 @@ import type { Capability } from "../artifact/index.js";
 import { dequeue, enqueue, type Pool } from "../queue/index.js";
 import { createTestSchema, resetQueueTables, type TestSchema } from "../queue/testDb.js";
 import { completeJob, completeJobWithRetry } from "./complete.js";
-import { jobOutcomeFor } from "./outcome.js";
+import { jobOutcomeFor } from "../fleet/stateMachine.js";
 
 const CAP = {
   id: "cap",
