@@ -99,6 +99,46 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
+## Fleet Step 8: leases that mean something (2026-11-11/12)
+
+- **Migration `0002_day2.sql`** (forward-only): the partial index `jobs_lease_expiry`,
+  `job_attempts.commit_intent_at`, and `job_verifications` (written from Step 9). Two migrations now:
+  tests that list applied migrations name both.
+- **The state machine** is `src/fleet/stateMachine.ts` (`jobOutcomeFor` moved there from
+  `src/worker/outcome.ts`; `completionAllowed`; `recoveryAction`). `src/fleet/model.ts` mirrors each SQL
+  statement as a pure function; the property tests (`stateMachine.property.test.ts`, fast-check) and the
+  model-vs-real test (`modelVsReal.db.test.ts`) both use it (D39). fast-check 4.10.2 is a new
+  devDependency.
+- **The worker** (D36–D38): a heartbeat (`src/worker/heartbeat.ts`, T2) every `ROTE_HEARTBEAT_SECONDS`
+  (10) against a `ROTE_LEASE_SECONDS` (30) lease, refused unless `heartbeat * 2 < lease`; a lost lease
+  aborts the run (`LeaseLostError`) and writes only `lease_lost` on the attempt row. The fenced commit
+  intent (`src/worker/intent.ts`, T3) runs in `onIrreversible.before`; `FencingError` = the Submit was
+  never clicked. T4 accepts `committing` (`succeeded`/`needs_human` only). Recovery
+  (`src/worker/recover.ts`, T6) runs before every dequeue (`createRecoverySweep`, wired in `main.ts` and
+  in the test env's `newWorker`): `running` → requeue / fail, `committing` → `needs_human`
+  (Step 8 interim). Every recovery bumps the token.
+- **What a stuck job looks like now:** a dead worker's job is recovered within lease + one poll. An
+  expired `committing` job ends `needs_human` / `commit_uncertain` with "lease expired after the commit
+  intent" until Step 9's verify; such jobs are never re-run automatically.
+- **Crash matrix** (D40): `--heartbeat-seconds`, `--expect step-08`; a point passes only if it ends as
+  `src/chaos/crashExpected.ts` says. `evidence/crash-matrix/step-08/`: 16/16 at 5 s / 2 s. The CI job
+  `crash-matrix` runs it on Linux on every push, report-only until Step 10.
+- **Chaos** (`evidence/chaos/step-08-seed-848183018/`): `RESULT: PASS`, 100 ok, 0 LOST, 0 duplicates,
+  18 kills; the report now lists recoveries by T6 label and the protections that fired in the workers.
+  The harness's `heldJobs` snapshot is taken just before `docker kill`/`pause` (which take a second or
+  two on Docker Desktop), so it can show a job one step behind; `jobs.json`/`attempts.json` are the
+  record.
+- **CI actions** are pinned by commit SHA at their node24 majors (D35 amendment); the Node 20
+  deprecation warning is gone.
+- **`vitest.uncapped.config.ts` is gone**; reproduce the D31 A/B from `b9bc8da` (D31 amendment).
+- **The suite is slower:** about 88 s → about 150 s wall locally (the lease integration tests wait on a
+  deliberately slow bank; the property and model-vs-real tests add CPU). 55 files.
+- **`intent.db.test.ts`'s Postgres-cut test cuts before connecting**: destroying a live pooled
+  connection under `pg` on Windows surfaced as an unhandled `ECONNRESET` in vitest (no test failed, the
+  run did), so the test uses the same cut as `faults.db.test.ts`. The "COMMIT result unknown" path is
+  covered at the worker level (`lease.db.test.ts`: any non-`FencingError` from T3 → no click,
+  `needs_human`).
+
 ## Fleet Step 7: the judges, CI, and three fixes (2026-11-11)
 
 - **Approvals cover tenant overrides** (D30): `status/*.json` record `approvedOverrideDigests`; a tenant
@@ -128,8 +168,7 @@ Recorded as found; each names its planned fix or the step that owns it.
   a CLI flag (D35 amendment; CI's first run caught it).
 - On Windows, `child.kill("SIGTERM")` is a hard terminate, and `process.kill(pid, "SIGKILL")` shows up
   as exit code 1, not a signal; the crash matrix records which it saw. CI (Linux) has real signals.
-- Not changed: the Compose lease is still 300 s with no heartbeat (Step 6). Day 2 restores 30 s / 10 s
-  (docs/plans/step-08.md).
+- ~~Not changed: the Compose lease is still 300 s with no heartbeat (Step 6).~~ Step 8 restored 30 s / 10 s.
 
 ## Fleet Step 6: worker, async API, Docker stack (2026-11-10)
 

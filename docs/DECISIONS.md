@@ -1032,3 +1032,161 @@ the whole report (per-point logs, jobs, ledgers, oracle reports) is uploaded as 
 `crash-matrix-report` artifact on every run. Step 10 removes `continue-on-error` and makes the job
 required. Alternatives considered: wait for Step 10 to add it (the first Linux run would then also be
 the gating one); run it only on `main` (Day 2 is built on `fleet/day-1`).
+
+## D36: A 30 s lease kept alive by a 10 s heartbeat that never revives an expired lease; a lost lease aborts the run and writes nothing to `jobs`
+
+(Step 8, plan section 2; reviewer decision 2.)
+
+**Decision.** `ROTE_LEASE_SECONDS=30`, `ROTE_HEARTBEAT_SECONDS=10` (Compose and the worker's defaults;
+Step 6's 300 s existed only because there was no heartbeat). The worker refuses to start unless
+`heartbeat * 2 < lease`, so one missed beat never loses a lease by itself. T2 (`src/worker/heartbeat.ts`)
+is one autocommit `UPDATE … SET lease_expires_at = now() + lease WHERE id, fencing_token, lease_owner, an
+active state AND lease_expires_at > now()`: it extends only a lease that is still alive by the database's
+clock (D22); an expired lease is recovery's, even if nobody has recovered it yet. 0 rows → the heartbeat
+stops and aborts the job's `AbortController` with a `LeaseLostError`; `runReplay` closes the context and
+rejects with it (D11); the worker writes **nothing** to `jobs` and marks only its own attempt row
+`lease_lost`, keeping any note recovery wrote first (`… [recovery had recorded: …]`), because the worker
+was alive and `crashed` would be the wrong label. A transient DB error is retried at the next beat
+(three misses = the lease is gone); a non-transient one gives the job up the same way (a heartbeat that
+cannot run cannot keep the lease). The heartbeat stops before T4. A run that *returned* before the abort
+landed still goes through the fenced T4 (its result is real information; T4 decides).
+
+**Alternatives considered.** Extend whenever the token matches (the brief's wording): a worker back
+from a long Postgres outage would revive a lease that recovery is entitled to take, and the moment of
+"expired" would depend on who reached Postgres first. Let the aborted run complete through T4 anyway:
+safe (T4 is fenced and `jobOutcomeFor` is conservative) but it writes into a job that is recovery's by
+then. A worker-side deadline timer as a second abort source: uses the worker's clock (D22).
+
+**Why.** A lease only means something if it ends on one clock and stays ended. Aborting on the first
+0-row beat closes the browser context while a zombie's next action is most likely still pending, which
+is the cheapest protection the zombie case has (plan section 6).
+
+**Date.** 2026-11-11
+
+## D37: The commit intent is one fenced transaction right before the Submit; only a FencingError means "not written"; T4 accepts `committing` through `completionAllowed`
+
+(Step 8, plan section 3.)
+
+**Decision.** T3 (`src/worker/intent.ts`) runs in `onIrreversible.before` (seam 1): `UPDATE jobs SET
+state = 'committing', commit_intent_at = now(), lease_expires_at = now() + lease WHERE id, token, owner,
+state = 'running' AND lease_expires_at > now()`, then `UPDATE job_attempts SET commit_intent_at = now()`,
+one transaction. 0 rows → `FencingError`; the hook throws; the Submit is never clicked. **Only a
+committed T3 lets the click happen.** `runJob` records `irreversibleStarted` from T3's outcome: a
+`FencingError` (definitely not written) leaves it false, so the run is retried like any failure before
+Submit (its T4 is fenced out, unless the lease merely expired with nobody recovering, in which case the
+worker's own requeue is the truth and is recorded); any other error (the COMMIT failed or its result is
+unknown) sets it, so the attempt is treated as "may have committed" (needs_human in Step 8) even though
+no click went out. T4 is widened from `state = 'running'` to `(state = 'running' OR (state =
+'committing' AND $4 IN ('succeeded','needs_human')))`, which is `completionAllowed`
+(`src/fleet/stateMachine.ts`) in SQL: not even a buggy caller can requeue or fail a job past its intent.
+T4 still does not check expiry (an unrecovered holder is the only one who ran the job).
+
+**Alternatives considered.** Write the intent and the state change in separate transactions (a crash
+between them leaves a row that says less than the truth); treat every T3 error as "not written" (a
+COMMIT whose result is unknown may have landed, and the job would then be retried past an intent); treat
+a `FencingError` as "may have committed" (it provably did not, and parking it costs a human).
+
+**Why.** The brief's rule: *a job is only ever retried blindly if it crashed before its commit intent was
+saved.* That needs the intent to be durable before the click and exactly as fenced as the lease.
+
+**Date.** 2026-11-11
+
+## D38: Recovery runs in every worker's loop, one transaction per job; every transition bumps the token; Step 8 parks an expired `committing` job as needs_human
+
+(Step 8, plan section 4; reviewer decision 3.)
+
+**Decision.** Seam 4 (`beforeDequeue`) runs `createRecoverySweep` (`src/worker/recover.ts`) before every
+dequeue: up to 10 expired jobs per iteration, each in its own transaction: claim the earliest-expired
+active lease `FOR UPDATE SKIP LOCKED` (served by the partial index `jobs_lease_expiry`, 0002), decide with
+the pure `recoveryAction` (T6.1 `running` with attempts left → `queued`; T6.2 `running` on its last
+attempt → `failed` / `lease_expired`, never `queued`, D21; T6.3 `committing` → `needs_human` /
+`commit_uncertain`, the Step 8 interim until Step 9's verify; `verifying`, unreachable in Step 8, is
+escalated too), execute it with one parameterized `UPDATE` that also sets `fencing_token + 1` and clears
+the lease, fenced on the claimed token and state and re-checking `lease_expires_at < now()`, and close the
+dead holder's open attempt row as `crashed` ("lease expired in <state>; recovered by <w> (T6.x kind)").
+A transient DB error is logged and the loop carries on to dequeue; any other error stops the worker
+loudly. A requeue's next dequeue bumps the token again (tokens 1 → 2 → 3).
+
+**Alternatives considered.** A separate reaper process (one more thing to supervise; a dead reaper
+silently stops recovery for everyone); bump the token only where a new holder is assigned (then "the
+token changed" would not always mean "the old holder is fenced", and every fence would need a state
+check too); requeue an expired `committing` job (the one thing that can duplicate a transfer without
+verify); recover without `SKIP LOCKED` (recoverers queue behind each other on the same row).
+
+**Why.** Every worker recovering a little before every dequeue keeps recovery as available as the fleet
+itself, and bounds how long a dead worker's job holds its tenant slot to one poll past expiry. With the
+token bumped by every transition, every fenced statement (T2, T3, T4) can trust the token alone.
+Tested: every row of the table, 8 concurrent recoverers over 50 expired jobs (each recovered exactly
+once), the model-vs-real test (D39).
+
+**Date.** 2026-11-11
+
+## D39: Every decision is a pure function; the SQL is mirrored by a pure model; property tests on the model, and a model-vs-real test that runs the same commands against Postgres
+
+(Step 8, plan section 7; reviewer additions R1 and R2.)
+
+**Decision.** `src/fleet/stateMachine.ts` holds `jobOutcomeFor` (moved from `src/worker/outcome.ts`),
+`completionAllowed` (T4's guard) and `recoveryAction` (T6); Step 9 adds `verifyDecision`. The worker
+calls them; the SQL repeats their guards and decides nothing alone. `src/fleet/model.ts` mirrors each
+statement (dequeue, T2, T3, T4 with the D21 CHECK, T6) as a pure function on a database-clock number.
+Two kinds of tests use it:
+- **Pure-model properties** (`stateMachine.property.test.ts`, fast-check 4.10.2, a new devDependency):
+  one job, a bank ledger, three workers that crash, restart, freeze and wake (heartbeat first, or the
+  zombie acting first), the clock; 10 000 seeded sequences per property, each ending in the same drain
+  (everyone wakes, every lease passes, clean workers run to quiescence), invariants checked on every
+  single transition (a requeue undone by a dequeue within the same event is still seen). Step 8's set:
+  no duplicate in any sequence, zombies included (nothing is requeued after an intent); no lost job;
+  terminal states final and `queued ⇒ attempt < max`; no requeue after an intent; the oracle passes
+  exactly when there is no duplicate and the job is terminal; R2a at most one worker holds a valid
+  lease, and it is the latest dequeuer; R2b the token never decreases. Plus deterministic zombie
+  scenarios. Event arrays are generated at `size: "max"`: fast-check's default small size left 60% of
+  runs without a single dequeue.
+- **Model vs real** (`modelVsReal.db.test.ts`, R1): fast-check commands (dequeue, heartbeat, intent,
+  complete to each target, recover, tick) run against the model and the real SQL on a test schema;
+  after every command each job's state, token, owner, attempt, outcome and lease (within 1 s) must
+  match, and so must each command's own answer; R2a/R2b are checked on the database too. 200 seeded
+  sequences of up to 25 commands (about 3 s). **Time is simulated by shifting every stored lease back
+  by dt**, exactly equivalent to the database clock moving forward because every rule compares
+  `lease_expires_at` with `now()`; the clock itself is never faked. Commands whose answer depends on a
+  lease within 1 s of expiry are not generated, so the milliseconds of real time a sequence takes cannot
+  flip a comparison.
+
+**Mutation-checked** (each reverted after): `recoveryAction` requeueing an expired `committing` job fails
+properties 1, 5 and 6 (shrunk to `dequeue, intent, click, crash`); T2 without `lease_expires_at > now()`
+fails model-vs-real (shrunk to `dequeue(wB), tick(31), heartbeat(wB)`); T6 without the token bump fails
+it (`dequeue(wA), tick(45), recover(wA)`). An earlier version of the properties missed the first mutant
+(per-event checks and short arrays); that is why the checks are per transition and the arrays full-size.
+
+**Alternatives considered.** Properties on the model only (the model could drift from the SQL unseen,
+which is what R1 exists to catch); faking the database clock (a test-only `now()` would mean test-only
+SQL); a TLA+ spec (a second language for one state machine, and nothing would tie it to the code).
+
+**Why.** The safety argument of Day 2 is a set of invariants over interleavings no example test
+enumerates; the model makes them checkable at thousands of sequences a second, and the model-vs-real
+test is what lets the properties speak about the SQL the workers actually run.
+
+**Date.** 2026-11-11
+
+## D40: The crash matrix judges every point against its expected Day-2 outcome, at a 5 s lease and a 2 s heartbeat
+
+(Step 8, plan section 9; reviewer decision 6.)
+
+**Decision.** `scripts/crash-matrix.ts` gains `--heartbeat-seconds` and `--expect <phase>`; a point
+passes only if the fault fired there, the oracle passes, **and** the final job matches
+`src/chaos/crashExpected.ts` (state, outcome, attempt, ledger rows): "oracle ok" alone would pass a
+`needs_human` with 0 rows, which is the wrong answer once verify exists. Step 8's expectations: every
+point before the intent (`after-dequeue` … `after-step-10`) → requeued (T6.1), attempt 2 `succeeded`,
+1 row; `before-submit` → `needs_human` / `commit_uncertain`, 0 rows; `after-submit`, `after-step-12`,
+`before-complete` → `needs_human` / `commit_uncertain`, 1 row; `after-complete` → `succeeded`, 1 row;
+never 2 rows. The matrix runs at `--lease-seconds 5 --heartbeat-seconds 2` (locally and in the
+report-only CI job) so a point costs seconds, not a 30 s wait; Compose keeps 30/10, which chaos
+exercises. **Step 10 adds one matrix run at the production 30/10**, saved as evidence (reviewer
+decision 6).
+
+**Alternatives considered.** Run the matrix at 30/10 always (16 points × at least 30 s of waiting per
+run, for the same transitions); judge by the oracle alone (see above).
+
+**Why.** The matrix is the brief's per-step-boundary exactly-once check; it has to say what the right
+answer is at each boundary, not merely that nothing was duplicated or lost.
+
+**Date.** 2026-11-11

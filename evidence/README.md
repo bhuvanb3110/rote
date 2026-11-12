@@ -30,6 +30,27 @@ several runs — can't be told from a single `run.jsonl`.
 | [`fleet-day1-exit-oracle/`](fleet-day1-exit-oracle/) | The Day-1 exit (100 transfer jobs, 4 workers) re-run once after its ledger checks moved onto the shared oracle (D32). | `check.txt` ends `RESULT: PASS`, with the oracle report (`ok=100`, every failing verdict 0) above it; `oracle.json`. |
 | [`crash-matrix/before-day2/`](crash-matrix/before-day2/) | **Expected to fail.** The crash-point matrix (D34): a worker SIGKILLs itself at each of 16 transfer boundaries, then a clean worker and the oracle. No recovery exists yet. | `matrix.md`: every fault fired; 15 points LOST (1 ledger row from `after-submit` on), `after-complete` ok; `RESULT: FAIL`. README explains. |
 | [`chaos/before-day2/`](chaos/before-day2/) | **Expected to fail.** The seeded chaos harness (D33), seed 2024306878: 100 jobs, 4 workers, 15 kills with restarts, one 45 s pause. | `check.txt`: 61 ok, 39 LOST (one after commit), 0 duplicates, `RESULT: FAIL`. README: why 0 duplicates proves nothing before Day 2. |
+| [`crash-matrix/ci-linux-before-day2/`](crash-matrix/ci-linux-before-day2/) | The first run of CI's report-only crash-matrix job (Linux, real signals), on pre-Step-8 code. | `matrix.md`: 1/16, the fault worker `signal SIGKILL` at every point. |
+| [`crash-matrix/step-08/`](crash-matrix/step-08/) | Step 8: the crash-point matrix with an **Expected** column (D40), lease 5 s / heartbeat 2 s. | `matrix.md`: **16/16**, `RESULT: PASS`. Before the intent: requeued, attempt 2, 1 row; after it: `needs_human`, 0 or 1 row (the Step 8 interim). |
+| [`chaos/step-08-seed-848183018/`](chaos/step-08-seed-848183018/) | Step 8: the same chaos harness, seed 848183018, 18 kills and a 45 s pause, against the 30 s lease, 10 s heartbeat, fenced intent and recovery. | `check.txt`: **ok=100, 0 LOST, 0 duplicates, `RESULT: PASS`**; 10 × T6.1, 1 × T6.3; the paused worker's heartbeat aborted it on waking (README traces it). |
+| [`step-08/`](step-08/) | Fleet Step 8: every full `npm test` log (raw, exit code and wall time) and the CI action-pin check. | `ci-action-pins.md`: 0 annotations after the pins (the Node 20 warning is gone). |
+
+## Day 2, Step 8: before / after
+
+The same judges, before Day 2 (Step 7) and after Step 8 (leases, heartbeat, fenced commit intent,
+recovery). Nothing was retuned: the matrix only gained its Expected column, chaos only gained report
+lines.
+
+| Judge | Before (Step 7) | After (Step 8) |
+| --- | --- | --- |
+| Crash-point matrix | `crash-matrix/before-day2/`: **1/16**, LOST at 15 points (1 row from `after-submit` on) | `crash-matrix/step-08/`: **16/16** against the Step 8 expectations: 11 pre-intent points requeued and finished (attempt 2, 1 row); `before-submit` `needs_human` 0 rows; 3 post-click points `needs_human` 1 row; `after-complete` done |
+| Chaos | `chaos/before-day2/` (seed 2024306878): **FAIL**, 61 ok, 39 LOST, 0 duplicates (meaningless: no second runner existed) | `chaos/step-08-seed-848183018/`: **PASS**, 100 ok, 0 LOST, 0 duplicates, with second runners: 10 jobs recovered and re-run, a frozen worker woke into a lost lease and stopped |
+
+**Still red (or not yet the final answer) until Step 9:** an expired `committing` job ends
+`needs_human` / `commit_uncertain` (matrix: `before-submit`, `after-submit`, `after-step-12`,
+`before-complete`; chaos: 1 of 100) instead of being verified against the bank's history; the
+recovery-internal crash points do not exist yet. Step 10: 20+ chaos seeds, the 30/10 matrix run, and the
+zombie-window measurement with the reconcile pass.
 
 ## Provenance
 

@@ -246,17 +246,19 @@ curl "http://127.0.0.1:8080/jobs/<jobId>?tenant=tenant-a"
 - A job ends `succeeded`, `business_outcome` (the bank refused: final, never retried), `failed`, or
   `needs_human`. `outcome: "commit_uncertain"` means the Submit may have gone through: it is never
   retried, and someone must check the bank's history for the `memoKey` (Day 2 automates this).
-- **Day-1 limits, on purpose:** leases are taken but not heartbeated, and nothing recovers a dead
-  worker's job yet. A worker killed with SIGKILL (or OOM) leaves its job `running`. `docker compose
-  stop` is graceful: the in-flight job gets 30 s, then is aborted and recorded. Day 2 adds heartbeats,
-  recovery and the commit intent.
+- ~~**Day-1 limits, on purpose:** leases are taken but not heartbeated, and nothing recovers a dead
+  worker's job yet.~~ **Since Step 8:** a 30 s lease with a 10 s heartbeat, the fenced commit intent,
+  and recovery before every dequeue (see "Day 2, Step 8" below). A worker killed with SIGKILL (or OOM)
+  stops heartbeating; within lease + one poll another worker requeues its job (died before the intent)
+  or parks it `needs_human` / `commit_uncertain` (died after). `docker compose stop` is graceful: the
+  in-flight job gets 30 s, then is aborted and recorded.
 
 Measured (evidence/fleet-day1-exit/check.txt, `RESULT: PASS`): 100 transfer jobs on 4 workers in
 102.6 s, all succeeded on the first attempt, exactly one ledger row per job, 0 duplicates, 0 lost.
 Peak memory per worker was about 260 MiB. Re-run on the shared ledger oracle in Step 7
 (evidence/fleet-day1-exit-oracle/): `RESULT: PASS` again, 84.0 s.
 
-## The judges: the ledger oracle, chaos and the crash-point matrix (Day 1: expected to fail)
+## The judges: the ledger oracle, chaos and the crash-point matrix
 
 Correctness is judged only by the mock bank's own ledger, matched to jobs by `memoKey` (D32). One
 module decides every verdict, for every harness:
@@ -291,6 +293,25 @@ now, even though they will fail):
 **0 duplicates here proves nothing.** A duplicate needs a second runner of the same job, and before Day
 2 nothing ever re-runs a dead worker's job. Day 2 (docs/plans/step-08.md: heartbeat, the fenced commit
 intent, recovery, verify through the history page) is what these same scripts must then judge green.
+
+### Day 2, Step 8: leases that mean something
+
+A worker holds a job by a **30 s lease** that its **heartbeat** extends every 10 s on the database's
+clock, never reviving one that already expired (D36). Right before the Submit it writes a **fenced
+commit intent** (D37): only if that commits does the click happen. Every worker **recovers expired
+leases** before each dequeue (D38): a dead worker's job is requeued if it died before its intent, and
+parked as `needs_human` / `commit_uncertain` if it died after (until Step 9's verify reads the bank's
+history). Every decision is a pure function, property-tested on a model that a second test checks
+against the real SQL (D39).
+
+| Judge | Step 7 | Step 8 |
+| --- | --- | --- |
+| Crash-point matrix (lease 5 s, heartbeat 2 s; a point passes only if it ends as expected, D40) | 1/16 | **16/16** (`evidence/crash-matrix/step-08/`) |
+| Chaos (100 jobs, 4 workers, kills + a 45 s pause) | FAIL: 39 LOST | **PASS**: 100 ok, 0 LOST, 0 duplicates; 10 jobs re-run after their worker died; the frozen worker stopped by its heartbeat on waking (`evidence/chaos/step-08-seed-848183018/`) |
+
+Not done until Step 9: jobs that died after their intent wait for a human; verify will decide them from
+the bank's history. The zombie frozen between the intent and the click is the one case no client can
+close; Step 10 measures it and adds a pass that detects it (docs/plans/step-08.md sections 6 and 9a).
 
 
 ## Saved demonstration runs

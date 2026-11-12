@@ -428,6 +428,56 @@ is the supervisor). The paused replica's lease expires at 30 s of its 45 s pause
 section-6 window. Expected per run: `RESULT: PASS`, 0 DUPLICATE, 0 LOST, the recoveries listed by
 label. Step 10 runs 20+ seeds (amendment 3) and commits each folder; the README quotes the tally.
 
+## 9a. Step 10 additions (reviewer decisions 6, 7 and R3; planned now, built in Step 10)
+
+**One matrix run at the production 30 / 10** (reviewer decision 6): `npm run crash-matrix --
+--lease-seconds 30 --heartbeat-seconds 10 --expect step-09 --drain-timeout 120s`, committed as
+`evidence/crash-matrix/step-10-production-30-10/`. Same expectations as the 5 / 2 run; it shows the
+answers do not depend on the shortened timing.
+
+**The reconcile pass (R3): turning a silent zombie-window duplicate into an alert.** Section 6's window
+cannot be closed from the client side, but its only possible victim is identifiable: a job that
+reached `succeeded` after a **resubmit** (an attempt that followed a verify decided `resubmitted`).
+Only such a job can carry a zombie's late second transfer.
+
+- *Which jobs:* `succeeded` jobs with a `job_verifications` row whose `decision = 'resubmitted'`, not yet
+  reconciled (new column `jobs.reconciled_at timestamptz` in a migration 0003; 0002 is not edited).
+- *When:* once `now() > updated_at + lease + settle + margin` (default 30 + 5 + 25 = 60 s after the job
+  succeeded): longer than any zombie click that was still in flight could take to land, since a zombie
+  frozen past its lease has a heartbeat that aborts it within one beat of waking, and an unfrozen one
+  fails its fenced T4.
+- *Who:* every worker's `beforeDequeue`, after recovery: claim at most one due job `FOR UPDATE SKIP
+  LOCKED` and lease it like a verify phase (token + 1, `state` stays `succeeded`, so no new state is
+  needed; the lease lives in `lease_owner`/`lease_expires_at`, which `succeeded` rows otherwise never
+  set; `jobs_active_has_owner` is unaffected). Run the history lookup once (lookup 1.2.0, the same
+  invocation as verify).
+- *Decision* (pure `reconcileDecision(matches)` in `src/fleet/stateMachine.ts`): 1 match → reconciled,
+  nothing else changes (`reconciled_at = now()`, lease cleared). **2+ matches → `needs_human`, outcome
+  `duplicate_suspected`**, `result.reconcile = { matches, refs: [all matching references], evidenceRef }`,
+  the counter `duplicates_detected_total` incremented (a Prometheus counter from Day 3; until then a
+  structured log line and a row in `job_verifications` with `reason = 'reconcile'`, which needs the
+  0003 migration to widen that CHECK). 0 matches or unreadable → `needs_human`, outcome
+  `reconcile_unreadable` (a `succeeded` job whose transfer the history cannot show is itself an alarm).
+- *Crash safety:* the reconcile lease is fenced and recovered like any other (an expired reconcile lease
+  on a `succeeded` row is released by T6 with no state change); a reconcile that dies is simply retried.
+- *Evidence:* `evidence/zombie-window-limit/` (reviewer decision 7) runs the targeted
+  `stall-after-intent` scenario (ROTE_FAULT_STALL_MS longer than lease + settle, a requeue forced), shows
+  the **duplicate in the ledger** (the honest limit, the only expected DUPLICATE in the repo), and shows
+  the reconcile pass **detecting** it: the job flipped to `needs_human` / `duplicate_suspected` with both
+  references, and `duplicates_detected_total = 1`. Its README states plainly: the window is not closed;
+  it is made loud.
+- *Tests:* `reconcileDecision` rows; DB tests (due-time selection, SKIP LOCKED, the fenced update, the
+  0003 constraints); an integration test with two ledger rows for one memo → `duplicate_suspected`.
+
+**D-entry draft (for Step 10): "A reconcile pass re-reads the history of every job that succeeded after
+a resubmit; two matches flag `duplicate_suspected`."** *Decision:* as above. *Alternatives considered:*
+reconcile every `succeeded` job (one extra lookup per transfer, for jobs that cannot be duplicated: no
+resubmit means no second runner ever clicked); widen the settle wait before a resubmit until the window
+is "long enough" (no wait closes it; it only shrinks it, and every recovery gets slower); have the
+oracle find duplicates (it only runs in harnesses, never in production). *Why:* the zombie window is the
+one place Day 2 cannot guarantee exactly-once; the next best property is that a duplicate is never
+silent, and the memo key makes it detectable from the bank's own history.
+
 ## 10. Commits (Step 8 only)
 
 1. `db/migrations/0002_day2.sql` + schema tests (index, column, table, constraints).
@@ -537,3 +587,39 @@ State plainly what is still red until Step 9.
 - Then write `docs/plans/step-09.md` (commit it; don't build it): verify as in section 5, plus lookup
   1.2.0 and its approvals, T5/T7, verifying recovery (T6.4–T6.6), the recovery-internal crash points,
   the reverify CLI, and what Step 8 changed. Short; it points back here.
+
+## Built (2026-11-11/12)
+
+Built in the order Part A (A1-A4, A5 recorded above), then Part B commits 1-8 of section 10, with the
+model-vs-real test (R1) as its own commit after recovery. Decisions D36-D40, plus amendments to D31
+(A2), D35 (A1, A3) and notes on D30/D32 (A4). Evidence: `evidence/step-08/` (every full `npm test` log,
+the CI action-pin check), `evidence/crash-matrix/step-08/`, `evidence/crash-matrix/ci-linux-before-day2/`,
+`evidence/chaos/step-08-seed-848183018/`, and the before/after table in `evidence/README.md`. Where the
+build went beyond or differed from the text above:
+
+- **`irreversibleStarted` comes from T3** (D37): a `FencingError` means "definitely not written, no
+  click" and the run is retried like any pre-Submit failure; any other T3 error means "may have been
+  written" (needs_human in Step 8) though no click went out. The plan said only "a throw after the
+  intent is needs_human".
+- **T4's guard is `completionAllowed` in SQL**: from `committing` only `succeeded` or `needs_human`
+  (the plan widened T4 to `state IN ('running','committing')` and relied on `jobOutcomeFor` alone).
+- **Recovery's T6.1-T6.3 are one parameterized UPDATE** (state/outcome from `recoveryAction`), not
+  three fixed statements; `verifying` (unreachable in Step 8) is escalated, the safe answer.
+- **A worker that loses its lease writes `lease_lost` and keeps recovery's note** on its attempt row
+  (`… [recovery had recorded: …]`); recovery marks the row `crashed` first if it gets there first.
+- **A run that returned before the heartbeat's abort landed still goes through the fenced T4**; only a
+  run that was aborted by the lost lease writes nothing to `jobs`.
+- **The property tests check every transition and drain every sequence** (D39): the first version
+  checked per event with fast-check's default small arrays and missed a deliberate mutant (requeueing
+  `committing`); fixed before commit, and mutation-checked (three mutants, all caught and reverted).
+- **Property 1 holds in Step 8 for every sequence, zombies included**, because nothing is requeued after
+  an intent; property 2 is implied and gets its own form in Step 9 (section 7 planned 1, 2, 6 for Step 9;
+  1 and 6 were built now in their Step 8 form).
+- **Crash-matrix expectations are a tested module** (`src/chaos/crashExpected.ts`, `--expect`).
+- **The zombie-window-limit evidence is Step 10**, not Step 8: in Step 8 the window cannot produce a
+  duplicate (no requeue after an intent), and reviewer decision 7 pairs it with the reconcile pass
+  (section 9a), which is built in Step 10.
+- **The CI crash-matrix job** got its first run before Step 8's code (1/16, real `SIGKILL`), kept as
+  evidence.
+- **Suite time:** about 88 s → 128-150 s wall locally (lease integration tests on a deliberately slow
+  bank; property and model-vs-real tests). 56 files.
