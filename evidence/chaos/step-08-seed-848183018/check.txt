@@ -1,0 +1,32 @@
+Chaos run, started 2026-11-12T03:19:55.847Z
+seed: 848183018  (reproduce: npm run chaos -- --seed 848183018)
+jobs: 100, workers: 4, schedule 150000 ms: 18 kills (gap 5000-15000 ms), pause replica 1 47228-92228 ms, restart after 2000 ms; drain timeout 600000 ms
+database: postgres://rote:***@127.0.0.1:55432/rote
+reset: queue tables truncated; bank ledger rows: 0
+replicas: rote-worker-1=337b77051b3f, rote-worker-2=7f1a495a0b76, rote-worker-3=8b0905669aba, rote-worker-4=212b99934a5e
+enqueued: 100/100 x 201
+
+kills executed: 18; restarts: 18; errors: 0
+recoveries (T6, from the attempt rows): T6.1 requeue x10, T6.3 escalate x1
+attempt outcomes: crashed x11, lease_lost x1, success x99
+final job states: needs_human/commit_uncertain x1, succeeded/success x99
+worker containers at the end: rote-worker-1:running, rote-worker-2:running, rote-worker-3:running, rote-worker-4:running
+worker protections fired (container logs): heartbeat lease lost x1, fenced commit intent x0, completion fenced out x0, run aborted on a lost lease x1
+credential values in jobs/attempts/API responses/container logs: none
+docker stats, peak memory per container:
+  rote-api-1: 180.9 MiB
+  rote-bank-1: 104.2 MiB
+  rote-postgres-1: 148.0 MiB
+  rote-worker-1: 319.4 MiB
+  rote-worker-2: 258.4 MiB
+  rote-worker-3: 224.2 MiB
+  rote-worker-4: 236.4 MiB
+
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 100; ledger rows: 100; drain timed out: no
+job states: needs_human=1, succeeded=99
+verdicts: ok=100, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+needs_human (1), listed with outcome and ledger rows:
+  fd1a73d8-3aeb-4f86-b735-22682f8f582b tenant-a outcome=commit_uncertain rows=1 [TXN-000018]
+RESULT: PASS

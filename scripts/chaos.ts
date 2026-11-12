@@ -16,8 +16,12 @@
 //   6. evidence in --out (default evidence/chaos/<UTC timestamp>-seed-<n>/), exit 1 on FAIL.
 // Workers, API and bank are stopped at the end (8 GB laptop) unless --keep-up.
 //
-// Day 1 (Step 7): EXPECTED TO FAIL. Nothing expires a lease or recovers a job yet, so every killed
-// worker's job stays `running` forever and holds its tenant slot; the oracle reports LOST.
+// Step 7 (before-day2): failed by design -- nothing expired a lease or recovered a job.
+// Step 8: leases of 30 s with a 10 s heartbeat, recovery before every dequeue, the fenced commit intent.
+// Expected: RESULT: PASS (0 DUPLICATE, 0 LOST); a job killed before its intent is requeued (T6.1) and
+// finished by another worker; a job killed after its intent is needs_human / commit_uncertain (T6.3,
+// the interim until Step 9's verify). The report counts recoveries by label (from the attempt rows) and
+// how often a heartbeat or a fenced intent stopped a worker (from the container logs).
 import "dotenv/config";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -214,6 +218,20 @@ async function main(): Promise<void> {
   log("");
   log(`kills executed: ${killEvents.filter((e) => e.kind === "kill").length}; restarts: ${events.filter((e) => JSON.parse(e).kind === "start").length}; ` +
     `errors: ${events.filter((e) => /-error"/.test(e)).length}`);
+  // Day 2: what recovered what (attempt rows closed by recovery carry "(T6.x kind)"), and the protections
+  // that fired in the workers (their own log lines).
+  const labels = new Map<string, number>();
+  for (const a of attempts as Array<{ outcome: string | null; error: string | null }>) {
+    const m = a.error ? /\((T6\.\d) (\w+)\)/.exec(a.error) : null;
+    if (a.outcome === "crashed" && m) labels.set(`${m[1]} ${m[2]}`, (labels.get(`${m[1]} ${m[2]}`) ?? 0) + 1);
+  }
+  const attemptOutcomes = new Map<string, number>();
+  for (const a of attempts as Array<{ outcome: string | null }>) attemptOutcomes.set(a.outcome ?? "(open)", (attemptOutcomes.get(a.outcome ?? "(open)") ?? 0) + 1);
+  const states = new Map<string, number>();
+  for (const j of jobs) states.set(`${j.state}${j.outcome ? `/${j.outcome}` : ""}`, (states.get(`${j.state}${j.outcome ? `/${j.outcome}` : ""}`) ?? 0) + 1);
+  log(`recoveries (T6, from the attempt rows): ${[...labels].sort().map(([k, n]) => `${k} x${n}`).join(", ") || "none"}`);
+  log(`attempt outcomes: ${[...attemptOutcomes].sort().map(([k, n]) => `${k} x${n}`).join(", ")}`);
+  log(`final job states: ${[...states].sort().map(([k, n]) => `${k} x${n}`).join(", ")}`);
   const notTerminal = report.findings.filter((f) => f.verdict === "LOST" || f.verdict === "PENDING");
   if (notTerminal.length > 0) {
     log(`non-terminal jobs tied to the kill or pause that orphaned them:`);
@@ -230,6 +248,12 @@ async function main(): Promise<void> {
   log(`worker containers at the end: ${inspect.map((c) => `${c.Name.replace(/^\//, "")}:${c.State.Status}${c.State.OOMKilled ? ":OOM" : ""}`).join(", ")}`);
   if (oom.length) log(`OOM-killed (not a chaos kill, D9): ${oom.map((c) => c.Name).join(", ")}`);
   const composeLogs = await docker(["compose", "logs", "--no-color", "--timestamps"]);
+  const count = (re: RegExp) => composeLogs.split("\n").filter((l) => re.test(l)).length;
+  log(
+    `worker protections fired (container logs): heartbeat lease lost x${count(/heartbeat: lease lost; aborting the job/)}, ` +
+      `fenced commit intent x${count(/FencingError: commit intent refused/)}, completion fenced out x${count(/lease lost; outcome NOT recorded on the job/)}, ` +
+      `run aborted on a lost lease x${count(/lease lost; run aborted, outcome NOT recorded/)}`,
+  );
   const leaks = Object.entries(FAKE_CREDS).filter(([, v]) =>
     [JSON.stringify(jobs), JSON.stringify(attempts), apiResponses.join("\n"), composeLogs].some((t) => t.includes(v)),
   );
