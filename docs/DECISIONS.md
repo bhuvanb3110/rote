@@ -860,6 +860,14 @@ every core and the browser files were contending with each other anyway.
 
 **Date.** 2026-11-11
 
+**Amendment (2026-11-11, Step 8 reviewer decision A2).** `vitest.uncapped.config.ts` (the pre-D31
+one-project configuration, kept only for the A/B) is deleted: a second vitest config at the repo root
+is one more thing to keep in step with the real one, for a measurement already taken. To reproduce the
+A/B, check out the commit it was measured on, which still has the file: `git switch --detach b9bc8da`,
+then `powershell -File scripts/ab-timing.ps1 -Out <dir> -Rounds 3`, then `git switch -`. The script now
+refuses with that instruction when the file is absent. Alternative considered: keep the file (it costs
+nothing at run time, but it is dead configuration on every later commit).
+
 ## D32: The ledger oracle: one module, one verdict table, DUPLICATE dominates, ORPHAN as the reverse check
 
 (Step 7 plan section 1; drafted there as D30, renumbered because Part A came first.)

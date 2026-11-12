@@ -33,7 +33,8 @@ Filled in below by the runs themselves; durations before the change (unsampled, 
 Mean 99.9 s. **This is not a fair "after" figure**: the builder (Claude Code) was writing code and the
 editor's TypeScript server was busy during these runs, and the "before" runs above (mean 90.8 s)
 were taken with less going on. So the before/after duration comparison was redone as an interleaved
-A/B with nothing else running (`ab/`, `scripts/ab-timing.ps1`): the pre-D31 configuration
+A/B with nothing else running (`ab/`, `scripts/ab-timing.ps1`; since Step 8 reproduce it from
+`git switch --detach b9bc8da`, which still has the uncapped config, D31 amendment): the pre-D31 configuration
 (`vitest.uncapped.config.ts`, one project, default parallelism) and the committed one, alternately, on
 the same commit:
 
