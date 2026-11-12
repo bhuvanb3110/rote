@@ -1,19 +1,26 @@
-// The worker's poll loop (docs/plans/step-06.md sections 1 and 6):
+// The worker's poll loop (docs/plans/step-06.md sections 1 and 6; Day 2: docs/plans/step-08.md):
 //
 //   while not stopping:
-//     beforeDequeue()                 # seam 4: Day-2 expired-lease recovery runs HERE (step-05 note 8)
+//     beforeDequeue()                 # seam 4: expired-lease recovery (T6) runs HERE
 //     job = dequeue(...)              # transient DB error -> log, back off (cap 5 s), never exit
 //     if none: sleep(poll backoff)    # 100 ms base, x2, cap 2 s, full jitter
-//     run it; record it (fenced; completion retried while Postgres is transiently down)
+//     heartbeat (T2) while it runs; run it; record it (T4, fenced; retried while Postgres is down)
+//
+// The heartbeat (heartbeatSeconds; Compose: 10 s against a 30 s lease) extends the lease on the
+// database clock. When it finds the lease gone it aborts the run with a LeaseLostError: runReplay
+// closes the context and rejects (D11), and the worker records NOTHING on `jobs` (the job is
+// recovery's now), only `lease_lost` on its own attempt row.
 //
 // Graceful stop (SIGTERM/SIGINT): stop dequeuing at once; let an in-flight job finish for up to
 // shutdownGraceMs, then abort it (runReplay closes its context and rejects, D11) and record that per
 // jobOutcomeFor's abort rows. A second stop() aborts at once and stops retrying a completion.
-// SIGKILL / OOM: nothing runs; the job stays `running` with its lease until Day-2 recovery.
+// SIGKILL / OOM: nothing runs; the lease expires (no heartbeat) and another worker's recovery takes it.
 import type { Browser } from "playwright";
 import { dequeue, type JobRow, type Pool } from "../queue/index.js";
 import { createBackoff, sleep } from "./backoff.js";
-import { completeJobWithRetry } from "./complete.js";
+import { completeJobWithRetry, markAttemptLeaseLost, retryTransient } from "./complete.js";
+import { Heartbeat, validateLeaseTiming } from "./heartbeat.js";
+import { LeaseLostError } from "./leaseErrors.js";
 import { redactDeep, type Redactor } from "./credentials.js";
 import { isTransientDbError } from "../queue/index.js";
 import { jobOutcomeFor, type JobOutcome } from "../fleet/stateMachine.js";
@@ -47,8 +54,13 @@ export interface JobDone {
 export interface WorkerOptions {
   pool: Pool;
   workerId: string;
-  /** Step 6: 300 s and no heartbeat (nothing recovers expired leases until Day 2). */
+  /** Lease length (Compose: 30 s). Every dequeue, heartbeat and commit intent sets now() + this. */
   leaseSeconds: number;
+  /**
+   * Heartbeat interval (Compose: 10 s); must satisfy heartbeat * 2 < lease. Omitted: no heartbeat
+   * (unit tests with long leases only; the worker entrypoint always sets it).
+   */
+  heartbeatSeconds?: number;
   /** A connected browser; relaunches if the last one died (one Chromium per worker, D13). */
   getBrowser: () => Promise<Browser>;
   runJob: (job: JobRow, options: RunJobOptions) => Promise<RunJobResult>;
@@ -62,7 +74,7 @@ export interface WorkerOptions {
   onJobDone?: (done: JobDone) => void;
   /** Test-only crash points after-dequeue / before-complete / after-complete (fault.ts, D34). */
   fault?: FaultInjector;
-  /** Seam 4 (step-06 section 7). No-op in Step 6. */
+  /** Seam 4: expired-lease recovery (createRecoverySweep, T6). The entrypoint always sets it. */
   beforeDequeue?: () => Promise<void>;
 }
 
@@ -80,6 +92,7 @@ export class Worker {
   private readonly dbBackoff;
 
   constructor(private readonly options: WorkerOptions) {
+    if (options.heartbeatSeconds !== undefined) validateLeaseTiming(options.leaseSeconds, options.heartbeatSeconds);
     this.log = options.log ?? silentLogger;
     this.pollBackoff = createBackoff({ baseMs: 100, capMs: 2000, random: options.random });
     this.dbBackoff = createBackoff({ baseMs: 200, capMs: 5000, random: options.random });
@@ -159,6 +172,20 @@ export class Worker {
     this.log.info(log, "worker: job leased");
     const fault = this.options.fault ?? NO_FAULT;
     fault.at("after-dequeue"); // lease taken, before any browser work
+    const heartbeat =
+      this.options.heartbeatSeconds === undefined
+        ? null
+        : new Heartbeat({
+            pool: this.options.pool,
+            jobId: job.id,
+            fencingToken: job.fencing_token,
+            workerId: this.options.workerId,
+            leaseSeconds: this.options.leaseSeconds,
+            intervalMs: this.options.heartbeatSeconds * 1000,
+            controller,
+            log: this.log,
+          });
+    heartbeat?.start();
     try {
       let run: RunJobResult;
       try {
@@ -167,6 +194,36 @@ export class Worker {
       } catch (error) {
         // getBrowser failed (Chromium would not start) or a bug escaped runJob: nothing irreversible ran.
         run = { end: { kind: "thrown", error, aborted: controller.signal.aborted }, irreversibleStarted: false };
+      }
+      // The heartbeat stops before the completion transaction (and on every other exit, below).
+      heartbeat?.stop();
+      const lost: unknown = controller.signal.reason;
+      if (run.end.kind === "thrown" && lost instanceof LeaseLostError) {
+        // The run was aborted because this worker no longer holds the job: write NOTHING to jobs.
+        // (A run that returned a result before the abort landed still goes through the fenced T4.)
+        const irreversibleStarted = run.irreversibleStarted;
+        const marked = await retryTransient(
+          () =>
+            markAttemptLeaseLost(this.options.pool, {
+              jobId: job.id,
+              fencingToken: job.fencing_token,
+              detail: this.options.redact(`lease lost during the run (heartbeat); nothing recorded on the job. ${lost.message}`),
+              commitUncertain: irreversibleStarted,
+            }),
+          { signal: this.hard.signal, random: this.options.random },
+        );
+        this.log.warn(
+          { ...log, err: lost.message, irreversibleStarted, attemptMarked: marked !== null, ms: Date.now() - started },
+          "worker: lease lost; run aborted, outcome NOT recorded on the job",
+        );
+        const outcome = jobOutcomeFor(run.end, {
+          attempt: job.attempt,
+          maxAttempts: job.max_attempts,
+          irreversibleStarted,
+          redact: this.options.redact,
+        });
+        this.options.onJobDone?.({ job, outcome, recorded: false, durationMs: Date.now() - started });
+        return;
       }
       const computed = jobOutcomeFor(run.end, {
         attempt: job.attempt,
@@ -195,6 +252,7 @@ export class Worker {
       else this.log.error(fields, "worker: stopped before the outcome could be recorded; job stays running for recovery");
       this.options.onJobDone?.({ job, outcome, recorded, durationMs: Date.now() - started });
     } finally {
+      heartbeat?.stop();
       if (this.current?.graceTimer) clearTimeout(this.current.graceTimer);
       this.current = null;
     }

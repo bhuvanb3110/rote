@@ -90,8 +90,8 @@ services:
     # So an out-of-memory kill is attributed (OOMKilled: true in docker inspect) and never mistaken for
     # a chaos kill (D9). Reviewer decision B6.
     mem_limit: 700m
-    # Step 6: no restarts. A worker that dies leaves its job `running` (no recovery until Day 2), and the
-    # Day-1 exit check reports it as lost. Day 2 decides restarts for chaos.
+    # No restarts: the chaos harness is the supervisor (D33), so every restart is logged. A worker that
+    # dies stops heartbeating; its lease expires and another worker's recovery takes the job (Day 2).
     restart: "no"
     environment:
       <<: *worker-credentials
@@ -100,7 +100,9 @@ services:
       # approved artifact targets http://localhost:4100 and stays byte-identical.
       ROTE_BANK_FORWARD: bank:4100
       ROTE_EVIDENCE_DIR: /evidence
-      ROTE_LEASE_SECONDS: "300"
+      # Day 2 (D36): a 30 s lease kept alive by a heartbeat every 10 s (heartbeat * 2 < lease, enforced).
+      ROTE_LEASE_SECONDS: "30"
+      ROTE_HEARTBEAT_SECONDS: "10"
       ROTE_SHUTDOWN_GRACE_MS: "30000"
       ROTE_HEALTH_FILE: /tmp/rote-worker-alive
     volumes:

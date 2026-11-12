@@ -14,6 +14,7 @@ export const BROWSER_TEST_FILES = [
   "src/surface/locate.test.ts",
   "src/tenant/multiTenant.test.ts",
   "src/worker/faults.db.test.ts",
+  "src/worker/lease.db.test.ts",
   "src/worker/worker.db.test.ts",
 ];
 

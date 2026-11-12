@@ -2,7 +2,7 @@
 // at every step boundary of the transfer and judge each point with the ledger oracle (D32).
 //
 //   npm run crash-matrix -- [--points after-submit,before-complete] [--drain-timeout 90s]
-//                           [--lease-seconds 30] [--tenant tenant-a] [--out <dir>]
+//                           [--lease-seconds 30] [--heartbeat-seconds 10] [--tenant tenant-a] [--out <dir>]
 //
 // Per point, isolated: a fresh Postgres test schema (rote_test database), a fresh in-process mock bank
 // on :4100 with an empty ledger, ONE transfer job, then
@@ -38,6 +38,7 @@ const BANK = `http://127.0.0.1:${BANK_PORT}`;
 const points = argValue("points") ? argValue("points")!.split(",") : [...TRANSFER_FAULT_POINTS];
 const DRAIN_TIMEOUT_MS = argValue("drain-timeout") ? parseDuration(argValue("drain-timeout")!) : 90_000;
 const LEASE_SECONDS = Number(argValue("lease-seconds") ?? 30);
+const HEARTBEAT_SECONDS = Number(argValue("heartbeat-seconds") ?? 10);
 const TENANT = argValue("tenant") ?? "tenant-a";
 const FAULT_WORKER_TIMEOUT_MS = 120_000;
 const started = new Date();
@@ -117,6 +118,7 @@ async function runPoint(point: string): Promise<{ row: Row; text: string }> {
       ...FAKE_CREDS,
       ROTE_DATABASE_URL: url.toString(),
       ROTE_LEASE_SECONDS: String(LEASE_SECONDS),
+      ROTE_HEARTBEAT_SECONDS: String(HEARTBEAT_SECONDS),
       ROTE_EVIDENCE_DIR: path.resolve(dir, "worker-evidence"),
       ROTE_SHUTDOWN_GRACE_MS: "10000",
     };
@@ -182,7 +184,7 @@ async function main(): Promise<void> {
   const header = [
     `Crash-point matrix, started ${started.toISOString()}`,
     `points: ${points.join(", ")}`,
-    `tenant: ${TENANT}; lease: ${LEASE_SECONDS} s; drain timeout per point: ${DRAIN_TIMEOUT_MS} ms; workers: child processes (node --import tsx src/worker/main.ts)`,
+    `tenant: ${TENANT}; lease: ${LEASE_SECONDS} s; heartbeat: ${HEARTBEAT_SECONDS} s; drain timeout per point: ${DRAIN_TIMEOUT_MS} ms; workers: child processes (node --import tsx src/worker/main.ts)`,
     "",
   ];
   console.log(header.join("\n"));

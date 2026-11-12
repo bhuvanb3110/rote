@@ -9,7 +9,8 @@
 // Environment (defaults in brackets):
 //   ROTE_DATABASE_URL        [postgres://rote:…@127.0.0.1:55432/rote]
 //   ROTE_WORKER_ID           [<hostname>-<pid>-<4 hex>]  (hostname = container id in Docker)
-//   ROTE_LEASE_SECONDS       [300]   Step 6 has no heartbeat; Day 2 sets 30 + a 10 s heartbeat
+//   ROTE_LEASE_SECONDS       [30]    the lease (D36); every dequeue, heartbeat and commit intent sets now() + this
+//   ROTE_HEARTBEAT_SECONDS   [10]    heartbeat interval; refused unless heartbeat * 2 < lease
 //   ROTE_SHUTDOWN_GRACE_MS   [30000]
 //   ROTE_EVIDENCE_DIR        [<tmpdir>/rote-worker-evidence]  never the repo's evidence/
 //   ROTE_BANK_FORWARD        [unset]  e.g. bank:4100 -> forward 127.0.0.1:4100 there
@@ -32,6 +33,7 @@ import { isTransientDbError } from "../queue/index.js";
 import { Worker } from "./loop.js";
 import { checkPlaywrightVersion } from "./playwrightVersion.js";
 import { createFaultInjector, parseFaultConfig } from "./fault.js";
+import { DEFAULT_HEARTBEAT_SECONDS, DEFAULT_LEASE_SECONDS, validateLeaseTiming } from "./heartbeat.js";
 import { runJob } from "./runJob.js";
 
 const log = pino({ base: { service: "worker" } });
@@ -65,7 +67,9 @@ async function main(): Promise<void> {
   const fault = createFaultInjector(faultPoint);
   const playwrightVersion = checkPlaywrightVersion(process.env.PLAYWRIGHT_VERSION);
   const workerId = process.env.ROTE_WORKER_ID || `${os.hostname()}-${process.pid}-${randomBytes(2).toString("hex")}`;
-  const leaseSeconds = intEnv("ROTE_LEASE_SECONDS", 300);
+  const leaseSeconds = intEnv("ROTE_LEASE_SECONDS", DEFAULT_LEASE_SECONDS);
+  const heartbeatSeconds = intEnv("ROTE_HEARTBEAT_SECONDS", DEFAULT_HEARTBEAT_SECONDS);
+  validateLeaseTiming(leaseSeconds, heartbeatSeconds); // refuse to start on a lease one missed beat could lose
   const shutdownGraceMs = intEnv("ROTE_SHUTDOWN_GRACE_MS", 30_000);
   const evidenceBaseDir = process.env.ROTE_EVIDENCE_DIR || path.join(os.tmpdir(), "rote-worker-evidence");
   const healthFile = process.env.ROTE_HEALTH_FILE;
@@ -123,7 +127,7 @@ async function main(): Promise<void> {
 
   if (faultPoint) log.warn({ workerId, faultPoint }, "worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)");
   log.info(
-    { workerId, playwrightVersion, leaseSeconds, shutdownGraceMs, evidenceBaseDir, db: redactDatabaseUrl(dbUrl), tenants },
+    { workerId, playwrightVersion, leaseSeconds, heartbeatSeconds, shutdownGraceMs, evidenceBaseDir, db: redactDatabaseUrl(dbUrl), tenants },
     "worker: ready",
   );
 
@@ -131,6 +135,7 @@ async function main(): Promise<void> {
     pool,
     workerId,
     leaseSeconds,
+    heartbeatSeconds,
     shutdownGraceMs,
     getBrowser,
     redact,

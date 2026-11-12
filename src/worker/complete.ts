@@ -24,6 +24,17 @@ UPDATE job_attempts
 SET ended_at = now(), outcome = $3, commit_uncertain = $4, error = $5
 WHERE job_id = $1 AND fencing_token = $2`;
 
+/**
+ * This worker lost the job (its completion was fenced out, or its heartbeat found the lease gone).
+ * Recovery may already have closed this attempt row as `crashed`; the worker was alive, so `lease_lost`
+ * is the truer label, and recovery's note is kept after the worker's own text.
+ */
+export const MARK_LEASE_LOST_SQL = `
+UPDATE job_attempts
+SET ended_at = now(), outcome = 'lease_lost', commit_uncertain = commit_uncertain OR $4,
+    error = $3 || COALESCE(' [recovery had recorded: ' || error || ']', '')
+WHERE job_id = $1 AND fencing_token = $2`;
+
 export interface CompleteInput {
   jobId: string;
   fencingToken: number;
@@ -45,17 +56,29 @@ export async function completeJob(pool: Pool, input: CompleteInput): Promise<{ r
       outcome.result === null ? null : JSON.stringify(outcome.result),
     ]);
     const recorded = updated.rowCount === 1;
-    await client.query(END_ATTEMPT_SQL, [
-      input.jobId,
-      input.fencingToken,
-      recorded ? outcome.attemptOutcome : "lease_lost",
-      outcome.commitUncertain,
-      recorded
-        ? outcome.error
-        : `lease lost before completion; this worker's outcome (${outcome.state}/${outcome.outcome ?? "requeue"}) was NOT recorded on the job`,
-    ]);
+    if (recorded) {
+      await client.query(END_ATTEMPT_SQL, [input.jobId, input.fencingToken, outcome.attemptOutcome, outcome.commitUncertain, outcome.error]);
+    } else {
+      await client.query(MARK_LEASE_LOST_SQL, [
+        input.jobId,
+        input.fencingToken,
+        `lease lost before completion; this worker's outcome (${outcome.state}/${outcome.outcome ?? "requeue"}) was NOT recorded on the job`,
+        outcome.commitUncertain,
+      ]);
+    }
     return { recorded };
   });
+}
+
+/**
+ * The heartbeat aborted the run with a LeaseLostError: nothing is written to `jobs` (the job is
+ * recovery's now); only this worker's attempt row says what happened.
+ */
+export async function markAttemptLeaseLost(
+  pool: Pool,
+  input: { jobId: string; fencingToken: number; detail: string; commitUncertain: boolean },
+): Promise<void> {
+  await pool.query(MARK_LEASE_LOST_SQL, [input.jobId, input.fencingToken, input.detail, input.commitUncertain]);
 }
 
 export interface CompleteRetryOptions {
@@ -75,11 +98,16 @@ export async function completeJobWithRetry(
   input: CompleteInput,
   options: CompleteRetryOptions = {},
 ): Promise<{ recorded: boolean } | null> {
+  return retryTransient(() => completeJob(pool, input), options);
+}
+
+/** `fn`, retried with backoff (100 ms .. 5 s, full jitter) on transient DB errors; null if `signal` aborted first. */
+export async function retryTransient<T>(fn: () => Promise<T>, options: CompleteRetryOptions = {}): Promise<T | null> {
   const backoff = createBackoff({ baseMs: 100, capMs: 5000, random: options.random });
   for (let attempt = 1; ; attempt += 1) {
     if (options.signal?.aborted) return null;
     try {
-      return await completeJob(pool, input);
+      return await fn();
     } catch (err) {
       if (!isTransientDbError(err)) throw err;
       options.onTransientError?.(err, attempt);
