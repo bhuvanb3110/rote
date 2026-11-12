@@ -1,0 +1,28 @@
+[
+  {
+    "id": "cc047793-efc4-4ad5-90d5-c9718f09c18c",
+    "idempotency_key": "crash-after-step-12",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "needs_human",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 2,
+    "trace_id": "637efce9be0a1c45836f6cbf4ab2f24b",
+    "commit_intent_at": "2026-11-12T03:16:07.640Z",
+    "outcome": "commit_uncertain",
+    "error": "lease expired after the commit intent: the Submit may have committed; check the bank's history for memo_key (T6.3: the lease of fault-after-step-12 expired; recovered by clean-after-step-12)",
+    "result": null,
+    "memo_key": "rote-cc047793-efc4-4ad5-90d5-c9718f09c18c",
+    "created_at": "2026-11-12T03:16:04.737Z",
+    "updated_at": "2026-11-12T03:16:12.778Z"
+  }
+]

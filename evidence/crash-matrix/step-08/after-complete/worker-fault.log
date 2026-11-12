@@ -1,0 +1,6 @@
+{"level":40,"time":1794453385138,"service":"worker","workerId":"fault-after-complete","faultPoint":"after-complete","msg":"worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)"}
+{"level":30,"time":1794453385139,"service":"worker","workerId":"fault-after-complete","playwrightVersion":"1.62.1","leaseSeconds":5,"heartbeatSeconds":2,"shutdownGraceMs":10000,"evidenceBaseDir":"C:\\Users\\hp\\Downloads\\rote\\evidence\\crash-matrix\\step-08\\after-complete\\worker-evidence","db":"postgres://rote:***@127.0.0.1:55432/rote_test?options=-c+search_path%3Dt_crash_after_complete_aa34c1b4","tenants":["tenant-a","tenant-b","tenant-c"],"msg":"worker: ready"}
+{"level":30,"time":1794453385139,"service":"worker","workerId":"fault-after-complete","leaseSeconds":5,"msg":"worker: started"}
+{"level":30,"time":1794453385171,"service":"worker","workerId":"fault-after-complete","jobId":"d1846ca6-601b-4a11-a462-642db7d9328f","tenant":"tenant-a","capability":"transfer","attempt":1,"msg":"worker: job leased"}
+{"level":30,"time":1794453386785,"service":"worker","workerId":"fault-after-complete","jobId":"d1846ca6-601b-4a11-a462-642db7d9328f","tenant":"tenant-a","capability":"transfer","attempt":1,"msg":"worker: commit intent written; clicking Submit"}
+ROTE_FAULT firing at after-complete (pid 3344)

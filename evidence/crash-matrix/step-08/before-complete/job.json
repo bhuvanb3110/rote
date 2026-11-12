@@ -1,0 +1,28 @@
+[
+  {
+    "id": "de4238dd-1b9b-47d0-a856-42a52ecebbaa",
+    "idempotency_key": "crash-before-complete",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "needs_human",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 2,
+    "trace_id": "034aede7097e481fb58c58faaa585155",
+    "commit_intent_at": "2026-11-12T03:16:16.644Z",
+    "outcome": "commit_uncertain",
+    "error": "lease expired after the commit intent: the Submit may have committed; check the bank's history for memo_key (T6.3: the lease of fault-before-complete expired; recovered by clean-before-complete)",
+    "result": null,
+    "memo_key": "rote-de4238dd-1b9b-47d0-a856-42a52ecebbaa",
+    "created_at": "2026-11-12T03:16:13.706Z",
+    "updated_at": "2026-11-12T03:16:23.077Z"
+  }
+]

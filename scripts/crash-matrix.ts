@@ -2,7 +2,8 @@
 // at every step boundary of the transfer and judge each point with the ledger oracle (D32).
 //
 //   npm run crash-matrix -- [--points after-submit,before-complete] [--drain-timeout 90s]
-//                           [--lease-seconds 30] [--heartbeat-seconds 10] [--tenant tenant-a] [--out <dir>]
+//                           [--lease-seconds 30] [--heartbeat-seconds 10] [--expect step-08]
+//                           [--tenant tenant-a] [--out <dir>]
 //
 // Per point, isolated: a fresh Postgres test schema (rote_test database), a fresh in-process mock bank
 // on :4100 with an empty ledger, ONE transfer job, then
@@ -11,14 +12,18 @@
 //   2. the harness checks it died at that point (its log line; a non-zero exit / SIGKILL);
 //   3. a clean worker (no fault) runs until the job is terminal or --drain-timeout passes, then is
 //      stopped with SIGTERM;
-//   4. the oracle judges the one job against the bank's ledger.
+//   4. the oracle judges the one job against the bank's ledger, and the final job is compared with the
+//      point's EXPECTED outcome (src/chaos/crashExpected.ts, --expect phase): a point passes only if the
+//      fault fired, the oracle passes AND the job ended as expected.
 // Writes <out>/matrix.md, <out>/check.txt (RESULT: PASS only if every point passes) and one folder per
-// point (both workers' logs, job.json, ledger.json, oracle.json). Exit 1 if any point fails.
+// point (both workers' logs, job.json, attempts.json, ledger.json, oracle.json). Exit 1 if any fails.
 //
 // Needs Postgres (`docker compose up -d postgres`) and port 4100 free (stop the Compose bank first).
-// Day 1 (Step 7): EXPECTED RED. Nothing recovers a dead worker's job, so from after-dequeue to
-// before-complete the job stays `running` and the oracle reports LOST (with 1 ledger row from
-// after-submit on). Day 2 (docs/plans/step-08.md) turns it green.
+// The matrix runs with --lease-seconds 5 --heartbeat-seconds 2 so a point costs seconds, not a 30 s wait
+// (D40); Step 10 adds one run at the production 30/10.
+// Step 7: red (nothing recovered a dead worker's job). Step 8 (--expect step-08): before the intent ->
+// requeued, attempt 2 succeeded, 1 row; after it -> needs_human (T6.3), 0 or 1 row, never 2. Step 9
+// adds verify and its own expectations.
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -31,6 +36,7 @@ import { checkLedger, fetchLedger, readJobs } from "../src/oracle/index.js";
 import { enqueue } from "../src/queue/index.js";
 import { createTestSchema, testDatabaseUrl } from "../src/queue/testDb.js";
 import { TRANSFER_FAULT_POINTS } from "../src/worker/fault.js";
+import { EXPECTATION_PHASES, expectedFor, judgePoint, type ExpectationPhase } from "../src/chaos/crashExpected.js";
 import { argValue, FAKE_CREDS, parseDuration } from "./lib/compose.js";
 
 const BANK_PORT = 4100;
@@ -40,6 +46,8 @@ const DRAIN_TIMEOUT_MS = argValue("drain-timeout") ? parseDuration(argValue("dra
 const LEASE_SECONDS = Number(argValue("lease-seconds") ?? 30);
 const HEARTBEAT_SECONDS = Number(argValue("heartbeat-seconds") ?? 10);
 const TENANT = argValue("tenant") ?? "tenant-a";
+const PHASE = (argValue("expect") ?? "step-08") as ExpectationPhase;
+if (!(EXPECTATION_PHASES as readonly string[]).includes(PHASE)) throw new Error(`--expect must be one of ${EXPECTATION_PHASES.join(", ")}`);
 const FAULT_WORKER_TIMEOUT_MS = 120_000;
 const started = new Date();
 const OUT = argValue("out") ?? path.join("evidence", "crash-matrix", started.toISOString().replace(/[:.]/g, "-"));
@@ -92,8 +100,12 @@ interface Row {
   fired: boolean;
   faultExit: string;
   state: string;
+  outcome: string | null;
   attempt: number;
   rows: number;
+  oracle: string;
+  expected: string;
+  /** "ok", or why the point failed. */
   verdict: string;
   detail: string;
 }
@@ -166,11 +178,18 @@ async function runPoint(point: string): Promise<{ row: Row; text: string }> {
     await writeFile(path.join(dir, "ledger.json"), JSON.stringify({ entries: ledger }, null, 2));
     await writeFile(path.join(dir, "oracle.json"), JSON.stringify(reportJson, null, 2));
     await writeFile(path.join(dir, "check.txt"), report.text + "\n");
-    // A point passes only if the fault actually fired there AND the oracle passes.
-    const verdict = !fired ? "FAULT_NOT_FIRED" : f.verdict;
+    // A point passes only if the fault fired there, the oracle passes AND the job ended as expected.
+    const expected = expectedFor(point, PHASE);
+    const final = jobs[0]!;
+    const verdict = judgePoint(
+      { fired, oracleVerdict: f.verdict, state: final.state, outcome: final.outcome ?? null, attempt: final.attempt, ledgerRows: f.rows },
+      expected,
+    ) ?? "ok";
     return {
-      row: { point, fired, faultExit, state: f.state, attempt: jobs[0]!.attempt, rows: f.rows, verdict, detail: f.detail },
-      text: `== ${point}: fault ${fired ? "fired" : "DID NOT FIRE"} (${faultExit}); drain ${drainTimedOut ? "timed out" : "ended"} after ${Date.now() - drainStart} ms\n${report.text}`,
+      row: { point, fired, faultExit, state: final.state, outcome: final.outcome ?? null, attempt: final.attempt, rows: f.rows, oracle: f.verdict, expected: expected.says, verdict, detail: f.detail },
+      text:
+        `== ${point}: fault ${fired ? "fired" : "DID NOT FIRE"} (${faultExit}); drain ${drainTimedOut ? "timed out" : "ended"} after ${Date.now() - drainStart} ms\n` +
+        `expected (${PHASE}): ${expected.says}; got ${final.state}/${final.outcome ?? "-"}, attempt ${final.attempt}, ${f.rows} row(s): ${verdict}\n${report.text}`,
     };
   } finally {
     await new Promise<void>((resolve) => bank.close(() => resolve()));
@@ -184,6 +203,7 @@ async function main(): Promise<void> {
   const header = [
     `Crash-point matrix, started ${started.toISOString()}`,
     `points: ${points.join(", ")}`,
+    `expectations: ${PHASE} (src/chaos/crashExpected.ts)`,
     `tenant: ${TENANT}; lease: ${LEASE_SECONDS} s; heartbeat: ${HEARTBEAT_SECONDS} s; drain timeout per point: ${DRAIN_TIMEOUT_MS} ms; workers: child processes (node --import tsx src/worker/main.ts)`,
     "",
   ];
@@ -194,17 +214,20 @@ async function main(): Promise<void> {
     const { row, text } = await runPoint(point);
     rows.push(row);
     texts.push(text);
-    console.log(`${point}: ${row.verdict} (state ${row.state}, attempt ${row.attempt}, rows ${row.rows}; fault ${row.fired ? "fired" : "NOT fired"}, ${row.faultExit})`);
+    console.log(`${point}: ${row.verdict} (state ${row.state}/${row.outcome ?? "-"}, attempt ${row.attempt}, rows ${row.rows}, oracle ${row.oracle}; expected ${row.expected}; fault ${row.fired ? "fired" : "NOT fired"}, ${row.faultExit})`);
   }
   const allPass = rows.every((r) => r.verdict === "ok");
   const md = [
     `# Crash-point matrix: ${started.toISOString()}`,
     "",
-    header.slice(1, 3).map((l) => `- ${l}`).join("\n"),
+    header.slice(1, 4).map((l) => `- ${l}`).join("\n"),
     "",
-    "| Point | Fault fired | Fault worker | Final state | Attempt | Ledger rows | Verdict |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
-    ...rows.map((r) => `| \`${r.point}\` | ${r.fired ? "yes" : "**no**"} | ${r.faultExit} | ${r.state} | ${r.attempt} | ${r.rows} | ${r.verdict === "ok" ? "ok" : `**${r.verdict}**`} |`),
+    "| Point | Fault fired | Fault worker | Expected | Final state | Attempt | Ledger rows | Oracle | Verdict |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map(
+      (r) =>
+        `| \`${r.point}\` | ${r.fired ? "yes" : "**no**"} | ${r.faultExit} | ${r.expected} | ${r.state}${r.outcome ? ` / ${r.outcome}` : ""} | ${r.attempt} | ${r.rows} | ${r.oracle} | ${r.verdict === "ok" ? "ok" : `**${r.verdict}**`} |`,
+    ),
     "",
     `Green points: ${rows.filter((r) => r.verdict === "ok").length}/${rows.length}.`,
     "",
