@@ -996,4 +996,17 @@ is `test:unit` (npm sets it, on every OS) or `ROTE_SKIP_DB_TESTS=1` (the CI job)
 process. Alternative considered: `cross-env` in the npm script (a new dependency, which needs its own
 reviewed step).
 
-**Date.** 2026-11-11
+**Amendment (2026-11-11, Step 8 reviewer decision A1): actions pinned by commit SHA, on node24.** Every
+run carried the warning "Node.js 20 is deprecated. The following actions target Node.js 20 but are being
+forced to run on Node.js 24" for `checkout@v4`, `setup-node@v4`, `upload-artifact@v4`,
+`setup-buildx-action@v3` and `build-push-action@v6`. Each is now the current major whose `action.yml`
+says `runs.using: node24` (checked with `gh` against each repository's releases and the tag's own
+`action.yml`), pinned by the full commit SHA the tag points at (an annotated tag dereferenced to its
+commit), with the release in a trailing comment: checkout v7.0.1 `3d3c42e…`, setup-node v7.1.0
+`949feb2…`, upload-artifact v7.0.2 `cf430e0…`, setup-buildx-action v4.4.1 `f87e599…`, build-push-action
+v7.4.0 `c3c9e26…`. The release notes between the old and new majors were read for breaking changes;
+none touches this workflow (setup-node v5+ caches automatically, and we already set `cache: npm`;
+checkout v6 stores the persisted token in a separate file; upload-artifact v7 adds an opt-in unzipped
+upload; the Docker actions drop inputs and env vars we never set). Alternatives considered: pin by tag
+(`@v7`; a tag can be moved to other code, a SHA cannot); Dependabot to keep the pins fresh (a new bot
+with write access to PRs, out of this step's scope; noted for the dependency step after Day 2).
