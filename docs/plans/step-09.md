@@ -118,3 +118,80 @@ outcome after Submit with nothing written → `[0, 0]` → `business_outcome`, n
    so 3 means the verifier itself is crashing repeatedly. OK, or fewer?
 3. **`rote jobs reverify`**: one job at a time by id only (proposed), or also `--all-commit-uncertain`
    for the Step 6–8 backlog?
+
+## Reviewer decisions (2026-11-11)
+
+The reviewer **approved** this plan with the decisions below. Where they differ from the sections
+above, these win; everything else in this file stands. The reviewer re-ran Step 8 on Postgres 16:
+500/501, only the version-17 assertion failing, as expected; the guard SQL in `heartbeat.ts`,
+`intent.ts`, `recover.ts` and `complete.ts` matches the plan.
+
+### Part A, built first: a small item from Step 8
+
+A1. **A distinct error for a forbidden completion.** When T4 updates 0 rows, re-read the job's
+    `fencing_token` in the same transaction (or right after). Token changed → `lease_lost`, as today.
+    Token unchanged → the worker attempted a transition `completionAllowed` forbids, i.e. a **bug**: log
+    it at error level as `illegal_transition`, record the attempt outcome `illegal_transition`, and
+    count it (a metric hook Day 3 will export). The job is untouched; its lease expires and recovery
+    handles it. Test both branches.
+
+### Part B: Step 9 as planned
+
+Lookup 1.2.0 with `firstMatchRef` and its re-approval with fresh evidence and all three override
+digests, `verifyDecision`, T5, T7, T6.4–T6.6, `rote jobs reverify` by id, the recovery-internal crash
+points, T5/T7 in the model-vs-real test, the matrix's Step 9 expectations, one chaos run. Open
+questions answered:
+
+1. **Settle period default 5 s, configurable via `ROTE_VERIFY_SETTLE_MS`:** approved.
+2. **3 verify phases before `verify_exhausted`:** approved.
+3. **`rote jobs reverify`: one job at a time, by id only:** approved.
+
+### Reviewer additions
+
+4. **History lag in the mock bank.** Today the history page shows a transfer instantly, so the `[0, 1]`
+   path never happens naturally and settle-and-recheck is untested. Add `/control/history-lag/:ms`
+   (0 = off, the default): a ledger row becomes visible on history pages (and the count row) only after
+   that many ms; `/control/ledger` (the oracle) always sees it at once. Then prove, with saved evidence:
+   - lag 3000 ms, settle 5000 ms, a crash right after Submit → the verify sees `[0, 1]` → `succeeded` /
+     `already_done`, exactly 1 ledger row;
+   - lag 8000 ms, settle 5000 ms, the same crash → `[0, 0]` → resubmitted → 2 ledger rows → the oracle
+     reports DUPLICATE.
+
+   Saved as `evidence/settle-vs-history-lag/` with a README stating the rule: **the settle period must
+   exceed the bank's history visibility delay.** That is a deployment configuration requirement, and
+   the reconcile pass (Step 10) is the backstop. Also add a property/model event for lagged visibility
+   so the model covers it.
+5. **Bank unavailable ≠ ambiguous.** Split the "unreadable" verify outcome:
+   - **unavailable:** the lookup fails with the bank's 503 / "System unavailable", or transient /
+     session-timeout failures persist after the one retry → **defer**. The job stays `verifying`, the
+     verify phase ends with decision `deferred` (a new value), and the job is retried after a backoff.
+     Deferrals get their own budget (e.g. up to 10 minutes from the first deferral, configurable) that
+     does **not** count toward the 3-phase crash cap; when the budget is exhausted → `needs_human`
+     (outcome `verify_unavailable`).
+   - **ambiguous:** 2+ matches, or a page that loads but can't be understood → `needs_human` at once,
+     as planned.
+
+   Design the exact SQL (respect the `jobs_active_has_owner` CHECK; e.g. keep the owner and set a short
+   lease, or another approach, justified), add it to the pure state machine, the property tests and the
+   model-vs-real test, and test it with `/control/errors/on` for 30 s during verifies: no duplicates,
+   and the verifies complete after the outage instead of escalating. A D-entry.
+6. **Step 10 plan item:** commit the deliberate-bug checks as `scripts/mutation-check` (apply each
+   planted bug as a patch, run the property tests, expect red, revert), and run it in CI as a job.
+
+### Turning green in Step 9
+
+After Step 9 every crash-matrix point, the new recovery-internal ones included, is green with the
+Step 9 expectations (after-intent points → verified, 1 row, `succeeded` or resubmitted). Run the matrix
+at 5 / 2 timing plus one seeded chaos run; update the before/after table in `evidence/README.md`.
+
+### Also required
+
+- Memory: 8 GB laptop. Never run the full suite while the fleet is up; stop the fleet containers when
+  not in use.
+- `npm test` before every commit; never commit or push on red. Full suite 3 times at the end, logs
+  unfiltered. After pushing, check CI with `gh` and report it; if it is red, fix it in this step.
+- Then write `docs/plans/step-10.md` (commit it; don't build it): the Day-2 exit. Chaos at scale (20+
+  seeds), the zombie stall-after-intent evidence paired with the reconcile pass, the bank-slow /
+  bank-down scenario, the matrix at production 30 / 10 timing, crash tests required in CI, the chaos
+  snapshot re-read fix, `scripts/mutation-check`, README "Fleet (Day 2)", the Day-2 exit criteria from
+  the brief, and what must be true before the PR from `fleet/day-1` to `main` opens.
