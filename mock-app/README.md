@@ -132,6 +132,8 @@ tenant-c's hostile variant applies. Button labels are identical on all tenants: 
    value is the page's only `.zk9bv`).
 3. `/member/:id/history[?memo=text]` → this tenant's transfers involving the member, with a
    "Matching transfers" row (the count of rows shown; `?memo=` keeps rows whose memo contains the text).
+   The grid's columns are Reference, Date, From, To, Amount, Memo; an empty result is a single
+   "No matching transfers." row (Step 9), so the grid's first body row always exists.
 
 Rules: Source and recipient must be Active; the recipient must exist and differ from the source;
 the amount is a positive dollar amount with at most two decimals and may not exceed the source's
@@ -152,6 +154,7 @@ Controls (registered before the tenants, so they work **without** a session cook
 | `GET /control/errors/on` | Every tenant route (except `/login`) returns **503 "System unavailable"** before any write. |
 | `GET /control/errors/after-write` | `POST .../transfer/confirm` appends the ledger row **then** returns the 503. Everything else is normal. |
 | `GET /control/errors/off` | Clears both error modes. |
+| `GET /control/history-lag/:ms` | A ledger row shows on history pages (rows **and** the count) only once `ms` (0..600000) have passed since it was written; `/control/ledger` sees it at once. Applied at read time. `0` (default) clears. Step 9: makes settle-and-recheck testable. |
 
 The 503 page text is "System unavailable", deliberately different from the transient interstitial's
 "System temporarily unavailable, please retry".

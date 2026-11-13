@@ -54,6 +54,18 @@ describe("committed approvals (status/) match the committed artifacts (artifacts
     });
   }
 
+  it("Step 9: the verify's lookup is approved at 1.2.0 (firstMatchRef, BANK_UNAVAILABLE) with all three tenant overrides", async () => {
+    const lookup = capabilities.find((c) => c.id === "transfer-history-lookup")!;
+    expect(lookup.version).toBe("1.2.0");
+    expect(lookup.outputs.map((o) => o.name)).toEqual(["matchingCount", "firstMatchRef"]);
+    const status = await readCapabilityStatus(lookup.id);
+    expect(status.approvedVersion).toBe("1.2.0");
+    expect(status.approvedDigest).toBe(capabilityDigest(lookup));
+    expect(Object.keys(status.approvedOverrideDigests ?? {})).toEqual(["tenant-a", "tenant-b", "tenant-c"]);
+    expect(status.approvedOverrideDigests).toEqual(await tenantOverrideDigests(lookup.id, DEFAULT_OVERRIDES_DIR));
+    expect(status.approvedReason).toMatch(/evidence\/transfer-history-lookup-1\.2\.0\//);
+  });
+
   it("the committed overrides are the ones the fleet runs: transfer and the lookup on tenants a/b/c", async () => {
     for (const id of ["transfer", "transfer-history-lookup", "member-lookup"]) {
       expect(Object.keys(await tenantOverrideDigests(id, DEFAULT_OVERRIDES_DIR))).toEqual(["tenant-a", "tenant-b", "tenant-c"]);

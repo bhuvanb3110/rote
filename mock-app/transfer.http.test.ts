@@ -25,6 +25,7 @@ afterAll(async () => {
 afterEach(async () => {
   await fetch(`${base}/control/errors/off`);
   await fetch(`${base}/control/latency/0`);
+  await fetch(`${base}/control/history-lag/0`);
   await fetch(`${base}/control/ledger/reset`);
 });
 
@@ -312,6 +313,45 @@ describe("history page", () => {
     const res = await fetch(`${base}/member/10001/history`, { redirect: "manual" });
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/login");
+  });
+
+  it("an empty result is one 'No matching transfers.' row; otherwise the first body row is the first match, Reference first", async () => {
+    const c = await Client.login(TENANTS[0]!);
+    const empty = await (await c.get("/member/10001/history?memo=rote-none")).text();
+    expect(empty).toContain(`<tr><td colspan="6">No matching transfers.</td></tr>`);
+    await c.transfer("10001", { toMemberId: "10002", amount: "1", memo: "rote-first" });
+    const html = await (await c.get("/member/10001/history?memo=rote-first")).text();
+    expect(html).not.toContain("No matching transfers.");
+    expect(html).toMatch(/<th>Memo<\/th><\/tr>\s*<tr><td>TXN-000001<\/td>/);
+  });
+});
+
+describe("history lag (/control/history-lag/:ms, step-09 reviewer decision 4)", () => {
+  it("a new row is missing from the history rows AND the count until the lag has passed; /control/ledger sees it at once", async () => {
+    const c = await Client.login(TENANTS[0]!);
+    expect(await (await fetch(`${base}/control/history-lag/400`)).text()).toBe("history lag: 400ms");
+    await c.transfer("10001", { toMemberId: "10002", amount: "1", memo: "rote-lag" });
+    expect(await ledger()).toHaveLength(1); // the oracle: immediately
+    expect(await c.matchingCount("10001", "rote-lag")).toBe(0);
+    expect(await (await c.get("/member/10001/history?memo=rote-lag")).text()).toContain("No matching transfers.");
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    expect(await c.matchingCount("10001", "rote-lag")).toBe(1);
+  });
+
+  it("0 turns it off (the default); the knob applies at read time, to existing rows too", async () => {
+    const c = await Client.login(TENANTS[1]!);
+    await c.transfer("10001", { toMemberId: "10002", amount: "1", memo: "rote-old" });
+    expect(await c.matchingCount("10001", "rote-old")).toBe(1);
+    await fetch(`${base}/control/history-lag/60000`);
+    expect(await c.matchingCount("10001", "rote-old")).toBe(0); // written < 60 s ago
+    await fetch(`${base}/control/history-lag/0`);
+    expect(await c.matchingCount("10001", "rote-old")).toBe(1);
+  });
+
+  it("refuses a non-integer, negative or over-10-minute lag", async () => {
+    for (const bad of ["-1", "1.5", "abc", "600001"]) {
+      expect((await fetch(`${base}/control/history-lag/${bad}`)).status).toBe(400);
+    }
   });
 });
 

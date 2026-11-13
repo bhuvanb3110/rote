@@ -169,6 +169,7 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
       await control("errors/off");
       await control("latency/0");
       await control("transient/off");
+      await control("history-lag/0");
       await control("ledger/reset");
     },
     async close() {

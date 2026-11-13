@@ -57,6 +57,16 @@ let unexpectedDialogEnabled = false;
 //   "after-write" -- POST .../transfer/confirm appends the ledger row, THEN returns the 503.
 let errorMode: "off" | "on" | "after-write" = "off";
 let latencyMs = 0;
+// History visibility delay (/control/history-lag/:ms, step-09 reviewer decision 4): a ledger row shows
+// on the history pages (rows AND the "Matching transfers" count) only once `historyLagMs` have passed
+// since it was written, like a bank whose history is fed by a batch or a replica. 0 = off (default).
+// /control/ledger (the oracle) always sees every row at once. The rule is applied at read time
+// (row.at + current lag <= now), so changing the knob changes what existing rows' visibility is.
+let historyLagMs = 0;
+
+function visibleInHistory(row: { at: string }, now: number): boolean {
+  return historyLagMs === 0 || Date.parse(row.at) + historyLagMs <= now;
+}
 
 function parseCookies(header: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
@@ -284,7 +294,8 @@ function createTenantRouter(tenant: TenantConfig): Router {
   });
 
   // Read-only. Shows only THIS tenant's rows that involve the member; ?memo= keeps rows whose
-  // stored (already truncated) memo contains the text.
+  // stored (already truncated) memo contains the text. With a history lag set, a row appears only
+  // once it is old enough (visibleInHistory).
   router.get("/member/:id/history", (req, res) => {
     const id = req.params.id;
     if (id === PERMISSION_DENIED_ID) {
@@ -296,11 +307,13 @@ function createTenantRouter(tenant: TenantConfig): Router {
       return;
     }
     const memo = typeof req.query.memo === "string" ? req.query.memo : "";
+    const now = Date.now();
     const rows = allLedgerEntries().filter(
       (r) =>
         r.tenantId === tenant.id &&
         (r.fromMemberId === id || r.toMemberId === id) &&
-        (memo === "" || r.memo.includes(memo)),
+        (memo === "" || r.memo.includes(memo)) &&
+        visibleInHistory(r, now),
     );
     res.send(renderTransferHistory(tenant, id, memo, rows));
   });
@@ -332,6 +345,16 @@ app.get("/control/latency/:ms", (req, res) => {
   }
   latencyMs = ms;
   res.type("text/plain").send(`latency: ${latencyMs}ms`);
+});
+
+app.get("/control/history-lag/:ms", (req, res) => {
+  const ms = Number(req.params.ms);
+  if (!Number.isInteger(ms) || ms < 0 || ms > 600_000) {
+    res.status(400).type("text/plain").send("history lag must be an integer 0..600000 (ms)");
+    return;
+  }
+  historyLagMs = ms;
+  res.type("text/plain").send(`history lag: ${historyLagMs}ms`);
 });
 
 app.get("/control/errors/:mode", (req, res) => {

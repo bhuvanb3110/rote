@@ -108,6 +108,12 @@ async function matchingCount(tenant: TenantConfig, memo: string): Promise<string
   return result.status === "success" ? String(result.outputs.matchingCount) : "";
 }
 
+async function lookupOutputs(tenant: TenantConfig, memo: string): Promise<Record<string, unknown>> {
+  const result = await lookup(tenant, memo);
+  expect(result.status, JSON.stringify(result)).toBe("success");
+  return result.status === "success" ? result.outputs : {};
+}
+
 /** The `kind` of every entry in the run's evidence log. */
 async function evidenceKinds(result: ReplayResult): Promise<string[]> {
   const ref = result.status === "needs_human" ? result.contextRef : result.evidenceRef;
@@ -145,6 +151,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
   await control("transient/off");
   await control("errors/off");
+  await control("history-lag/0");
   await control("ledger/reset");
 });
 
@@ -175,13 +182,19 @@ describe("transfer artifacts: static checks (no browser)", () => {
     ]);
     expect(lookupBase.outputs).toEqual([
       expect.objectContaining({ name: "matchingCount", producedByStepId: "step-09" }),
+      expect.objectContaining({ name: "firstMatchRef", producedByStepId: "step-10" }), // 1.2.0 (Step 9)
     ]);
-    // Only the existing transient retry; deliberately nothing for the 503 "System unavailable".
+    // Only the existing transient retry; deliberately nothing for the 503 "System unavailable"...
     for (const cap of [transferBase, lookupBase]) {
       expect(cap.recoverables.map((r) => r.recognizer)).toEqual([
         { kind: "textPresent", text: "System temporarily unavailable" },
       ]);
     }
+    // ...which the read-only lookup (1.2.0) recognizes as a known outcome, so verify can tell "the bank
+    // is down" from "a page it cannot understand" (step-09 reviewer decision 5). The transfer does not:
+    // after Submit, a 503 is commit-uncertain, never a refusal.
+    expect(lookupBase.knownOutcomes.map((o) => o.code)).toEqual(["NO_SUCH_MEMBER", "PERMISSION_DENIED", "BANK_UNAVAILABLE"]);
+    expect(transferBase.knownOutcomes.map((o) => o.code)).not.toContain("BANK_UNAVAILABLE");
   });
 
   it("the live gate says risky on step-11 of transfer only, on every tenant; the lookup is all safe", async () => {
@@ -233,11 +246,30 @@ describe("transfer artifacts: replay against the mock bank", () => {
     expect(refs).toEqual(rows.map((r) => r.id));
     expect(refs).toEqual(["TXN-000001", "TXN-000002", "TXN-000003", "TXN-000004"]);
 
-    expect(await matchingCount(TENANT_A, memo)).toBe("2");
-    expect(await matchingCount(TENANT_B, memo)).toBe("1");
+    // 1.2.0: the count AND the first match's Reference (the bank's own row id), on every tenant; with no
+    // match, the grid's empty-state text.
+    expect(await lookupOutputs(TENANT_A, memo)).toEqual({ matchingCount: "2", firstMatchRef: "TXN-000001" });
+    expect(await lookupOutputs(TENANT_B, memo)).toEqual({ matchingCount: "1", firstMatchRef: "TXN-000002" });
     // tenant-c's history never shows a/b rows, even with a memo they share.
-    expect(await matchingCount(TENANT_C, memo)).toBe("0");
+    expect(await lookupOutputs(TENANT_C, memo)).toEqual({ matchingCount: "0", firstMatchRef: "No matching transfers." });
+    expect(await lookupOutputs(TENANT_C, "rote-step3-tenant-c-only")).toEqual({ matchingCount: "1", firstMatchRef: "TXN-000003" });
   }, 180_000);
+
+  it("lookup 1.2.0: the bank's 503 is the BANK_UNAVAILABLE outcome (nothing read), on every tenant; a history lag hides a new row", async () => {
+    await transfer(TENANT_A, { memo: "rote-s9-lag" });
+    await control("history-lag/60000");
+    expect(await lookupOutputs(TENANT_A, "rote-s9-lag")).toEqual({ matchingCount: "0", firstMatchRef: "No matching transfers." });
+    await control("history-lag/0");
+    await control("errors/on");
+    try {
+      for (const tenant of TENANTS) {
+        expect(await lookup(tenant, "rote-s9-lag"), tenant.id).toMatchObject({ status: "business_outcome", code: "BANK_UNAVAILABLE" });
+      }
+    } finally {
+      await control("errors/off");
+    }
+    expect(await lookupOutputs(TENANT_A, "rote-s9-lag")).toEqual({ matchingCount: "1", firstMatchRef: "TXN-000001" });
+  }, 120_000);
 
   it("without approveRisky: needs_human at step-11 and nothing in the ledger", async () => {
     const result = await transfer(TENANT_A, { memo: "rote-step3-unapproved" }, false);

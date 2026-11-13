@@ -1,0 +1,59 @@
+{
+  "memoMaxLength": 64,
+  "entries": [
+    {
+      "id": "TXN-000001",
+      "tenantId": "tenant-a",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 12.34,
+      "memo": "rote-evidence-tenant-a",
+      "at": "2026-11-13T18:32:16.862Z"
+    },
+    {
+      "id": "TXN-000002",
+      "tenantId": "tenant-b",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 12.34,
+      "memo": "rote-evidence-tenant-b",
+      "at": "2026-11-13T18:32:19.745Z"
+    },
+    {
+      "id": "TXN-000003",
+      "tenantId": "tenant-c",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 12.34,
+      "memo": "rote-evidence-tenant-c",
+      "at": "2026-11-13T18:32:22.396Z"
+    },
+    {
+      "id": "TXN-000004",
+      "tenantId": "tenant-a",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 12.34,
+      "memo": "rote-evidence-twice-tenant-a",
+      "at": "2026-11-13T18:32:28.212Z"
+    },
+    {
+      "id": "TXN-000005",
+      "tenantId": "tenant-a",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 12.34,
+      "memo": "rote-evidence-twice-tenant-a",
+      "at": "2026-11-13T18:32:29.511Z"
+    },
+    {
+      "id": "TXN-000006",
+      "tenantId": "tenant-a",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 12.34,
+      "memo": "rote-evidence-lagged-tenant-a",
+      "at": "2026-11-13T18:32:31.928Z"
+    }
+  ]
+}

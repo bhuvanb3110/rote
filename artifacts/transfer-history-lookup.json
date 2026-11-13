@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "transfer-history-lookup",
   "name": "Transfer History Lookup",
-  "description": "Read-only: count a member's transfers whose memo contains the given text, from the bank's transfer history page. Used to check whether a transfer was already committed.",
-  "version": "1.1.0",
+  "description": "Read-only: count a member's transfers whose memo contains the given text, and read the first match's Reference, from the bank's transfer history page. Used to check whether a transfer was already committed (the fleet's verify).",
+  "version": "1.2.0",
   "target": {
     "appId": "great-plains-cu-backoffice",
     "entryUrlPattern": "^http://localhost:4100/",
@@ -45,6 +45,12 @@
       "type": "string",
       "shape": "Number of matching transfers as shown, e.g. \"1\"",
       "producedByStepId": "step-09"
+    },
+    {
+      "name": "firstMatchRef",
+      "type": "string",
+      "shape": "Reference of the first matching transfer, e.g. \"TXN-000001\"; the grid's empty-state text (\"No matching transfers.\") when nothing matched",
+      "producedByStepId": "step-10"
     }
   ],
   "steps": [
@@ -302,6 +308,24 @@
         ]
       },
       "risk": "safe"
+    },
+    {
+      "id": "step-10",
+      "intent": "Read the Reference of the first matching transfer (the first cell of the history grid's first body row).",
+      "action": {
+        "kind": "readText"
+      },
+      "target": {
+        "describedAs": "First matching transfer's Reference",
+        "strategies": [
+          {
+            "kind": "css",
+            "css": "table.grid1:has(th:text-is(\"Reference\")) tr:nth-child(2) > td:nth-child(1)",
+            "confidence": 0.5
+          }
+        ]
+      },
+      "risk": "safe"
     }
   ],
   "successCondition": {
@@ -356,6 +380,23 @@
         }
       },
       "detail": "The current operator is not permitted to view this member."
+    },
+    {
+      "code": "BANK_UNAVAILABLE",
+      "recognizer": {
+        "kind": "elementPresent",
+        "target": {
+          "describedAs": "Error message containing \"System unavailable\"",
+          "strategies": [
+            {
+              "kind": "css",
+              "css": ".msg1.err:has-text(\"System unavailable\")",
+              "confidence": 0.7
+            }
+          ]
+        }
+      },
+      "detail": "The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later."
     }
   ],
   "recoverables": [
@@ -370,8 +411,8 @@
     }
   ],
   "provenance": {
-    "recordedAt": "2026-11-09T12:00:00.000Z",
+    "recordedAt": "2026-11-13T12:00:00.000Z",
     "model": "none (hand-authored; docs/DECISIONS.md D3)",
-    "transcriptRef": "docs/plans/step-03.md"
+    "transcriptRef": "docs/plans/step-09.md"
   }
 }

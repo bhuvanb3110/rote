@@ -364,12 +364,17 @@ export function renderTransferHistory(
     "f-memofilter",
   );
   const filterBlock = tenant.hostile ? filterField : `<table class="grid1">${filterField}</table>`;
-  const body = rows
-    .map(
-      (r) =>
-        `<tr><td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.at)}</td><td>${escapeHtml(r.fromMemberId)}</td><td>${escapeHtml(r.toMemberId)}</td><td>$${r.amount.toFixed(2)}</td><td>${escapeHtml(r.memo)}</td></tr>`,
-    )
-    .join("\n  ");
+  // An empty result is one "No matching transfers." row, as legacy grids do (Step 9): the grid's first
+  // body row always exists, so a capability can read its first cell whether or not anything matched.
+  const body =
+    rows.length === 0
+      ? `<tr><td colspan="6">No matching transfers.</td></tr>`
+      : rows
+          .map(
+            (r) =>
+              `<tr><td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.at)}</td><td>${escapeHtml(r.fromMemberId)}</td><td>${escapeHtml(r.toMemberId)}</td><td>$${r.amount.toFixed(2)}</td><td>${escapeHtml(r.memo)}</td></tr>`,
+          )
+          .join("\n  ");
   return layout(
     tenant,
     `Transfer History ${memberId}`,

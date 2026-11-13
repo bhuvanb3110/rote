@@ -1,0 +1,28 @@
+PASS  ledger has exactly 6 rows (got 6)
+PASS  no duplicate memo in the ledger (except the deliberate twice-used one)
+PASS  tenant-a: transfer status is success (got success)
+PASS  tenant-a: exactly one ledger row with memo "rote-evidence-tenant-a" (got 1)
+PASS  tenant-a: confirmationRef TXN-000001 == ledger row id TXN-000001
+PASS  tenant-a: lookup status success and matchingCount "1" (got 1)
+PASS  tenant-a: lookup firstMatchRef TXN-000001 == ledger row id TXN-000001
+PASS  tenant-a: no-match lookup -> matchingCount "0", firstMatchRef "No matching transfers." (got {"matchingCount":"0","firstMatchRef":"No matching transfers."})
+PASS  tenant-a: with the bank's 503 on -> business_outcome BANK_UNAVAILABLE (got {"status":"business_outcome","code":"BANK_UNAVAILABLE"})
+PASS  tenant-b: transfer status is success (got success)
+PASS  tenant-b: exactly one ledger row with memo "rote-evidence-tenant-b" (got 1)
+PASS  tenant-b: confirmationRef TXN-000002 == ledger row id TXN-000002
+PASS  tenant-b: lookup status success and matchingCount "1" (got 1)
+PASS  tenant-b: lookup firstMatchRef TXN-000002 == ledger row id TXN-000002
+PASS  tenant-b: no-match lookup -> matchingCount "0", firstMatchRef "No matching transfers." (got {"matchingCount":"0","firstMatchRef":"No matching transfers."})
+PASS  tenant-b: with the bank's 503 on -> business_outcome BANK_UNAVAILABLE (got {"status":"business_outcome","code":"BANK_UNAVAILABLE"})
+PASS  tenant-c: transfer status is success (got success)
+PASS  tenant-c: exactly one ledger row with memo "rote-evidence-tenant-c" (got 1)
+PASS  tenant-c: confirmationRef TXN-000003 == ledger row id TXN-000003
+PASS  tenant-c: lookup status success and matchingCount "1" (got 1)
+PASS  tenant-c: lookup firstMatchRef TXN-000003 == ledger row id TXN-000003
+PASS  tenant-c: no-match lookup -> matchingCount "0", firstMatchRef "No matching transfers." (got {"matchingCount":"0","firstMatchRef":"No matching transfers."})
+PASS  tenant-c: with the bank's 503 on -> business_outcome BANK_UNAVAILABLE (got {"status":"business_outcome","code":"BANK_UNAVAILABLE"})
+PASS  tenant-a: a memo used twice -> matchingCount "2", firstMatchRef = the first row TXN-000004 (got {"matchingCount":"2","firstMatchRef":"TXN-000004"})
+PASS  tenant-a: behind a 60 s history lag the new row (TXN-000006, in the oracle's ledger) is not shown: count "0" (got {"matchingCount":"0","firstMatchRef":"No matching transfers."})
+PASS  tenant-a: lag off -> count "1", firstMatchRef TXN-000006 (got {"matchingCount":"1","firstMatchRef":"TXN-000006"})
+
+RESULT: PASS
