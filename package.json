@@ -20,6 +20,7 @@
     "evidence:queue": "tsx scripts/evidence-queue.ts",
     "evidence:day1": "tsx scripts/evidence-day1-exit.ts",
     "oracle": "tsx src/cli/index.ts oracle check",
+    "jobs": "tsx src/cli/index.ts jobs",
     "chaos": "tsx scripts/chaos.ts",
     "crash-matrix": "tsx scripts/crash-matrix.ts",
     "worker": "tsx src/worker/main.ts",

@@ -123,17 +123,25 @@ describe("the fenced commit intent (T3) in a running worker", () => {
     expect(a).toMatchObject({ outcome: "lease_lost", commit_uncertain: false, commit_intent_at: null });
   }, 60_000);
 
-  it("T3 fails with anything but a FencingError (COMMIT result unknown): no click, 0 rows, and the attempt is treated as 'may have committed' (needs_human, interim)", async () => {
+  it("T3 fails with anything but a FencingError (COMMIT result unknown): no click; the attempt 'may have committed', so verify (T5) looks: [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row", async () => {
     const [job] = await env.enqueueTransfers(1, {}, ["tenant-a"]);
     const done: JobDone[] = [];
+    let first = true;
     const worker = workerMeddlingBeforeIntent(async () => {
+      if (!first) return;
+      first = false;
       throw new Error("Connection terminated unexpectedly"); // what pg says when the link drops mid-COMMIT
     }, done);
     expect(await worker.tick()).toBe("ran");
-    expect(done[0]!.recorded).toBe(true);
-    expect((await env.jobs())[0]).toMatchObject({ id: job!.id, state: "needs_human", outcome: "commit_uncertain", attempt: 1 });
+    expect(done[0]!).toMatchObject({ recorded: true, outcome: { state: "verifying", outcome: "commit_uncertain" } });
+    // The same tick verified it: two 0-match lookups, then the one retry after an intent there is.
+    expect((await env.jobs())[0]).toMatchObject({ id: job!.id, state: "queued", attempt: 1, commit_intent_at: null });
+    const [phase] = (await env.pool.query("SELECT reason, prior_status, decision, lookups FROM job_verifications WHERE job_id = $1", [job!.id])).rows;
+    expect(phase).toEqual({ reason: "commit_uncertain", prior_status: null, decision: "resubmitted", lookups: [0, 0] });
     expect(await env.ledger()).toHaveLength(0);
-    expect(await worker.tick()).toBe("idle"); // never retried blindly
+    expect(await worker.tick()).toBe("ran");
+    expect((await env.jobs())[0]).toMatchObject({ state: "succeeded", outcome: "success", attempt: 2 });
+    expect(await env.ledger()).toHaveLength(1);
   }, 60_000);
 
   it("lease expired before Submit but nobody recovered it: T3 refuses (no click); the worker's own requeue is recorded; attempt 2 succeeds; exactly 1 row", async () => {
@@ -175,14 +183,20 @@ describe("recovery (T6) in a running worker's loop", () => {
     expect(await env.ledger()).toHaveLength(1);
   }, 60_000);
 
-  it("a dead worker's expired `committing` job is escalated (T6.3, Step 8 interim) and never re-run: needs_human, 0 rows, nothing to dequeue", async () => {
+  it("Step 9: a dead worker's expired `committing` job (intent written, no click) is claimed to verify (T6.4): [0, 0] -> resubmitted -> attempt 2 succeeds, exactly 1 row", async () => {
     const [job] = await env.enqueueTransfers(1, {}, ["tenant-a"]);
     const dead = await dequeue(env.pool, { workerId: "dead-worker", leaseSeconds: 30 });
     await writeCommitIntent(env.pool, { jobId: dead!.id, fencingToken: dead!.fencing_token, workerId: "dead-worker", leaseSeconds: 30 });
     await env.pool.query("UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", [job!.id]);
     const worker = env.newWorker();
-    expect(await worker.tick()).toBe("idle");
-    expect((await env.jobs())[0]).toMatchObject({ id: job!.id, state: "needs_human", outcome: "commit_uncertain", attempt: 1, fencing_token: 2 });
-    expect(await env.ledger()).toHaveLength(0);
+    expect(await worker.tick()).toBe("ran"); // the claim to verify was this iteration's work
+    expect((await env.jobs())[0]).toMatchObject({ id: job!.id, state: "queued", attempt: 1, fencing_token: 2, commit_intent_at: null });
+    expect(await worker.tick()).toBe("ran");
+    expect((await env.jobs())[0]).toMatchObject({ state: "succeeded", attempt: 2 });
+    expect((await attempts(job!.id)).map((a) => [a.worker_id, a.outcome])).toEqual([
+      ["dead-worker", "crashed"],
+      [expect.stringMatching(/^test-worker-/), "success"],
+    ]);
+    expect(await env.ledger()).toHaveLength(1);
   }, 60_000);
 });

@@ -37,15 +37,15 @@ describe("jobOutcomeFor (step-06 section 2)", () => {
     expect(o.error).toContain("NO_SUCH_RECIPIENT");
   });
 
-  it("business_outcome WITH commitUncertain -> needs_human / commit_uncertain, never retried", () => {
+  it("Step 9: business_outcome WITH commitUncertain -> verifying (T5), prior_status business_outcome, never retried blindly", () => {
     const o = jobOutcomeFor({ kind: "result", result: { ...business, commitUncertain: CU } }, first);
-    expect(o).toMatchObject({ state: "needs_human", outcome: "commit_uncertain", attemptOutcome: "business_outcome", commitUncertain: true });
-    expect(o.error).toMatch(/commit uncertain \(not retried\)/);
+    expect(o).toMatchObject({ state: "verifying", outcome: "commit_uncertain", attemptOutcome: "business_outcome", commitUncertain: true, priorStatus: "business_outcome" });
+    expect(o.error).toMatch(/commit uncertain \(not retried blindly\): .*Verifying in the bank's history by memo_key \(T5\)/);
   });
 
-  it("failure WITH commitUncertain -> needs_human / commit_uncertain, never retried, even with attempts left", () => {
+  it("Step 9: failure WITH commitUncertain -> verifying (T5), never retried blindly, even with attempts left", () => {
     const o = jobOutcomeFor({ kind: "result", result: { ...failure, commitUncertain: CU } }, first);
-    expect(o).toMatchObject({ state: "needs_human", outcome: "commit_uncertain", attemptOutcome: "failure", commitUncertain: true });
+    expect(o).toMatchObject({ state: "verifying", outcome: "commit_uncertain", attemptOutcome: "failure", commitUncertain: true, priorStatus: "failure" });
     expect(o.result).toMatchObject({ commitUncertain: CU });
   });
 
@@ -54,9 +54,9 @@ describe("jobOutcomeFor (step-06 section 2)", () => {
     expect(o).toMatchObject({ state: "needs_human", outcome: "needs_human", attemptOutcome: "needs_human", commitUncertain: false });
   });
 
-  it("needs_human carrying commitUncertain (defensive) -> commit_uncertain, so Day 2's sweep finds it", () => {
+  it("needs_human carrying commitUncertain (defensive) -> verifying (T5) too", () => {
     const o = jobOutcomeFor({ kind: "result", result: { ...needsHuman, commitUncertain: CU } }, first);
-    expect(o).toMatchObject({ state: "needs_human", outcome: "commit_uncertain", commitUncertain: true });
+    expect(o).toMatchObject({ state: "verifying", outcome: "commit_uncertain", commitUncertain: true, priorStatus: "needs_human" });
   });
 
   it("failure without commitUncertain, attempts left -> queued (retry), no terminal outcome", () => {
@@ -83,10 +83,10 @@ describe("jobOutcomeFor (step-06 section 2)", () => {
     expect(jobOutcomeFor(thrown, last)).toMatchObject({ state: "failed", outcome: "failure" });
   });
 
-  it("threw AFTER the irreversible step started -> needs_human / commit_uncertain, never retried", () => {
+  it("threw AFTER the irreversible step started -> verifying (T5), prior_status null, never retried blindly", () => {
     const thrown = { kind: "thrown" as const, error: new Error("browser crashed"), aborted: false };
     const o = jobOutcomeFor(thrown, { ...first, irreversibleStarted: true });
-    expect(o).toMatchObject({ state: "needs_human", outcome: "commit_uncertain", attemptOutcome: "failure", commitUncertain: true });
+    expect(o).toMatchObject({ state: "verifying", outcome: "commit_uncertain", attemptOutcome: "failure", commitUncertain: true, priorStatus: null });
   });
 
   it("aborted by shutdown: before the irreversible step -> requeue (attempt counted) / failed 'aborted' when exhausted", () => {
@@ -95,10 +95,10 @@ describe("jobOutcomeFor (step-06 section 2)", () => {
     expect(jobOutcomeFor(aborted, last)).toMatchObject({ state: "failed", outcome: "aborted", attemptOutcome: "aborted" });
   });
 
-  it("aborted by shutdown AFTER the irreversible step started -> needs_human / commit_uncertain", () => {
+  it("aborted by shutdown AFTER the irreversible step started -> verifying (T5)", () => {
     const aborted = { kind: "thrown" as const, error: new DOMException("shutdown", "AbortError"), aborted: true };
     expect(jobOutcomeFor(aborted, { ...first, irreversibleStarted: true })).toMatchObject({
-      state: "needs_human",
+      state: "verifying",
       outcome: "commit_uncertain",
       attemptOutcome: "aborted",
       commitUncertain: true,

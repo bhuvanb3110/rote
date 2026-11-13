@@ -227,6 +227,37 @@ describe("0002_day2: the recovery index, job_attempts.commit_intent_at, job_veri
   });
 });
 
+describe("0003_verify: the Step 9 values and the open/ended rule on job_verifications", () => {
+  const insert = (jobId: unknown, cols: Record<string, unknown>) => {
+    const row = { job_id: jobId, fencing_token: 3, worker_id: "w", reason: "lease_expired_in_committing", ...cols };
+    const names = Object.keys(row);
+    return pool.query(
+      `INSERT INTO job_verifications (${names.join(", ")}) VALUES (${names.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING *`,
+      names.map((n) => (row as Record<string, unknown>)[n]),
+    );
+  };
+
+  it("accepts reason 'resumed' and decisions 'deferred', 'handed_off', 'illegal_transition' (each ended)", async () => {
+    const job = await insertJob();
+    let token = 1;
+    for (const decision of ["deferred", "handed_off", "illegal_transition"]) {
+      const reason = decision === "handed_off" ? "commit_uncertain" : "resumed";
+      const { rows } = await insert(job.id, { fencing_token: token++, reason, decision, ended_at: new Date(Date.now() + 1000), lookups: [null] });
+      expect(rows[0]).toMatchObject({ reason, decision });
+    }
+  });
+
+  it("job_verifications_decided_has_end: a decision needs an end, an end needs a decision", async () => {
+    const job = await insertJob();
+    expect(await rejection(insert(job.id, { decision: "deferred" }))).toEqual({ code: "23514", constraint: "job_verifications_decided_has_end" });
+    expect(await rejection(insert(job.id, { fencing_token: 4, ended_at: new Date(Date.now() + 1000) }))).toEqual({
+      code: "23514",
+      constraint: "job_verifications_decided_has_end",
+    });
+    await insert(job.id, { fencing_token: 5 }); // open: neither
+  });
+});
+
 describe("Zod row schemas parse real rows", () => {
   it("JobRowSchema and AttemptRowSchema accept rows straight from SELECT *", async () => {
     const job = await insertJob();

@@ -36,6 +36,7 @@ SET state = $4, outcome = $5, error = $6, result = $7::jsonb,
     lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
 WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3
   AND (state = 'running' OR (state = 'committing' AND $4 IN ('succeeded', 'needs_human')))
+  AND $4 IN ('succeeded', 'business_outcome', 'failed', 'needs_human', 'queued')
 RETURNING id`;
 
 export const END_ATTEMPT_SQL = `
@@ -103,6 +104,8 @@ export type CompletionResult =
 
 export async function completeJob(pool: Pool, input: CompleteInput): Promise<CompletionResult> {
   const { outcome } = input;
+  // A run that may have committed is moved into verify by T5 (src/worker/verifySql.ts), never by T4.
+  if (outcome.state === "verifying") throw new Error("completeJob (T4) never writes verifying: use completeIntoVerify (T5)");
   return withTransaction(pool, async (client) => {
     const updated = await client.query(COMPLETE_JOB_SQL, [
       input.jobId,

@@ -115,8 +115,9 @@ describe("completeJob (fenced)", () => {
     expect(a.error).toMatch(/^illegal_transition: T4 refused queued\/requeue/);
     // Its lease expires and recovery handles it (the next transition bumps the token).
     await pool.query("UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", [job.id]);
-    const recovered = await recoverOne(pool, { workerId: "w2" });
-    expect(recovered).toMatchObject({ jobId: job.id, from: "committing", previousToken: 1, fencingToken: 2 });
+    const recovered = await recoverOne(pool, { workerId: "w2", leaseSeconds: 300 });
+    // Step 9: an expired commit is claimed to verify (T6.4), never parked.
+    expect(recovered).toMatchObject({ jobId: job.id, from: "committing", previousToken: 1, fencingToken: 2, action: { label: "T6.4" } });
     // The attempt row keeps the bug's label (recovery closes only open attempt rows).
     expect((await attempts(job.id))[0].outcome).toBe("illegal_transition");
   });
@@ -177,13 +178,13 @@ describe("completeJob (fenced)", () => {
     expect((await attempts(job.id))[0].ended_at).toBeNull();
   });
 
-  it("commit_uncertain is recorded on the job and the attempt", async () => {
+  it("Step 9: a commit_uncertain outcome is T5's (into verify), never T4's: completeJob refuses it before touching the database", async () => {
     const job = await leasedJob();
     const cu = { ...failure, commitUncertain: { irreversibleStepId: "step-11", detail: "write-then-error" } };
     const outcome = jobOutcomeFor({ kind: "result", result: cu }, { attempt: 1, maxAttempts: 3, irreversibleStarted: true });
-    await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome });
-    expect(await row(job.id)).toMatchObject({ state: "needs_human", outcome: "commit_uncertain" });
-    expect((await attempts(job.id))[0]).toMatchObject({ outcome: "failure", commit_uncertain: true });
+    expect(outcome.state).toBe("verifying");
+    await expect(completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome })).rejects.toThrow(/never writes verifying/);
+    expect(await row(job.id)).toMatchObject({ state: "running", lease_owner: "w1" });
   });
 });
 

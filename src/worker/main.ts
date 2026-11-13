@@ -13,6 +13,11 @@
 //   ROTE_WORKER_ID           [<hostname>-<pid>-<4 hex>]  (hostname = container id in Docker)
 //   ROTE_LEASE_SECONDS       [30]    the lease (D36); every dequeue, heartbeat and commit intent sets now() + this
 //   ROTE_HEARTBEAT_SECONDS   [10]    heartbeat interval; refused unless heartbeat * 2 < lease
+//   ROTE_VERIFY_SETTLE_MS    [5000]  verify: wait this long after a 0-match lookup before looking again.
+//                                    MUST exceed the bank's history visibility delay (D47)
+//   ROTE_VERIFY_DEFER_BUDGET_SECONDS  [600]  verify: give up deferring (bank unavailable) this long
+//                                    after the first deferral -> needs_human / verify_unavailable (D44)
+//   ROTE_VERIFY_DEFER_BACKOFF_SECONDS [5]    verify: first backoff after a deferral; doubles, capped at 60 s
 //   ROTE_SHUTDOWN_GRACE_MS   [30000]
 //   ROTE_EVIDENCE_DIR        [<tmpdir>/rote-worker-evidence]  never the repo's evidence/
 //   ROTE_BANK_FORWARD        [unset]  e.g. bank:4100 -> forward 127.0.0.1:4100 there
@@ -39,6 +44,8 @@ import { createFaultInjector, parseFaultConfig } from "./fault.js";
 import { DEFAULT_HEARTBEAT_SECONDS, DEFAULT_LEASE_SECONDS, validateLeaseTiming } from "./heartbeat.js";
 import { runJob } from "./runJob.js";
 import { InMemoryCounters } from "./metrics.js";
+import { DEFAULT_VERIFY_SETTLE_MS, runVerifyPhase } from "./verify.js";
+import { DEFAULT_DEFER_CONFIG, type DeferConfig } from "../fleet/stateMachine.js";
 
 const log = pino({ base: { service: "worker" } });
 
@@ -75,6 +82,13 @@ async function main(): Promise<void> {
   const heartbeatSeconds = intEnv("ROTE_HEARTBEAT_SECONDS", DEFAULT_HEARTBEAT_SECONDS);
   validateLeaseTiming(leaseSeconds, heartbeatSeconds); // refuse to start on a lease one missed beat could lose
   const shutdownGraceMs = intEnv("ROTE_SHUTDOWN_GRACE_MS", 30_000);
+  const settleMs = intEnv("ROTE_VERIFY_SETTLE_MS", DEFAULT_VERIFY_SETTLE_MS);
+  const backoffBase = intEnv("ROTE_VERIFY_DEFER_BACKOFF_SECONDS", DEFAULT_DEFER_CONFIG.backoffBaseSeconds);
+  const defer: DeferConfig = {
+    budgetSeconds: intEnv("ROTE_VERIFY_DEFER_BUDGET_SECONDS", DEFAULT_DEFER_CONFIG.budgetSeconds),
+    backoffBaseSeconds: Math.max(1, backoffBase),
+    backoffCapSeconds: Math.max(backoffBase, DEFAULT_DEFER_CONFIG.backoffCapSeconds),
+  };
   const evidenceBaseDir = process.env.ROTE_EVIDENCE_DIR || path.join(os.tmpdir(), "rote-worker-evidence");
   const healthFile = process.env.ROTE_HEALTH_FILE;
   const dbUrl = databaseUrlFromEnv();
@@ -131,10 +145,12 @@ async function main(): Promise<void> {
 
   if (faultPoint) log.warn({ workerId, faultPoint }, "worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)");
   log.info(
-    { workerId, playwrightVersion, leaseSeconds, heartbeatSeconds, shutdownGraceMs, evidenceBaseDir, db: redactDatabaseUrl(dbUrl), tenants },
+    { workerId, playwrightVersion, leaseSeconds, heartbeatSeconds, shutdownGraceMs, settleMs, defer, evidenceBaseDir, db: redactDatabaseUrl(dbUrl), tenants },
     "worker: ready",
   );
 
+  // In-process counters (illegal_transitions_total, verify_decisions_total); Day 3 exports them (D41).
+  const metrics = new InMemoryCounters();
   worker = new Worker({
     pool,
     workerId,
@@ -145,11 +161,19 @@ async function main(): Promise<void> {
     redact,
     log,
     fault,
+    metrics,
     runJob: (job, options) => runJob({ credentials, evidenceBaseDir, fault }, job, options),
-    // In-process counters (illegal_transitions_total, ...); Day 3 exports them (D41).
-    metrics: new InMemoryCounters(),
-    // Seam 4: every loop iteration recovers up to 10 expired leases before it dequeues (T6, D38).
-    beforeDequeue: createRecoverySweep({ pool, workerId, log }),
+    // Step 9: a job that may have committed is verified in the bank's history (T5/T6.4-T6.7 -> T7/T8).
+    verify: (claim, controller, hardSignal) =>
+      runVerifyPhase(
+        { pool, workerId, leaseSeconds, heartbeatSeconds, settleMs, defer, getBrowser, credentials, evidenceBaseDir, fault, log, metrics, redact },
+        claim,
+        controller,
+        hardSignal,
+      ),
+    // Seam 4: every loop iteration recovers up to 10 expired leases before it dequeues (T6, D38); a
+    // claim to verify (T6.4/T6.5/T6.7) is the iteration's work.
+    beforeDequeue: createRecoverySweep({ pool, workerId, leaseSeconds, log, fault }),
     onTick: healthFile
       ? () => {
           writeFile(healthFile, new Date().toISOString()).catch(() => undefined);

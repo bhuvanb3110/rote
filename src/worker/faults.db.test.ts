@@ -1,6 +1,6 @@
 // Worker fault handling (step-06 section 8): a failure before Submit is retried, a write-then-error is
-// parked as commit_uncertain and never retried, graceful shutdown finishes or aborts the in-flight
-// job, and a Postgres blip never kills the worker.
+// verified in the bank's history and never retried blindly (Step 9; Steps 6-8 parked it), graceful
+// shutdown finishes or aborts the in-flight job, and a Postgres blip never kills the worker.
 import net from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createPool } from "../queue/index.js";
@@ -50,21 +50,23 @@ describe("worker faults", () => {
     expect(await env.ledger()).toHaveLength(1);
   }, 60_000);
 
-  it("errors/after-write (bank commits, then errors) -> needs_human / commit_uncertain on attempt 1; exactly 1 row; never retried", async () => {
+  it("Step 9: errors/after-write (bank commits, then errors) -> commit uncertain -> verify (T5) [1] -> succeeded / already_done on attempt 1; confirmationRef = the row's id; exactly 1 row; never retried", async () => {
     const [job] = await env.enqueueTransfers(1);
     const worker = env.newWorker();
     await env.control("errors/after-write");
-    expect(await worker.tick()).toBe("ran");
+    expect(await worker.tick()).toBe("ran"); // the run, T5, and the verify, in one tick
     await env.control("errors/off");
     expect(await worker.tick()).toBe("idle"); // nothing to retry
 
     const [row] = await env.jobs();
-    expect(row).toMatchObject({ id: job!.id, state: "needs_human", outcome: "commit_uncertain", attempt: 1 });
-    expect(row!.result).toMatchObject({ commitUncertain: { irreversibleStepId: "step-11" } });
-    expect((await attempts(job!.id))[0]).toMatchObject({ commit_uncertain: true });
     const ledger = await env.ledger();
     expect(ledger).toHaveLength(1);
     expect(ledger[0]!.memo).toBe(job!.memo_key);
+    expect(row).toMatchObject({ id: job!.id, state: "succeeded", outcome: "already_done", attempt: 1 });
+    expect(row!.result).toMatchObject({ status: "success", outputs: { confirmationRef: ledger[0]!.id }, recoveredBy: "verify" });
+    expect((await attempts(job!.id))[0]).toMatchObject({ outcome: "failure", commit_uncertain: true });
+    const phases = (await env.pool.query("SELECT reason, prior_status, decision, lookups FROM job_verifications WHERE job_id = $1", [job!.id])).rows;
+    expect(phases).toEqual([{ reason: "commit_uncertain", prior_status: "failure", decision: "already_done", lookups: [1] }]);
   }, 60_000);
 
   it("graceful stop during a slow job: the job finishes and is recorded", async () => {

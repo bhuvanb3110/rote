@@ -12,10 +12,28 @@
 //   before-submit      onIrreversible.before (Day 2: after the commit intent)    (runJob)
 //   after-submit       onIrreversible.after: the bank has answered the click     (runJob)
 //   before-complete    outcome computed, completion transaction not started      (Worker.process)
-//   after-complete     the completion transaction committed                      (Worker.process)
+//   after-complete     the completion transaction (T4, or T5 into verify) committed (Worker.process)
+// Recovery-internal points (Step 9, step-08 section 9's second table), fired in the RECOVERING worker:
+//   verify-after-login     the lookup's step-03 (credentials submitted)           (verify.ts onStep)
+//   verify-after-count     the lookup's step-09 (count read, not yet acted on)    (verify.ts onStep)
+//   verify-before-result   a decision computed, T7/T8 not started                  (verify.ts)
+//   verify-before-requeue  the decision is "resubmitted", T7 not started           (verify.ts)
+//   verify-after-requeue   T7 (queued) committed                                   (verify.ts)
+//   recover-in-transaction inside T6 after the claim's writes, before COMMIT       (recover.ts)
 import { writeSync } from "node:fs";
 
-export const FAULT_POINT_RE = /^(after-dequeue|after-step-\d{2}|before-submit|after-submit|before-complete|after-complete)$/;
+export const FAULT_POINT_RE =
+  /^(after-dequeue|after-step-\d{2}|before-submit|after-submit|before-complete|after-complete|verify-after-login|verify-after-count|verify-before-result|verify-before-requeue|verify-after-requeue|recover-in-transaction)$/;
+
+/** The recovery-internal points (fired by the worker that recovers or verifies the job). */
+export const RECOVERY_FAULT_POINTS = [
+  "verify-after-login",
+  "verify-after-count",
+  "verify-before-result",
+  "verify-before-requeue",
+  "verify-after-requeue",
+  "recover-in-transaction",
+] as const;
 
 /** The transfer's boundaries, in order (12 steps; step-11 is Submit, step-12 reads the reference). */
 export const TRANSFER_FAULT_POINTS = [

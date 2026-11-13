@@ -1,10 +1,13 @@
 // The worker's poll loop (docs/plans/step-06.md sections 1 and 6; Day 2: docs/plans/step-08.md):
 //
 //   while not stopping:
-//     beforeDequeue()                 # seam 4: expired-lease recovery (T6) runs HERE
+//     claim = beforeDequeue()         # seam 4: expired-lease recovery (T6) runs HERE
+//     if claim: verify it (T6.4/T6.5/T6.7 handed this worker a job to verify); that is the iteration
 //     job = dequeue(...)              # transient DB error -> log, back off (cap 5 s), never exit
 //     if none: sleep(poll backoff)    # 100 ms base, x2, cap 2 s, full jitter
 //     heartbeat (T2) while it runs; run it; record it (T4, fenced; retried while Postgres is down)
+//     ... or, if it may have committed, move it into this worker's own verify phase (T5) and verify
+//     it at once (src/worker/verify.ts: lookups, settle, T7 / T8)
 //
 // The heartbeat (heartbeatSeconds; Compose: 10 s against a 30 s lease) extends the lease on the
 // database clock. When it finds the lease gone it aborts the run with a LeaseLostError: runReplay
@@ -29,6 +32,9 @@ import type { RunJobOptions, RunJobResult } from "./runJob.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
 import { NO_METRICS, type WorkerMetrics } from "./metrics.js";
 import type { FencedOutReason } from "./complete.js";
+import type { VerifyClaim } from "./recover.js";
+import type { VerifyPhaseOutcome } from "./verify.js";
+import { completeIntoVerify } from "./verifySql.js";
 
 export interface WorkerLogger {
   info(obj: Record<string, unknown>, msg: string): void;
@@ -79,8 +85,18 @@ export interface WorkerOptions {
   onJobDone?: (done: JobDone) => void;
   /** Test-only crash points after-dequeue / before-complete / after-complete (fault.ts, D34). */
   fault?: FaultInjector;
-  /** Seam 4: expired-lease recovery (createRecoverySweep, T6). The entrypoint always sets it. */
-  beforeDequeue?: () => Promise<void>;
+  /**
+   * Seam 4: expired-lease recovery (createRecoverySweep, T6). The entrypoint always sets it. Resolves
+   * with a job it claimed to verify (T6.4/T6.5/T6.7), which is then this iteration's work.
+   */
+  beforeDequeue?: () => Promise<VerifyClaim | null | void>;
+  /**
+   * Runs one verify phase (src/worker/verify.ts runVerifyPhase) on a job this worker holds in
+   * `verifying` (after T5, or a recovery claim). The entrypoint always sets it. Without it, a
+   * commit-uncertain run still goes through T5 and the job waits for a verifier's recovery.
+   */
+  verify?: (claim: VerifyClaim, controller: AbortController, hardSignal: AbortSignal) => Promise<VerifyPhaseOutcome>;
+  onVerifyDone?: (done: VerifyPhaseOutcome) => void;
   /** Counters (illegal_transitions_total, ...); Day 3 exports them. Default: not counted. */
   metrics?: WorkerMetrics;
 }
@@ -132,9 +148,13 @@ export class Worker {
     this.current?.controller.abort(new ShutdownAbortError());
   }
 
-  /** One iteration: dequeue at most one job and run + record it. */
+  /** One iteration: verify a job recovery just claimed, or dequeue at most one job and run + record it. */
   async tick(): Promise<TickResult> {
-    await this.options.beforeDequeue?.();
+    const claim = await this.options.beforeDequeue?.();
+    if (claim) {
+      await this.verifyPhase(claim);
+      return "ran";
+    }
     let job: JobRow | null;
     try {
       job = await dequeue(this.options.pool, { workerId: this.options.workerId, leaseSeconds: this.options.leaseSeconds });
@@ -255,6 +275,11 @@ export class Worker {
       // Replay already redacts its result; this is the belt to that braces (credential values only).
       const outcome: JobOutcome = { ...computed, result: computed.result && redactDeep(computed.result, this.options.redact) };
       fault.at("before-complete"); // outcome computed, completion transaction not started
+      if (outcome.state === "verifying") {
+        // The run may have committed: T5 moves the job into THIS worker's verify phase (never T4).
+        await this.completeIntoVerifyAndVerify(job, outcome, log, started);
+        return;
+      }
       const completion = await completeJobWithRetry(
         this.options.pool,
         { jobId: job.id, fencingToken: job.fencing_token, workerId: this.options.workerId, outcome },
@@ -282,6 +307,77 @@ export class Worker {
       heartbeat?.stop();
       if (this.current?.graceTimer) clearTimeout(this.current.graceTimer);
       this.current = null;
+    }
+  }
+
+  /** T5, then (if it moved the job) this worker's verify phase on the new token. */
+  private async completeIntoVerifyAndVerify(
+    job: JobRow,
+    outcome: JobOutcome,
+    log: Record<string, unknown>,
+    started: number,
+  ): Promise<void> {
+    const fault = this.options.fault ?? NO_FAULT;
+    const moved = await retryTransient(
+      () =>
+        completeIntoVerify(this.options.pool, {
+          jobId: job.id,
+          fencingToken: job.fencing_token,
+          workerId: this.options.workerId,
+          leaseSeconds: this.options.leaseSeconds,
+          outcome,
+        }),
+      {
+        signal: this.hard.signal,
+        random: this.options.random,
+        onTransientError: (err, n) =>
+          this.log.warn({ ...log, err: this.describe(err), retry: n }, "worker: Postgres unavailable while moving the job into verify; retrying"),
+      },
+    );
+    if (moved?.recorded) fault.at("after-complete"); // T5 committed
+    const recorded = moved === null ? null : moved.recorded;
+    const fencedOut = moved && !moved.recorded ? moved.reason : undefined;
+    const fields = { ...log, state: outcome.state, outcome: outcome.outcome, error: outcome.error, recorded, ms: Date.now() - started };
+    if (moved?.recorded) this.log.info({ ...fields, fencingToken: moved.fencingToken }, "worker: commit uncertain; verifying (T5)");
+    else if (moved && !moved.recorded && moved.reason === "illegal_transition") {
+      (this.options.metrics ?? NO_METRICS).inc("illegal_transitions_total");
+      this.log.error({ ...fields, illegal_transition: true, detail: moved.detail }, "worker: illegal_transition: T5 refused (a bug); job left for recovery");
+    } else if (recorded === false) this.log.warn(fields, "worker: lease lost; the job was not moved into verify (recovery verifies it)");
+    else this.log.error(fields, "worker: stopped before T5 could be recorded; the job is recovered after its lease expires");
+    this.options.onJobDone?.({ job, outcome, recorded, fencedOut, durationMs: Date.now() - started });
+    if (!moved?.recorded) return;
+    if (this.current?.graceTimer) clearTimeout(this.current.graceTimer);
+    this.current = null;
+    await this.verifyPhase({
+      job: { id: job.id, tenant_id: job.tenant_id, params: job.params, memo_key: job.memo_key, attempt: job.attempt, max_attempts: job.max_attempts },
+      fencingToken: moved.fencingToken,
+      label: "T5",
+      priorStatus: outcome.priorStatus ?? null,
+    });
+  }
+
+  /** One verify phase on a job this worker holds in `verifying`, abortable by stop() like a job. */
+  private async verifyPhase(claim: VerifyClaim): Promise<void> {
+    if (!this.options.verify) {
+      this.log.error(
+        { workerId: this.options.workerId, jobId: claim.job.id, label: claim.label },
+        "worker: holds a job to verify but has no verifier; its lease expires and another worker's recovery re-verifies it",
+      );
+      return;
+    }
+    const controller = new AbortController();
+    const current: { controller: AbortController; graceTimer?: NodeJS.Timeout } = { controller };
+    this.current = current;
+    if (this.stopping) {
+      // Stopping already: the verify gets the same grace as a job would.
+      current.graceTimer = setTimeout(() => controller.abort(new ShutdownAbortError()), this.options.shutdownGraceMs ?? 30_000);
+    }
+    try {
+      const done = await this.options.verify(claim, controller, this.hard.signal);
+      this.options.onVerifyDone?.(done);
+    } finally {
+      if (current.graceTimer) clearTimeout(current.graceTimer);
+      if (this.current === current) this.current = null;
     }
   }
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { Command } from "commander";
 import pino from "pino";
@@ -13,6 +14,8 @@ import { createCatalogApp, findCapability, invokeCapability, listCapabilities, D
 import { approvalKeyWithOverrides, approveCapability, readRunConfidence } from "../confidence/index.js";
 import { createPool, databaseUrlFromEnv, migrate, redactDatabaseUrl } from "../queue/index.js";
 import { collectAndCheck, DEFAULT_BANK_URL, oracleJson, readJobIdsFile } from "../oracle/index.js";
+import { reverifyJob } from "../worker/verifySql.js";
+import { REVERIFIABLE_OUTCOMES } from "../fleet/stateMachine.js";
 
 const logger = pino();
 const program = new Command();
@@ -423,6 +426,48 @@ dbCommand
     } catch (err) {
       logger.error({ err, database: redactDatabaseUrl(url) }, "db migrate: failed");
       process.exitCode = 1;
+    } finally {
+      await pool.end();
+    }
+  });
+
+const jobsCommand = program.command("jobs").description("Operate on fleet jobs in Postgres (ROTE_DATABASE_URL)");
+
+jobsCommand
+  .command("reverify <id>")
+  .description(
+    "Hand ONE needs_human job that could not be decided (commit_uncertain, unreadable, verify_unavailable, " +
+      "verify_exhausted) back to verify: it becomes verifying with an expired lease, and the next worker's " +
+      "recovery reads the bank's history for its memo_key (T6.7). Never automatic; one job, by id.",
+  )
+  .option("--tenant <tenant>", "only if the job belongs to this tenant")
+  .option("--by <name>", "who asked (recorded on the job and its verification row)", `reverify:${os.hostname()}`)
+  .option("--database-url <url>", "Postgres URL (default: ROTE_DATABASE_URL or the Compose dev database)")
+  .action(async (id: string, opts: { tenant?: string; by: string; databaseUrl?: string }) => {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      logger.error({ id }, "jobs reverify: not a job id (a uuid)");
+      process.exitCode = 2;
+      return;
+    }
+    const url = opts.databaseUrl ?? databaseUrlFromEnv();
+    const pool = createPool({ connectionString: url, max: 1 });
+    try {
+      const res = await reverifyJob(pool, { jobId: id, tenant: opts.tenant, who: opts.by });
+      if (res.moved) {
+        logger.info({ jobId: id, fencingToken: res.fencingToken, priorStatus: res.priorStatus, by: opts.by }, "jobs reverify: handed to verify; the next worker's recovery verifies it");
+      } else if (res.why === "not_found") {
+        logger.error({ jobId: id, tenant: opts.tenant }, "jobs reverify: no such job (for this tenant)");
+        process.exitCode = 1;
+      } else {
+        logger.error(
+          { jobId: id, state: res.state, outcome: res.outcome, reverifiable: ["needs_human with outcome", ...REVERIFIABLE_OUTCOMES] },
+          "jobs reverify: refused; only a needs_human job that could not be decided can be reverified",
+        );
+        process.exitCode = 1;
+      }
+    } catch (err) {
+      logger.error({ err, database: redactDatabaseUrl(url) }, "jobs reverify: could not run");
+      process.exitCode = 2;
     } finally {
       await pool.end();
     }

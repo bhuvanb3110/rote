@@ -18,6 +18,7 @@ import { createRedactor, loadTenantCredentials } from "./credentials.js";
 import { Worker, type WorkerOptions } from "./loop.js";
 import { runJob, type RunJobContext } from "./runJob.js";
 import { createRecoverySweep } from "./recover.js";
+import { runVerifyPhase, type VerifyContext } from "./verify.js";
 import { listenOnSafePort } from "../testing/listen.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -56,7 +57,7 @@ export interface WorkerTestEnv {
   credentials: ReturnType<typeof loadTenantCredentials>;
   control(route: string): Promise<void>;
   ledger(): Promise<LedgerRow[]>;
-  newWorker(overrides?: Partial<WorkerOptions> & { ctx?: Partial<RunJobContext> }): Worker;
+  newWorker(overrides?: Partial<WorkerOptions> & { ctx?: Partial<RunJobContext>; verifyCtx?: Partial<VerifyContext> }): Worker;
   enqueueTransfers(n: number, fields?: Record<string, string>, tenants?: string[]): Promise<JobRow[]>;
   jobs(): Promise<JobRow[]>;
   waitForTerminal(ids: string[], timeoutMs: number): Promise<JobRow[]>;
@@ -87,17 +88,23 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
   await Promise.all([artifactsDir, overridesDir, statusDir, evidenceBaseDir].map((d) => mkdir(d)));
 
   const transfer = await relaxedCopy("transfer", artifactsDir);
-  for (const tenant of Object.keys(TENANT_PREFIX)) {
-    const override = JSON.parse(await readFile(path.join(repo, "overrides", `transfer.${tenant}.json`), "utf8"));
-    override.entryUrl = `${baseUrl}${TENANT_PREFIX[tenant]}/`;
-    await writeFile(path.join(overridesDir, `transfer.${tenant}.json`), JSON.stringify(override));
+  // The verify's read-only lookup (Step 9), relaxed and approved the same way.
+  const lookup = await relaxedCopy("transfer-history-lookup", artifactsDir);
+  for (const id of ["transfer", "transfer-history-lookup"]) {
+    for (const tenant of Object.keys(TENANT_PREFIX)) {
+      const override = JSON.parse(await readFile(path.join(repo, "overrides", `${id}.${tenant}.json`), "utf8"));
+      override.entryUrl = `${baseUrl}${TENANT_PREFIX[tenant]}/`;
+      await writeFile(path.join(overridesDir, `${id}.${tenant}.json`), JSON.stringify(override));
+    }
   }
-  // Approves the relaxed copy AND the relaxed per-tenant overrides the jobs run with (D30).
-  await approveCapability("transfer", {
-    ...(await approvalKeyWithOverrides(transfer, overridesDir)),
-    statusDir,
-    reason: "test-only approval of the relaxed copy",
-  });
+  // Approves the relaxed copies AND the relaxed per-tenant overrides the jobs run with (D30).
+  for (const capability of [transfer, lookup]) {
+    await approveCapability(capability.id, {
+      ...(await approvalKeyWithOverrides(capability, overridesDir)),
+      statusDir,
+      reason: "test-only approval of the relaxed copy",
+    });
+  }
 
   const credentials = loadTenantCredentials(FAKE_ENV, Object.keys(TENANT_PREFIX), ["password", "username"]);
   const redact = createRedactor(credentials);
@@ -124,19 +131,45 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
     ledger,
     jobs,
     newWorker(overrides = {}) {
-      const { ctx: ctxOverrides, ...rest } = overrides;
+      const { ctx: ctxOverrides, verifyCtx, ...rest } = overrides;
       const runCtx = { ...ctx, ...ctxOverrides };
       const workerId = rest.workerId ?? `test-worker-${++seq}`;
+      const leaseSeconds = rest.leaseSeconds ?? 300;
+      const workerPool = rest.pool ?? pool;
       return new Worker({
         pool,
         workerId,
-        leaseSeconds: 300,
+        leaseSeconds,
         getBrowser: async () => browser,
         runJob: (job, options) => runJob(runCtx, job, options),
         redact,
         shutdownGraceMs: 30_000,
+        // Like the entrypoint: verify a job that may have committed (Step 9), with a short settle by
+        // default so tests do not wait 5 s for every 0-match lookup.
+        verify: (claim, controller, hardSignal) =>
+          runVerifyPhase(
+            {
+              pool: workerPool,
+              workerId,
+              leaseSeconds,
+              heartbeatSeconds: rest.heartbeatSeconds,
+              settleMs: 300,
+              getBrowser: async () => browser,
+              credentials,
+              evidenceBaseDir,
+              artifactsDir,
+              overridesDir,
+              statusDir: runCtx.statusDir,
+              redact,
+              fault: runCtx.fault,
+              ...verifyCtx,
+            },
+            claim,
+            controller,
+            hardSignal,
+          ),
         // Like the entrypoint: recover expired leases before every dequeue (T6).
-        beforeDequeue: createRecoverySweep({ pool: rest.pool ?? pool, workerId }),
+        beforeDequeue: createRecoverySweep({ pool: workerPool, workerId, leaseSeconds }),
         ...rest,
       });
     },

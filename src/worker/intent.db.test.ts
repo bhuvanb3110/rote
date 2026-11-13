@@ -143,10 +143,12 @@ describe("T4 widened: completion from committing", () => {
     expect(await row(job.id)).toMatchObject({ state: "succeeded", lease_owner: null, lease_expires_at: null });
   });
 
-  it("the live holder records needs_human / commit_uncertain from committing", async () => {
+  it("the live holder records needs_human / commit_uncertain from committing (T4 still allows it; since Step 9 jobOutcomeFor sends such runs to T5 instead)", async () => {
     const job = await leased();
     await writeCommitIntent(pool, args(job));
-    const outcome = jobOutcomeFor({ kind: "result", result: cuFailure }, { attempt: 1, maxAttempts: 3, irreversibleStarted: true });
+    const toVerify = jobOutcomeFor({ kind: "result", result: cuFailure }, { attempt: 1, maxAttempts: 3, irreversibleStarted: true });
+    expect(toVerify.state).toBe("verifying");
+    const outcome = { ...toVerify, state: "needs_human" as const };
     expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome })).toEqual({ recorded: true });
     expect(await row(job.id)).toMatchObject({ state: "needs_human", outcome: "commit_uncertain" });
     expect((await attempt(job.id)).commit_uncertain).toBe(true);
