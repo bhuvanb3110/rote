@@ -201,9 +201,10 @@ class CompleteCmd implements Cmd {
     const h = m.held[this.w]!;
     const { db: next, result } = modelComplete(m.db, { jobId: h.jobId, token: h.token, owner: this.w }, this.to, OUTCOMES[this.to].outcome);
     const outcome: JobOutcome = { state: this.to, ...OUTCOMES[this.to], error: null, result: null, commitUncertain: false };
-    let real: "recorded" | "fenced" | "check_violation";
+    let real: "recorded" | "fenced" | "illegal_transition" | "check_violation";
     try {
-      real = (await completeJob(r.pool, { jobId: h.jobId, fencingToken: h.token, workerId: this.w, outcome })).recorded ? "recorded" : "fenced";
+      const res = await completeJob(r.pool, { jobId: h.jobId, fencingToken: h.token, workerId: this.w, outcome });
+      real = res.recorded ? "recorded" : res.reason === "illegal_transition" ? "illegal_transition" : "fenced";
     } catch (err) {
       if (sqlState(err) !== "23514") throw err;
       real = "check_violation";

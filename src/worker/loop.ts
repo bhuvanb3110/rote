@@ -27,6 +27,8 @@ import { isTransientDbError } from "../queue/index.js";
 import { jobOutcomeFor, type JobOutcome } from "../fleet/stateMachine.js";
 import type { RunJobOptions, RunJobResult } from "./runJob.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
+import { NO_METRICS, type WorkerMetrics } from "./metrics.js";
+import type { FencedOutReason } from "./complete.js";
 
 export interface WorkerLogger {
   info(obj: Record<string, unknown>, msg: string): void;
@@ -49,6 +51,8 @@ export interface JobDone {
   outcome: JobOutcome;
   /** false: the lease was lost (nothing recorded on jobs); null: shutdown stopped the completion retry. */
   recorded: boolean | null;
+  /** Why a completion was not recorded: the lease was lost, or (a bug) the state guard refused it (D41). */
+  fencedOut?: FencedOutReason;
   durationMs: number;
 }
 
@@ -77,6 +81,8 @@ export interface WorkerOptions {
   fault?: FaultInjector;
   /** Seam 4: expired-lease recovery (createRecoverySweep, T6). The entrypoint always sets it. */
   beforeDequeue?: () => Promise<void>;
+  /** Counters (illegal_transitions_total, ...); Day 3 exports them. Default: not counted. */
+  metrics?: WorkerMetrics;
 }
 
 export type TickResult = "ran" | "idle" | "db-unavailable";
@@ -261,11 +267,17 @@ export class Worker {
       );
       if (completion?.recorded) fault.at("after-complete"); // the completion transaction committed
       const recorded = completion === null ? null : completion.recorded;
+      const fencedOut = completion && !completion.recorded ? completion.reason : undefined;
       const fields = { ...log, state: outcome.state, outcome: outcome.outcome, error: outcome.error, recorded, ms: Date.now() - started };
       if (recorded === true) this.log.info(fields, "worker: job recorded");
-      else if (recorded === false) this.log.warn(fields, "worker: lease lost; outcome NOT recorded on the job");
+      else if (completion && !completion.recorded && completion.reason === "illegal_transition") {
+        // A bug, not a lost lease (D41): the token is unchanged, so the state guard refused this
+        // worker's own request. Nothing is written to the job; its lease expires and recovery takes it.
+        (this.options.metrics ?? NO_METRICS).inc("illegal_transitions_total");
+        this.log.error({ ...fields, illegal_transition: true, detail: completion.detail }, "worker: illegal_transition: the state guard refused this completion (a bug); job left for recovery");
+      } else if (recorded === false) this.log.warn(fields, "worker: lease lost; outcome NOT recorded on the job");
       else this.log.error(fields, "worker: stopped before the outcome could be recorded; job stays running for recovery");
-      this.options.onJobDone?.({ job, outcome, recorded, durationMs: Date.now() - started });
+      this.options.onJobDone?.({ job, outcome, recorded, fencedOut, durationMs: Date.now() - started });
     } finally {
       heartbeat?.stop();
       if (this.current?.graceTimer) clearTimeout(this.current.graceTimer);

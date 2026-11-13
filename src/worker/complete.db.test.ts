@@ -1,10 +1,15 @@
 // The fenced completion (docs/plans/step-06.md section 3) against real Postgres.
+import type { Browser } from "playwright";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Capability } from "../artifact/index.js";
 import { dequeue, enqueue, type Pool } from "../queue/index.js";
 import { createTestSchema, resetQueueTables, type TestSchema } from "../queue/testDb.js";
 import { completeJob, completeJobWithRetry } from "./complete.js";
 import { jobOutcomeFor } from "../fleet/stateMachine.js";
+import { writeCommitIntent } from "./intent.js";
+import { recoverOne } from "./recover.js";
+import { Worker, type JobDone } from "./loop.js";
+import { InMemoryCounters } from "./metrics.js";
 
 const CAP = {
   id: "cap",
@@ -71,18 +76,94 @@ describe("completeJob (fenced)", () => {
     await pool.query("UPDATE jobs SET fencing_token = fencing_token + 1, lease_owner = 'w-new' WHERE id = $1", [job.id]);
     const before = await row(job.id);
     const outcome = jobOutcomeFor({ kind: "result", result: success }, { attempt: 1, maxAttempts: 3, irreversibleStarted: false });
-    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome })).toEqual({ recorded: false });
+    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome })).toMatchObject({
+      recorded: false,
+      reason: "lease_lost",
+    });
     expect(await row(job.id)).toEqual(before);
     const [a] = await attempts(job.id);
     expect(a.outcome).toBe("lease_lost");
     expect(a.error).toMatch(/NOT recorded on the job/);
   });
 
-  it("a different lease_owner with the same token is also refused", async () => {
+  it("a different lease_owner with the SAME token is refused too, and is a bug (token unchanged): illegal_transition, job untouched", async () => {
+    const job = await leasedJob();
+    const before = await row(job.id);
+    const outcome = jobOutcomeFor({ kind: "result", result: success }, { attempt: 1, maxAttempts: 3, irreversibleStarted: false });
+    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "someone-else", outcome })).toMatchObject({
+      recorded: false,
+      reason: "illegal_transition",
+    });
+    expect(await row(job.id)).toEqual(before);
+  });
+
+  it("D41: a forbidden transition with the token UNCHANGED (requeue past the commit intent) -> illegal_transition: attempt says so, job untouched, recovery takes it after expiry", async () => {
+    const job = await leasedJob();
+    await writeCommitIntent(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", leaseSeconds: 300 });
+    const before = await row(job.id);
+    expect(before.state).toBe("committing");
+    // A buggy caller asks for a requeue after the intent; completionAllowed (in T4's SQL) refuses it.
+    const requeue = jobOutcomeFor({ kind: "result", result: failure }, { attempt: 1, maxAttempts: 3, irreversibleStarted: false });
+    expect(requeue.state).toBe("queued");
+    const res = await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome: requeue });
+    expect(res).toMatchObject({ recorded: false, reason: "illegal_transition" });
+    expect(res.recorded === false && res.detail).toMatch(/token 1 is unchanged .*committing with token 1, owner w1/);
+    expect(await row(job.id)).toEqual(before); // untouched: still committing, lease and owner kept
+    const [a] = await attempts(job.id);
+    expect(a).toMatchObject({ outcome: "illegal_transition" });
+    expect(a.ended_at).toBeInstanceOf(Date);
+    expect(a.error).toMatch(/^illegal_transition: T4 refused queued\/requeue/);
+    // Its lease expires and recovery handles it (the next transition bumps the token).
+    await pool.query("UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", [job.id]);
+    const recovered = await recoverOne(pool, { workerId: "w2" });
+    expect(recovered).toMatchObject({ jobId: job.id, from: "committing", previousToken: 1, fencingToken: 2 });
+    // The attempt row keeps the bug's label (recovery closes only open attempt rows).
+    expect((await attempts(job.id))[0].outcome).toBe("illegal_transition");
+  });
+
+  it("a second completion of the same lease (token unchanged, owner already cleared) is illegal_transition and keeps the first record", async () => {
     const job = await leasedJob();
     const outcome = jobOutcomeFor({ kind: "result", result: success }, { attempt: 1, maxAttempts: 3, irreversibleStarted: false });
-    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "someone-else", outcome })).toEqual({ recorded: false });
-    expect((await row(job.id)).state).toBe("running");
+    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome })).toEqual({ recorded: true });
+    const after = await row(job.id);
+    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome })).toMatchObject({
+      recorded: false,
+      reason: "illegal_transition",
+    });
+    expect(await row(job.id)).toEqual(after);
+    expect((await attempts(job.id))[0]).toMatchObject({ outcome: "success" });
+  });
+
+  it("D41 in a running worker: a runJob bug that hides its commit intent -> the worker logs illegal_transition at error level and counts it; nothing recorded", async () => {
+    await enqueue(pool, { capability: CAP, tenantId: "tenant-a", idempotencyKey: `k-${Math.random()}`, params: { memberId: "1" } });
+    const errors: Array<{ obj: Record<string, unknown>; msg: string }> = [];
+    const metrics = new InMemoryCounters();
+    const done: JobDone[] = [];
+    const worker = new Worker({
+      pool,
+      workerId: "w-buggy",
+      leaseSeconds: 300,
+      getBrowser: async () => ({}) as Browser,
+      redact: (s) => s,
+      metrics,
+      log: { info() {}, warn() {}, error: (obj, msg) => errors.push({ obj, msg }) },
+      onJobDone: (d) => done.push(d),
+      // The bug: writes the intent (committing), then reports a plain failure with irreversibleStarted
+      // false, so jobOutcomeFor asks for a requeue that completionAllowed forbids.
+      runJob: async (_job, options) => {
+        await options.commitIntent!();
+        return { end: { kind: "result", result: failure }, irreversibleStarted: false };
+      },
+    });
+    expect(await worker.tick()).toBe("ran");
+    expect(done).toHaveLength(1);
+    expect(done[0]).toMatchObject({ recorded: false, fencedOut: "illegal_transition" });
+    expect(metrics.get("illegal_transitions_total")).toBe(1);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.msg).toMatch(/illegal_transition/);
+    expect(errors[0]!.obj).toMatchObject({ illegal_transition: true, state: "queued" });
+    const [j] = (await pool.query("SELECT state, lease_owner FROM jobs")).rows;
+    expect(j).toEqual({ state: "committing", lease_owner: "w-buggy" });
   });
 
   it("the schema refuses a requeue once attempts are exhausted (jobs_queued_has_attempts_left)", async () => {

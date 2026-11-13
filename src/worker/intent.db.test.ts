@@ -152,7 +152,7 @@ describe("T4 widened: completion from committing", () => {
     expect((await attempt(job.id)).commit_uncertain).toBe(true);
   });
 
-  it("a requeue or failed is NEVER written past the intent, even by the live holder (completionAllowed in SQL): 0 rows", async () => {
+  it("a requeue or failed is NEVER written past the intent, even by the live holder (completionAllowed in SQL): 0 rows, reported as illegal_transition (D41)", async () => {
     const job = await leased();
     await writeCommitIntent(pool, args(job));
     for (const result of [
@@ -160,10 +160,16 @@ describe("T4 widened: completion from committing", () => {
     ]) {
       const requeue = jobOutcomeFor({ kind: "result", result }, { attempt: 1, maxAttempts: 3, irreversibleStarted: false }); // a buggy caller
       expect(requeue.state).toBe("queued");
-      expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome: requeue })).toEqual({ recorded: false });
+      expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome: requeue })).toMatchObject({
+        recorded: false,
+        reason: "illegal_transition",
+      });
       const failed = jobOutcomeFor({ kind: "result", result }, { attempt: 3, maxAttempts: 3, irreversibleStarted: false });
       expect(failed.state).toBe("failed");
-      expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome: failed })).toEqual({ recorded: false });
+      expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome: failed })).toMatchObject({
+        recorded: false,
+        reason: "illegal_transition",
+      });
     }
     expect((await row(job.id)).state).toBe("committing");
   });
@@ -174,7 +180,10 @@ describe("T4 widened: completion from committing", () => {
     await pool.query("UPDATE jobs SET fencing_token = fencing_token + 1, state = 'needs_human', lease_owner = NULL, lease_expires_at = NULL WHERE id = $1", [job.id]);
     const before = await row(job.id);
     const outcome = jobOutcomeFor({ kind: "result", result: success }, { attempt: 1, maxAttempts: 3, irreversibleStarted: true });
-    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome })).toEqual({ recorded: false });
+    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome })).toMatchObject({
+      recorded: false,
+      reason: "lease_lost",
+    });
     expect(await row(job.id)).toEqual(before);
   });
 });

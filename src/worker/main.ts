@@ -38,6 +38,7 @@ import { checkPlaywrightVersion } from "./playwrightVersion.js";
 import { createFaultInjector, parseFaultConfig } from "./fault.js";
 import { DEFAULT_HEARTBEAT_SECONDS, DEFAULT_LEASE_SECONDS, validateLeaseTiming } from "./heartbeat.js";
 import { runJob } from "./runJob.js";
+import { InMemoryCounters } from "./metrics.js";
 
 const log = pino({ base: { service: "worker" } });
 
@@ -145,6 +146,8 @@ async function main(): Promise<void> {
     log,
     fault,
     runJob: (job, options) => runJob({ credentials, evidenceBaseDir, fault }, job, options),
+    // In-process counters (illegal_transitions_total, ...); Day 3 exports them (D41).
+    metrics: new InMemoryCounters(),
     // Seam 4: every loop iteration recovers up to 10 expired leases before it dequeues (T6, D38).
     beforeDequeue: createRecoverySweep({ pool, workerId, log }),
     onTick: healthFile

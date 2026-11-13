@@ -14,7 +14,18 @@
 //
 // A requeue is the same statement with state = 'queued'; the jobs_queued_has_attempts_left CHECK
 // makes it impossible once attempts are exhausted (D21).
-import { withTransaction, type Pool } from "../queue/index.js";
+//
+// 0 rows has two causes, told apart by re-reading the job's fencing token in the same transaction
+// (step-09 reviewer decision A1, D41):
+//   token CHANGED    the lease was lost (recovery moved the job on): `lease_lost`, as before.
+//   token UNCHANGED  nobody fenced this worker out, so its own request was refused by the state guard
+//                    (completionAllowed): a BUG in the caller, e.g. a requeue past the commit intent.
+//                    `illegal_transition` on the attempt row, an error-level log and a counter in the
+//                    worker. The job is untouched; its lease expires and recovery handles it.
+// Under READ COMMITTED the re-read sees the latest committed row, so a recovery that commits between
+// the UPDATE and the re-read is reported as lease_lost: the benign label, in a race that is itself
+// harmless (the job is recovery's either way).
+import { withTransaction, type Pool, type Queryable } from "../queue/index.js";
 import { createBackoff, sleep } from "./backoff.js";
 import { isTransientDbError } from "../queue/index.js";
 import type { JobOutcome } from "../fleet/stateMachine.js";
@@ -43,6 +54,41 @@ SET ended_at = now(), outcome = 'lease_lost', commit_uncertain = commit_uncertai
     error = $3 || COALESCE(' [recovery had recorded: ' || error || ']', '')
 WHERE job_id = $1 AND fencing_token = $2`;
 
+/** The re-read after a fenced write matched 0 rows: is the token still the one this worker presented? */
+export const READ_FENCE_SQL = `SELECT fencing_token, lease_owner, state FROM jobs WHERE id = $1`;
+
+/**
+ * The token did not move: this worker's own request was refused by the state guard (a bug). Only an
+ * attempt row that is still open is closed; a row the worker already closed (a second completion of
+ * the same lease) keeps what was first recorded -- the log line and the counter still fire.
+ */
+export const MARK_ILLEGAL_TRANSITION_SQL = `
+UPDATE job_attempts
+SET ended_at = now(), outcome = 'illegal_transition', commit_uncertain = commit_uncertain OR $4, error = $3
+WHERE job_id = $1 AND fencing_token = $2 AND ended_at IS NULL`;
+
+export type FencedOutReason = "lease_lost" | "illegal_transition";
+
+export interface FenceReading {
+  reason: FencedOutReason;
+  /** What the job looked like at the re-read (for the log line and the attempt's error text). */
+  current: { fencingToken: number; leaseOwner: string | null; state: string } | null;
+}
+
+/** After a fenced write matched 0 rows: lease_lost if the token moved (or the job is gone), else illegal_transition. */
+export async function readFence(db: Queryable, jobId: string, presentedToken: number): Promise<FenceReading> {
+  const row = (await db.query<{ fencing_token: number; lease_owner: string | null; state: string }>(READ_FENCE_SQL, [jobId])).rows[0];
+  if (!row) return { reason: "lease_lost", current: null };
+  const current = { fencingToken: row.fencing_token, leaseOwner: row.lease_owner, state: row.state };
+  return { reason: row.fencing_token === presentedToken ? "illegal_transition" : "lease_lost", current };
+}
+
+export function describeFence(f: FenceReading): string {
+  return f.current
+    ? `the job is ${f.current.state} with token ${f.current.fencingToken}, owner ${f.current.leaseOwner ?? "none"}`
+    : "the job no longer exists";
+}
+
 export interface CompleteInput {
   jobId: string;
   fencingToken: number;
@@ -50,8 +96,12 @@ export interface CompleteInput {
   outcome: JobOutcome;
 }
 
-/** recorded: false -> the lease was lost; jobs untouched, the attempt is lease_lost. */
-export async function completeJob(pool: Pool, input: CompleteInput): Promise<{ recorded: boolean }> {
+export type CompletionResult =
+  | { recorded: true }
+  /** jobs untouched. lease_lost: the attempt is lease_lost. illegal_transition: a bug; the attempt says so. */
+  | { recorded: false; reason: FencedOutReason; detail: string };
+
+export async function completeJob(pool: Pool, input: CompleteInput): Promise<CompletionResult> {
   const { outcome } = input;
   return withTransaction(pool, async (client) => {
     const updated = await client.query(COMPLETE_JOB_SQL, [
@@ -63,18 +113,22 @@ export async function completeJob(pool: Pool, input: CompleteInput): Promise<{ r
       outcome.error,
       outcome.result === null ? null : JSON.stringify(outcome.result),
     ]);
-    const recorded = updated.rowCount === 1;
-    if (recorded) {
+    if (updated.rowCount === 1) {
       await client.query(END_ATTEMPT_SQL, [input.jobId, input.fencingToken, outcome.attemptOutcome, outcome.commitUncertain, outcome.error]);
-    } else {
-      await client.query(MARK_LEASE_LOST_SQL, [
-        input.jobId,
-        input.fencingToken,
-        `lease lost before completion; this worker's outcome (${outcome.state}/${outcome.outcome ?? "requeue"}) was NOT recorded on the job`,
-        outcome.commitUncertain,
-      ]);
+      return { recorded: true };
     }
-    return { recorded };
+    const fence = await readFence(client, input.jobId, input.fencingToken);
+    const wanted = `${outcome.state}/${outcome.outcome ?? "requeue"}`;
+    if (fence.reason === "illegal_transition") {
+      const detail =
+        `illegal_transition: T4 refused ${wanted} although the fencing token ${input.fencingToken} is unchanged ` +
+        `(${describeFence(fence)}): the state guard forbids it; nothing recorded on the job, recovery will handle it after the lease expires`;
+      await client.query(MARK_ILLEGAL_TRANSITION_SQL, [input.jobId, input.fencingToken, detail, outcome.commitUncertain]);
+      return { recorded: false, reason: "illegal_transition", detail };
+    }
+    const stored = `lease lost before completion; this worker's outcome (${wanted}) was NOT recorded on the job`;
+    await client.query(MARK_LEASE_LOST_SQL, [input.jobId, input.fencingToken, stored, outcome.commitUncertain]);
+    return { recorded: false, reason: "lease_lost", detail: `${stored} (${describeFence(fence)})` };
   });
 }
 
@@ -105,7 +159,7 @@ export async function completeJobWithRetry(
   pool: Pool,
   input: CompleteInput,
   options: CompleteRetryOptions = {},
-): Promise<{ recorded: boolean } | null> {
+): Promise<CompletionResult | null> {
   return retryTransient(() => completeJob(pool, input), options);
 }
 

@@ -134,7 +134,10 @@ describe("lease_lost on the attempt row (the worker writes nothing to jobs)", ()
       { kind: "result", result: { status: "success", outputs: { confirmationRef: "TXN-000001" }, evidenceRef: "e" } },
       { attempt: 1, maxAttempts: 3, irreversibleStarted: false },
     );
-    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome })).toEqual({ recorded: false });
+    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome })).toMatchObject({
+      recorded: false,
+      reason: "lease_lost",
+    });
     const [a] = (await pool.query("SELECT * FROM job_attempts WHERE job_id = $1", [job.id])).rows;
     expect(a.outcome).toBe("lease_lost");
     expect(a.error).toMatch(/^lease lost before completion; .*NOT recorded on the job \[recovery had recorded: lease expired in running; recovered by w9 \(T6\.1 requeue\)\]$/);

@@ -141,7 +141,14 @@ export function modelIntent(db: ModelDb, ref: LeaseRef, leaseSeconds: number): {
   };
 }
 
-export type ModelCompleteResult = "recorded" | "fenced" | "check_violation";
+export type ModelCompleteResult = "recorded" | "fenced" | "illegal_transition" | "check_violation";
+
+/**
+ * After a fenced write matched 0 rows (src/worker/complete.ts readFence, D41): the token moved ->
+ * "fenced" (lease_lost); the token is the one presented -> "illegal_transition" (a bug).
+ */
+const fencedOut = (job: ModelJob, ref: LeaseRef): "fenced" | "illegal_transition" =>
+  job.token === ref.token ? "illegal_transition" : "fenced";
 
 /**
  * T4: the holder (token + owner) records its outcome and releases the lease. Not lease-checked: a
@@ -156,7 +163,7 @@ export function modelComplete(
   result: unknown = null,
 ): { db: ModelDb; result: ModelCompleteResult } {
   const job = find(db, ref.jobId);
-  if (!(holds(job, ref) && completionAllowed(job.state, to))) return { db, result: "fenced" };
+  if (!(holds(job, ref) && completionAllowed(job.state, to))) return { db, result: fencedOut(job, ref) };
   if (to === "queued" && !(job.attempt < job.maxAttempts)) return { db, result: "check_violation" };
   return {
     db: replace(db, { ...job, state: to, outcome, result, owner: null, leaseExpiresAt: null }),
