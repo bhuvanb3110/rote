@@ -16,6 +16,7 @@ run failed and no test flaked in any of them.
 | `npm-test-final-x3-run1.txt` | final run 1 of 3, back to back, on the docs commit's tree | 58 | 571/571 | **245.6 s** |
 | `npm-test-final-x3-run2.txt` | final run 2 of 3 | 58 | 571/571 | 167 s |
 | `npm-test-final-x3-run3.txt` | final run 3 of 3 | 58 | 571/571 | 168.7 s |
+| `npm-test-commit-ci-linux-evidence.txt` | the commit saving CI's Linux 23/23 matrix report (evidence only) | 58 | 571/571 | 173.2 s |
 
 Where a run is listed before a commit, the tree differed from that commit only by files that change no code
 under test (evidence, docs, CI YAML, harness scripts outside the suite).
