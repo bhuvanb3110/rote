@@ -1,0 +1,32 @@
+2026-11-14T16:21:59.876Z one job a4e5821c-ba81-41a2-acb1-cfb73169c073; the zombie worker starts with ROTE_FAULT=stall-after-intent, ROTE_FAULT_STALL_MS=30000
+2026-11-14T16:22:03.403Z the zombie wrote its intent and froze (heartbeat suspended); the clean worker starts
+2026-11-14T16:22:41.058Z the job is settled
+
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 2; drain timed out: no
+job states: needs_human=1
+verdicts: ok=0, DUPLICATE=1, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 1; lost: 0 (of which after commit: 0); orphan rows: 0
+needs_human (1), listed with outcome and ledger rows:
+  a4e5821c-ba81-41a2-acb1-cfb73169c073 tenant-a outcome=duplicate_suspected rows=2 [TXN-000001, TXN-000002]
+findings (1):
+  DUPLICATE         a4e5821c-ba81-41a2-acb1-cfb73169c073 tenant-a needs_human attempt=2 rows=2: 2 ledger rows (TXN-000001, TXN-000002) for one job
+RESULT: FAIL
+
+# The zombie window, measured and made loud: 2026-11-14T16:21:59.599Z
+
+- one job; lease 5 s / heartbeat 2 s; settle 5000 ms; reconcile delay 5 + 5 + 10 = 20 s
+- the zombie: ROTE_FAULT=stall-after-intent, a 30 s stall right after its commit intent with its heartbeat suspended (a process freeze's worst case: it clicks the moment it wakes)
+
+| Event | Time (from the zombie's intent) |
+| --- | --- |
+| the zombie writes its commit intent and freezes | +0.0 s |
+| verify decided resubmitted | +14.3 s |
+| attempt 2's row written | +16.0 s |
+| the zombie's row written | +30.1 s |
+| the reconcile started (its lookup reads after this) | +36.5 s |
+| the reconcile decided duplicate_suspected [2] | +37.6 s |
+
+Final job: needs_human / duplicate_suspected; result.reconcile {"lookups":[2],"matches":2,"decision":"duplicate_suspected","phaseToken":4,"evidenceRef":"evidence://C:/Users/hp/Downloads/rote/evidence/zombie-window-limit/worker-evidence/transfer-history-lookup-2026-11-14T16-22-39-894Z-a2145536/run.jsonl","evidenceRefs":["evidence://C:/Users/hp/Downloads/rote/evidence/zombie-window-limit/worker-evidence/transfer-history-lookup-2026-11-14T16-22-39-894Z-a2145536/run.jsonl"],"firstMatchRef":"TXN-000001","jobConfirmationRef":"TXN-000001"}; ledger rows TXN-000001, TXN-000002; oracle DUPLICATE; duplicates_detected_total 1.
+
+RESULT: PASS (the duplicate happened, and it was detected)
