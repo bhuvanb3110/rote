@@ -1451,3 +1451,65 @@ starts at the crash, and the README explains the difference.
 a property of each deployment's bank, so it has to be configured and stated, not assumed.
 
 **Date.** 2026-11-14
+
+## D48: A `slow` vitest project for the integration files that wait, in the browser files' pool with one longest-first queue; overlapping them with the unit/DB files was measured and rejected
+
+(Step 10, plan section 6; reviewer decision 6: the first code commit of Step 10.)
+
+**Decision.** `vitest.config.ts` has three projects. `unit-db` is unchanged (group 0, full parallelism).
+`browser` and the new **`slow`** share group 1 and one pool of at most `BROWSER_TEST_WORKERS` (3) files, so
+D31's browser cap covers both. `slow` holds the integration files that mostly wait on leases, a deliberately
+slow bank, an outage or worker child processes: `faults`, `lease` and `verify` (moved out of `browser`), and
+from Step 10's later commits `crashSubmit`. All three projects run in `npm test` and in CI; nothing is
+skipped. `npm run test:fast` (`--project unit-db --project browser`) leaves the slow files out for a quick
+local loop, never as a commit gate.
+
+vitest's own sequencer orders a group's files by **project name** before duration ("projects run
+sequential"), which queued every slow file behind every browser file. **`vitest.sequencer.ts`** is vitest's
+comparator without that step, so group 1 is one longest-first queue across both projects, as it was when the
+slow files were browser files; with no recorded durations (a fresh CI checkout) the slow files go first.
+
+The guard test (`browserProject.test.ts`) requires every Chromium-launching file, worker child processes
+included, to be in exactly one of the two lists, and every slow file to be a `*.db.test.ts`; `npm run
+test:unit` leaves the slow project empty (`passWithNoTests`).
+
+**Measurement** (`evidence/step-10/slow-project/README.md`: every run's full log and JSON per-file timeline;
+`scripts/test-timeline.ts` prints them). An interleaved A/B, 3 rounds, nothing else running. "Before" is the
+pre-D48 arrangement; the first "after" ran the slow project in group 0, beside `unit-db`, to overlap its
+waiting with the unit/DB CPU work:
+
+| Round | Before (s) | Slow in group 0 (s) |
+| --- | --- | --- |
+| 1 | 168.5 | 160.3 |
+| 2 | 171.6 | 180.0 |
+| 3 | 215.4 | 215.3, **6 tests failed** |
+| mean | 185.2 | 185.2 |
+
+No gain: overlapping made both sides slower (`modelVsReal.db.test.ts` about 40 → 75 s, `verify` 59 → 75 s),
+and in round 3, with the machine loaded, it failed six tests (model vs real past its slack, two recovery
+tests' 5 s timeouts, `faults`' setup hook). Then the slow project in group 1 WITHOUT the sequencer: the
+slow files ran after the browser files (group 1: browser 45–160 s, slow 159–213 s), slower by design. With
+the sequencer: it packs group 1 as tightly as the "before" runs did (span / summed file time 0.36 against 0.355-0.36),
+so the scheduling is the one the suite had before the slow project existed. The committed run passed
+572/572 in 203.4 s on a machine loaded enough that every file ran slower than in the A/B's first rounds
+(`final-4`). The runs on the way there are in the README, including one red gate run whose failure was
+the model-vs-real load flake in unit-db, not the slow project (`evidence/step-10/flakes.md` 1).
+
+**Alternatives considered.**
+- *The slow project in group 0* (measured above): no gain, and flaky under load.
+- *Group 1 with vitest's default order* (measured above): the slow files run last.
+- *Name the projects so "slow" sorts first:* it works by accident of spelling, and it is slow-first, not
+  longest-first.
+- *Its own group after `browser`:* the groups run one after the other, adding the slow files' longest one
+  to the wall time.
+- *Raise group 1's cap to 4:* D31 measured cap 4 as faster (102.3 s vs 108.8 s; 19 vs 15 peak Chromium
+  processes) but chose 3 to halve peak memory on the 8 GB laptop. Changing it is D31's decision; noted for
+  the reviewer.
+- *Skip the slow files locally:* never; they run in every `npm test` and every CI run.
+
+**Why.** The project boundary is what the reviewer asked for: the waiting integration files are named,
+guarded, and can be left out of a quick loop, while the gate still runs everything. The measurements say
+where they can run without making the suite slower or flakier: in the pool they were already in, in the
+same order.
+
+**Date.** 2026-11-14

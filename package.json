@@ -27,7 +27,8 @@
     "worker": "tsx src/worker/main.ts",
     "db:migrate": "tsx src/cli/index.ts db migrate",
     "test": "vitest run",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "test:fast": "vitest run --project unit-db --project browser"
   },
   "license": "ISC",
   "dependencies": {
