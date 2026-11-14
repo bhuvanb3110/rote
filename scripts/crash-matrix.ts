@@ -3,8 +3,8 @@
 // the recovery-internal two-fault scenarios (docs/plans/step-08.md section 9's second table).
 //
 //   npm run crash-matrix -- [--points after-submit,before-submit>verify-after-count] [--drain-timeout 90s]
-//                           [--lease-seconds 30] [--heartbeat-seconds 10] [--expect step-09]
-//                           [--tenant tenant-a] [--out <dir>]
+//                           [--lease-seconds 30] [--heartbeat-seconds 10] [--expect step-10]
+//                           [--reconcile-margin-seconds 5] [--tenant tenant-a] [--out <dir>]
 //
 // Per scenario, isolated: a fresh Postgres test schema (rote_test database), a fresh in-process mock bank
 // on :4100 with an empty ledger, ONE transfer job, then
@@ -28,13 +28,18 @@
 // (D40); Step 10 adds one run at the production 30/10. The verify settle period is the worker default
 // (5 s, ROTE_VERIFY_SETTLE_MS).
 // Step 7: red. Step 8 (--expect step-08): before the intent -> requeued; after it -> needs_human (T6.3).
-// Step 9 (--expect step-09, the default): after the intent -> VERIFIED ([0, 0] resubmitted, attempt 2;
-// [1] already_done, attempt 1), always exactly 1 row; plus the 7 recovery-internal scenarios.
+// Step 9 (--expect step-09): after the intent -> VERIFIED ([0, 0] resubmitted, attempt 2; [1] already_done,
+// attempt 1), always exactly 1 row; plus the 7 recovery-internal scenarios.
+// Step 10 (--expect step-10, the default; D50, D54): Step 9's outcomes, each scenario drained until its job is
+// SETTLED, and the reconcile pass judged too: a resubmitted job (first fault before-submit) is reconciled with 1
+// match; no other job has a reconcile due. The workers' reconcile margin is --reconcile-margin-seconds (default 5,
+// so the reconcile is due lease + settle + 5 s after the success, inside the drain).
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resetLedger } from "../mock-app/data.js";
 import { findCapability } from "../src/catalog/registry.js";
 import { checkLedger, fetchLedger, readJobs } from "../src/oracle/index.js";
+import { jobSettled } from "../src/fleet/stateMachine.js";
 import { enqueue } from "../src/queue/index.js";
 import { createTestSchema } from "../src/queue/testDb.js";
 import { EXPECTATION_PHASES, scenariosFor, judgePoint, type CrashScenario, type ExpectationPhase } from "../src/chaos/crashExpected.js";
@@ -45,7 +50,8 @@ const DRAIN_TIMEOUT_MS = argValue("drain-timeout") ? parseDuration(argValue("dra
 const LEASE_SECONDS = Number(argValue("lease-seconds") ?? 30);
 const HEARTBEAT_SECONDS = Number(argValue("heartbeat-seconds") ?? 10);
 const TENANT = argValue("tenant") ?? "tenant-a";
-const PHASE = (argValue("expect") ?? "step-09") as ExpectationPhase;
+const PHASE = (argValue("expect") ?? "step-10") as ExpectationPhase;
+const RECONCILE_MARGIN_SECONDS = Number(argValue("reconcile-margin-seconds") ?? 5);
 if (!(EXPECTATION_PHASES as readonly string[]).includes(PHASE)) throw new Error(`--expect must be one of ${EXPECTATION_PHASES.join(", ")}`);
 const ALL = scenariosFor(PHASE);
 const scenarios: CrashScenario[] = argValue("points")
@@ -97,6 +103,7 @@ async function runScenario(scenario: CrashScenario): Promise<{ row: Row; text: s
     const base = workerEnv(db, {
       ROTE_LEASE_SECONDS: String(LEASE_SECONDS),
       ROTE_HEARTBEAT_SECONDS: String(HEARTBEAT_SECONDS),
+      ROTE_RECONCILE_MARGIN_SECONDS: String(RECONCILE_MARGIN_SECONDS),
       ROTE_EVIDENCE_DIR: path.resolve(dir, "worker-evidence"),
     });
 
@@ -111,7 +118,8 @@ async function runScenario(scenario: CrashScenario): Promise<{ row: Row; text: s
     let drainTimedOut = false;
     for (;;) {
       const [current] = await readJobs(db.pool, [job.id]);
-      if (TERMINAL.has(current!.state)) break;
+      // step-10: until settled (the reconcile pass, if one is due, has run); earlier phases: terminal.
+      if (PHASE === "step-10" ? jobSettled(current!) : TERMINAL.has(current!.state)) break;
       if (Date.now() - drainStart > DRAIN_TIMEOUT_MS) {
         drainTimedOut = true;
         break;
@@ -136,12 +144,14 @@ async function runScenario(scenario: CrashScenario): Promise<{ row: Row; text: s
     await writeFile(path.join(dir, "oracle.json"), JSON.stringify(reportJson, null, 2));
     await writeFile(path.join(dir, "check.txt"), report.text + "\n");
     const final = jobs[0]!;
+    type V = { reason: string; decision: string | null; lookups: Array<number | null> | null };
+    const reconcile = (verifications as V[]).filter((v) => v.reason === "reconcile").map((v) => v.decision ?? "open").join(", ");
     const verdict =
       judgePoint(
-        { fired: first.fired, secondFired: second?.fired, oracleVerdict: f.verdict, state: final.state, outcome: final.outcome ?? null, attempt: final.attempt, ledgerRows: f.rows },
+        { fired: first.fired, secondFired: second?.fired, oracleVerdict: f.verdict, state: final.state, outcome: final.outcome ?? null, attempt: final.attempt, ledgerRows: f.rows, reconcile },
         scenario.expected,
       ) ?? "ok";
-    const verify = verifications.map((v: { decision: string | null; lookups: Array<number | null> | null }) => `${v.decision ?? "open"}${v.lookups ? JSON.stringify(v.lookups) : ""}`).join(", ") || "-";
+    const verify = (verifications as V[]).map((v) => `${v.reason === "reconcile" ? "reconcile:" : ""}${v.decision ?? "open"}${v.lookups ? JSON.stringify(v.lookups) : ""}`).join(", ") || "-";
     const faultExit = second ? `${first.exit}; then ${second.exit}` : first.exit;
     const firedText = `${scenario.first}: ${first.fired ? "fired" : "DID NOT FIRE"}${second ? `; ${scenario.second}: ${second.fired ? "fired" : "DID NOT FIRE"}` : ""}`;
     return {
@@ -177,7 +187,7 @@ async function main(): Promise<void> {
     `Crash-point matrix, started ${started.toISOString()}`,
     `scenarios: ${scenarios.map((s) => s.name).join(", ")}`,
     `expectations: ${PHASE} (src/chaos/crashExpected.ts)`,
-    `tenant: ${TENANT}; lease: ${LEASE_SECONDS} s; heartbeat: ${HEARTBEAT_SECONDS} s; verify settle: the worker default (5 s); drain timeout per scenario: ${DRAIN_TIMEOUT_MS} ms; workers: child processes (node --import tsx src/worker/main.ts)`,
+    `tenant: ${TENANT}; lease: ${LEASE_SECONDS} s; heartbeat: ${HEARTBEAT_SECONDS} s; verify settle: the worker default (5 s); reconcile margin: ${RECONCILE_MARGIN_SECONDS} s; drain ${PHASE === "step-10" ? "until settled" : "until terminal"}, timeout per scenario: ${DRAIN_TIMEOUT_MS} ms; workers: child processes (node --import tsx src/worker/main.ts)`,
     "",
   ];
   console.log(header.join("\n"));

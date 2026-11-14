@@ -1762,3 +1762,41 @@ entrypoint, signals and recovery that production runs.
 
 **Date.** 2026-11-14
 
+
+## D54: `scripts/mutation-check`: every planted bug must turn its tests red, in a required CI job; the crash matrix becomes required
+
+(Step 10, plan section 7; step-09 reviewer addition 6; D35's amendment for the matrix.)
+
+**Decision.** `npm run mutation-check` (`scripts/mutation-check.ts`) applies each patch in
+`scripts/mutations/` in turn: `git apply --check` (a patch that no longer applies fails the check: "update the
+mutant", so the mutants cannot rot), a refusal if a touched file has uncommitted changes, `git apply`, its
+test files under vitest with a JSON report (caught = a non-zero exit AND at least one named failing test),
+`git apply -R`, then `git diff --exit-code` on the touched files. `evidence/mutation-check/` keeps the
+report. The eight mutants:
+
+| # | Step | The planted bug | Caught by |
+| --- | --- | --- | --- |
+| 01 | 8 (and Step 9's M2) | recovery requeues an expired `committing` job | property tests, unit tests |
+| 02 | 8 | T2 extends an expired lease | model vs real |
+| 03 | 8 | T6 without the token bump | model vs real |
+| 04 | 9 (M1) | one 0-match lookup decides | property tests |
+| 05 | 9 (M3) | `[0, 1]` read as not committed | property tests |
+| 06 | 9 (M4) | a refusal after Submit is retried | property tests |
+| 07 | 10 | the reconcile reads 2+ matches as reconciled | property tests, unit tests |
+| 08 | 10 | T4's requeue without `not_before` | model vs real, DB tests |
+
+CI gains a **`mutation-check`** job (ubuntu-24.04, Node 22, a `postgres:17` service; no browser), and the
+**`crash-matrix`** job loses `continue-on-error` and runs `--expect step-10` (Step 9's outcomes, plus the
+reconcile pass on the resubmit paths, each scenario drained until settled). A red matrix or a surviving
+mutant now fails the workflow. Making them *required status checks* on the branch is a repository setting
+for its owner; the workflow can only make them fail.
+
+**Alternatives considered.** A mutation-testing tool (Stryker: a new dependency, its own reviewed step, and
+thousands of random mutants instead of the bugs these tests exist to catch); mutants as in-script string
+replacements, as Step 9's PowerShell check did (they silently stop matching when the code moves; a patch
+that no longer applies fails loudly).
+
+**Why.** A property test that cannot fail is worse than none: it reads as proof. Each mutant is a bug the
+design argument says is caught; the check proves it is, on every push.
+
+**Date.** 2026-11-14

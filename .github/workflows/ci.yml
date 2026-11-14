@@ -4,7 +4,8 @@
 #   unit-node25 the pure unit tests (no browser, no Postgres) on Node 25, the builder's local Node.
 #   docker      builds the fleet image (build only, never pushed), with the GitHub Actions build cache,
 #               so a broken Dockerfile fails fast.
-#   crash-matrix the crash-point matrix, REPORT-ONLY (continue-on-error) until Step 10; report uploaded.
+#   crash-matrix the crash-point matrix (Step 10: no longer report-only, D54); report uploaded.
+#   mutation-check every planted bug in scripts/mutations/ must turn its tests red (D54); report uploaded.
 # Not in CI (README "CI"): the Day-1 exit and chaos. They need the Compose stack and minutes of wall
 # time; they run as scripts with committed evidence.
 #
@@ -91,14 +92,14 @@ jobs:
           path: unit-node25.txt
           if-no-files-found: warn
 
-  # REPORT-ONLY until Step 10 (Step 8 reviewer decision A3, D35 amendment): the crash-point matrix on
-  # Linux, where the fault worker's SIGKILL is a real signal. continue-on-error keeps a red matrix from
-  # failing the workflow; the report (matrix.md, check.txt, per-point logs) is uploaded on every run and
-  # matrix.md is written to the job summary. Step 10 removes continue-on-error and makes it required.
+  # The crash-point matrix on Linux, where the fault worker's SIGKILL is a real signal (Step 8 reviewer
+  # decision A3, D35 amendment). Step 10 (D54): no longer report-only -- a red matrix fails the workflow --
+  # and it judges --expect step-10 (Step 9's outcomes, each scenario drained until settled, the reconcile
+  # pass on the resubmit paths). The report (matrix.md, check.txt, per-point logs) is uploaded on every
+  # run and matrix.md is written to the job summary.
   crash-matrix:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
-    continue-on-error: true
     services:
       postgres:
         image: postgres:17
@@ -120,11 +121,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: crash-point matrix (report-only)
+      - name: crash-point matrix
         shell: bash
         run: |
           set -o pipefail
-          npm run crash-matrix -- --lease-seconds 5 --heartbeat-seconds 2 --expect step-09 --drain-timeout 60s --out crash-matrix-report 2>&1 | tee crash-matrix-stdout.txt
+          npm run crash-matrix -- --lease-seconds 5 --heartbeat-seconds 2 --expect step-10 --reconcile-margin-seconds 5 --drain-timeout 90s --out crash-matrix-report 2>&1 | tee crash-matrix-stdout.txt
       - if: always()
         name: matrix to the job summary
         shell: bash
@@ -136,6 +137,49 @@ jobs:
           path: |
             crash-matrix-report/
             crash-matrix-stdout.txt
+          if-no-files-found: warn
+
+  # Every planted bug (scripts/mutations/*.patch) must turn the tests that guard it red, and the tree must be
+  # exactly as before afterwards (D54). Model vs real needs Postgres; no browser is needed.
+  mutation-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: rote
+          POSTGRES_PASSWORD: rote_dev_only
+          POSTGRES_DB: rote
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rote -d rote" --health-interval 2s
+          --health-timeout 3s --health-retries 30
+    env:
+      ROTE_TEST_DATABASE_URL: postgres://rote:rote_dev_only@127.0.0.1:55432/rote_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: mutation check
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run mutation-check -- --out mutation-check-report 2>&1 | tee mutation-check-stdout.txt
+      - if: always()
+        name: report to the job summary
+        shell: bash
+        run: cat mutation-check-report/report.md >> "$GITHUB_STEP_SUMMARY" || echo "no report.md" >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-check-report
+          path: |
+            mutation-check-report/
+            mutation-check-stdout.txt
           if-no-files-found: warn
 
   docker:

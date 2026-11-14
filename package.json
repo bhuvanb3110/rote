@@ -25,6 +25,7 @@
     "chaos": "tsx scripts/chaos.ts",
     "crash-matrix": "tsx scripts/crash-matrix.ts",
     "verify-scenarios": "tsx scripts/verify-scenarios.ts",
+    "mutation-check": "tsx scripts/mutation-check.ts",
     "worker": "tsx src/worker/main.ts",
     "db:migrate": "tsx src/cli/index.ts db migrate",
     "test": "vitest run",

@@ -1,0 +1,13 @@
+diff --git a/src/fleet/stateMachine.ts b/src/fleet/stateMachine.ts
+index 94b8122..99d7ac6 100644
+--- a/src/fleet/stateMachine.ts
++++ b/src/fleet/stateMachine.ts
+@@ -615,7 +615,7 @@ export function verifyDecision(input: VerifyInput): VerifyDecision {
+     return { decision: "already_done", to: "succeeded", outcome: "already_done", confirmationRef: decisive.firstMatchRef, evidenceRef: decisive.evidenceRef, error: null };
+   }
+   // [0, 0]: the transfer did not happen.
+-  if (input.priorStatus === "business_outcome") {
++  if (input.priorStatus === "business_outcome" && false) {
+     return {
+       decision: "not_committed_final",
+       to: "business_outcome",

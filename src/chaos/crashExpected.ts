@@ -15,9 +15,14 @@ export interface CrashExpectation {
   oracle?: string;
   /** One line for the matrix's Expected column. */
   says: string;
+  /**
+   * Step 10 (D50): the reconcile pass's decisions on the job, in order ("" = none was due). Checked only
+   * when set; a step-10 run also waits until the job is SETTLED.
+   */
+  reconcile?: string;
 }
 
-export const EXPECTATION_PHASES = ["step-08", "step-09"] as const;
+export const EXPECTATION_PHASES = ["step-08", "step-09", "step-10"] as const;
 export type ExpectationPhase = (typeof EXPECTATION_PHASES)[number];
 
 const BEFORE_INTENT = /^(after-dequeue|after-step-(0[1-9]|10))$/;
@@ -63,12 +68,25 @@ function step09(point: string): CrashExpectation {
   }
 }
 
+/**
+ * Step 10: Step 9's outcomes, and the reconcile pass (D50). A job whose first worker died after its intent
+ * but before the click (`before-submit`) is verified [0, 0], resubmitted and succeeds on attempt 2, so it is
+ * reconciled (the history shows its 1 row); every other job has no reconcile due.
+ */
+function step10(expected: CrashExpectation, firstPoint: string): CrashExpectation {
+  return firstPoint === "before-submit"
+    ? { ...expected, reconcile: "reconciled", says: `${expected.says}; reconciled [1]` }
+    : { ...expected, reconcile: "", says: `${expected.says}; no reconcile due` };
+}
+
 export function expectedFor(point: string, phase: ExpectationPhase = "step-08"): CrashExpectation {
   switch (phase) {
     case "step-08":
       return step08(point);
     case "step-09":
       return step09(point);
+    case "step-10":
+      return step10(step09(point), point);
   }
 }
 
@@ -97,7 +115,9 @@ export const RECOVERY_SCENARIOS: readonly CrashScenario[] = [
 /** Every scenario a phase judges: the transfer's 16 single points, plus Step 9's two-fault scenarios. */
 export function scenariosFor(phase: ExpectationPhase): CrashScenario[] {
   const single = TRANSFER_FAULT_POINTS.map((point) => ({ name: point, first: point, expected: expectedFor(point, phase) }));
-  return phase === "step-09" ? [...single, ...RECOVERY_SCENARIOS] : single;
+  if (phase === "step-08") return single;
+  const recovery = phase === "step-10" ? RECOVERY_SCENARIOS.map((sc) => ({ ...sc, expected: step10(sc.expected, sc.first) })) : [...RECOVERY_SCENARIOS];
+  return [...single, ...recovery];
 }
 
 export interface CrashObserved {
@@ -109,6 +129,8 @@ export interface CrashObserved {
   outcome: string | null;
   attempt: number;
   ledgerRows: number;
+  /** The reconcile decisions on the job, in order ("" = none); compared when the expectation names them. */
+  reconcile?: string;
 }
 
 /** null = the point passes; otherwise why it does not. */
@@ -121,6 +143,7 @@ export function judgePoint(observed: CrashObserved, expected: CrashExpectation):
   if (expected.outcome !== undefined && observed.outcome !== expected.outcome) wrong.push(`outcome ${observed.outcome} (expected ${expected.outcome})`);
   if (observed.attempt !== expected.attempt) wrong.push(`attempt ${observed.attempt} (expected ${expected.attempt})`);
   if (observed.ledgerRows !== expected.ledgerRows) wrong.push(`rows ${observed.ledgerRows} (expected ${expected.ledgerRows})`);
+  if (expected.reconcile !== undefined && observed.reconcile !== expected.reconcile) wrong.push(`reconcile "${observed.reconcile ?? "?"}" (expected "${expected.reconcile}")`);
   return wrong.length === 0 ? null : `UNEXPECTED: ${wrong.join(", ")}`;
 }
 

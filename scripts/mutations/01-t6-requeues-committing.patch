@@ -1,0 +1,12 @@
+diff --git a/src/fleet/stateMachine.ts b/src/fleet/stateMachine.ts
+index 94b8122..2cb4010 100644
+--- a/src/fleet/stateMachine.ts
++++ b/src/fleet/stateMachine.ts
+@@ -389,6 +389,7 @@ export function recoveryAction(row: RecoveryRow): RecoveryAction {
+               "no commit intent, so nothing irreversible happened",
+           };
+     case "committing":
++      if (row.attempt < row.maxAttempts) return { kind: "requeue", label: "T6.1", to: "queued", outcome: null, error: "mutant: a blind retry after the intent" };
+       return {
+         kind: "verify",
+         label: "T6.4",

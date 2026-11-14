@@ -76,3 +76,30 @@ describe("crash-point expectations, Step 9 (docs/plans/step-09.md section 4)", (
     expect(judgePoint({ ...ok, oracleVerdict: "DUPLICATE", ledgerRows: 2 }, dup)).toBeNull();
   });
 });
+
+describe("crash-point expectations, Step 10 (docs/plans/step-10.md; D50, D54)", () => {
+  it("Step 9's outcomes; the resubmit paths (first fault before-submit) are reconciled, every other scenario has no reconcile due; step-10 judges 16 + 7", () => {
+    const all = scenariosFor("step-10");
+    expect(all).toHaveLength(23);
+    for (const s of all) {
+      const nine = s.second ? RECOVERY_SCENARIOS.find((r) => r.name === s.name)!.expected : expectedFor(s.first, "step-09");
+      expect({ ...s.expected, reconcile: undefined, says: undefined }, s.name).toEqual({ ...nine, reconcile: undefined, says: undefined });
+      expect(s.expected.reconcile, s.name).toBe(s.first === "before-submit" ? "reconciled" : "");
+    }
+    expect(all.filter((s) => s.expected.reconcile === "reconciled").map((s) => s.name)).toEqual([
+      "before-submit",
+      "before-submit>verify-after-count",
+      "before-submit>verify-before-requeue",
+      "before-submit>verify-after-requeue",
+    ]);
+  });
+
+  it("judgePoint compares the reconcile decisions when the expectation names them", () => {
+    const e = expectedFor("before-submit", "step-10");
+    const ok = { fired: true, oracleVerdict: "ok", state: "succeeded", outcome: "success", attempt: 2, ledgerRows: 1, reconcile: "reconciled" };
+    expect(judgePoint(ok, e)).toBeNull();
+    expect(judgePoint({ ...ok, reconcile: "" }, e)).toBe('UNEXPECTED: reconcile "" (expected "reconciled")');
+    expect(judgePoint({ ...ok, reconcile: "duplicate_suspected" }, e)).toMatch(/reconcile "duplicate_suspected"/);
+    expect(judgePoint({ ...ok, reconcile: "anything" }, expectedFor("before-submit", "step-09"))).toBeNull(); // step-09 does not judge it
+  });
+});

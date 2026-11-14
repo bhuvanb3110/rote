@@ -1,0 +1,13 @@
+diff --git a/src/worker/complete.ts b/src/worker/complete.ts
+index 709e31e..b37c3d2 100644
+--- a/src/worker/complete.ts
++++ b/src/worker/complete.ts
+@@ -42,7 +42,7 @@ export const DEFAULT_RECONCILE_DUE_SECONDS = reconcileDueSeconds(30, 5000);
+ export const COMPLETE_JOB_SQL = `
+ UPDATE jobs
+ SET state = $4, outcome = $5, error = $6, result = $7::jsonb,
+-    not_before = CASE WHEN $4 = 'queued' THEN now() + make_interval(secs => $8) END,
++    not_before = CASE WHEN $4 = 'queued' AND false THEN now() + make_interval(secs => $8) END,
+     reconcile_after = CASE WHEN $4 = 'succeeded' AND EXISTS (
+                         SELECT 1 FROM job_verifications v WHERE v.job_id = $1 AND v.decision = 'resubmitted')
+                       THEN now() + make_interval(secs => $9) ELSE reconcile_after END,

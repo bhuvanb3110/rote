@@ -1,0 +1,106 @@
+Mutation check (D54), started 2026-11-14T16:30:36.583Z; 8 mutants; head 05027a7
+== 01 01-t6-requeues-committing.patch: Step 8 / Step 9's M2: recovery requeues an expired `committing` job (a blind retry after the intent)
+tests: src/fleet/stateMachine.property.test.ts, src/fleet/stateMachine.test.ts
+verdict: caught (8.9 s)
+vitest exit 1; 18 of 63 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 1: no duplicate unless a zombie clicked (frozen across its own lease expiry) or the history lag exceeds the settle period
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 2: no duplicate at all when no pause spans lease + settle (no click lands that long after its lease was extended) and there is no history lag
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50)
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded -- the honest limit of property 8 is closed
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 8's exemption is real (fast-check finds a duplicate that the workers' pass read too early), and the reconcile is what flags duplicates (without it, one stays succeeded)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) crash after the click: T6.4 claims the job, verify [1] -> succeeded / already_done with the row's id; 1 row, attempt 1
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) crash after the intent, before the click: verify [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the settle period: a second lookup before SETTLE seconds have passed is not taken
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE -- and the reconcile pass flags it: needs_human / duplicate_suspected
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the reconcile pass's limit: a zombie still frozen when the reconcile READ the history clicks after it -- the duplicate stays succeeded (property 8's exemption); the end-of-day batch then flags it
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) frozen after the intent, and its heartbeat fires first on waking: the run is aborted, no click; verify resubmits; 1 row
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the bank down during the verify: deferred (T8), resumed after the backoff (T6.7) while still down, then the outage ends -> [1] already_done; deferrals never exhaust the 3-phase cap
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the bank down for longer than the deferral budget: needs_human / verify_unavailable (and only after looking once more)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) three verifiers die in a row: T6.6 escalates needs_human / verify_exhausted
+  x src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows) committing -> T6.4 claim to verify (Step 9 replaces Step 8's T6.3 escalate), whatever the attempts
+  x src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows) no input ever yields queued without an attempt left, or queued from past the intent
+
+== 02 02-t2-revives-expired-lease.patch: Step 8: the heartbeat (T2) extends a lease that already expired (no `lease_expires_at > now()`)
+tests: src/fleet/modelVsReal.db.test.ts
+verdict: caught (36.3 s)
+vitest exit 1; 2 of 3 tests failed:
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 100 more sequences that START with a job in committing (a real dequeue + T3) or in verifying (+ T5): the expired-commit claim, the verify writes, re-claims and deferrals
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 100 more sequences that START with a job that succeeded after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4 succeeded): the reconcile pass; then every Step 9 and Step 10 path was exercised
+
+== 03 03-t6-no-token-bump.patch: Step 8: recovery (T6.1/T6.2/T6.6) does not bump the fencing token
+tests: src/fleet/modelVsReal.db.test.ts
+verdict: caught (29.5 s)
+vitest exit 1; 2 of 3 tests failed:
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 200 seeded command sequences agree after every command
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 100 more sequences that START with a job that succeeded after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4 succeeded): the reconcile pass; then every Step 9 and Step 10 path was exercised
+
+== 04 04-m1-single-zero-decides.patch: Step 9's M1: one 0-match lookup decides (no settle, no second lookup)
+tests: src/fleet/stateMachine.property.test.ts
+verdict: caught (11.7 s)
+vitest exit 1; 10 of 29 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal
+  x src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) crash after the intent, before the click: verify [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the settle period: a second lookup before SETTLE seconds have passed is not taken
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) history lag 3 s < settle 5 s, the bank's answer lost after it committed (T5 verifies at once): [0, 1] -> already_done, 1 row
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) history lag 8 s > settle 5 s, the same crash: [0, 0] -> resubmitted -> a second transfer: DUPLICATE (the settle must exceed the lag) -- and the reconcile pass flags it (D47's backstop)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE -- and the reconcile pass flags it: needs_human / duplicate_suspected
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the reconcile pass's limit: a zombie still frozen when the reconcile READ the history clicks after it -- the duplicate stays succeeded (property 8's exemption); the end-of-day batch then flags it
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) frozen after the intent, and its heartbeat fires first on waking: the run is aborted, no click; verify resubmits; 1 row
+
+== 05 05-m3-zero-one-not-committed.patch: Step 9's M3: lookups [0, 1] read as not committed
+tests: src/fleet/stateMachine.property.test.ts
+verdict: caught (9.6 s)
+vitest exit 1; 3 of 29 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) history lag 3 s < settle 5 s, the bank's answer lost after it committed (T5 verifies at once): [0, 1] -> already_done, 1 row
+
+== 06 06-m4-refusal-retried.patch: Step 9's M4: a refusal shown after Submit is retried instead of final
+tests: src/fleet/stateMachine.property.test.ts
+verdict: caught (13.1 s)
+vitest exit 1; 1 of 29 tests failed:
+  x src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+
+== 07 07-reconcile-ignores-duplicates.patch: Step 10: the reconcile pass reads 2+ matches as reconciled (the duplicate stays silent)
+tests: src/fleet/stateMachine.property.test.ts, src/fleet/stateMachine.test.ts
+verdict: caught (10.9 s)
+vitest exit 1; 8 of 63 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50)
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded -- the honest limit of property 8 is closed
+  x src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) history lag 8 s > settle 5 s, the same crash: [0, 0] -> resubmitted -> a second transfer: DUPLICATE (the settle must exceed the lag) -- and the reconcile pass flags it (D47's backstop)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE -- and the reconcile pass flags it: needs_human / duplicate_suspected
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the reconcile pass's limit: a zombie still frozen when the reconcile READ the history clicks after it -- the duplicate stays succeeded (property 8's exemption); the end-of-day batch then flags it
+  x src/fleet/stateMachine.test.ts > reconcileDecision (Step 10 section 2, R2's table; D50) 2+ matches -> duplicate_suspected: needs_human, with the count and the first match's reference
+  x src/fleet/stateMachine.test.ts > reconcileDecision (Step 10 section 2, R2's table; D50) result.reconcile carries the decision, the count, the first match's reference and the job's own confirmationRef
+
+== 08 08-t4-requeue-without-not-before.patch: Step 10: T4's requeue after a failure sets no not_before (retries do not back off)
+tests: src/fleet/modelVsReal.db.test.ts, src/worker/complete.db.test.ts
+verdict: caught (35.4 s)
+vitest exit 1; 3 of 16 tests failed:
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 200 seeded command sequences agree after every command
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 100 more sequences that START with a job that succeeded after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4 succeeded): the reconcile pass; then every Step 9 and Step 10 path was exercised
+  x src/worker/complete.db.test.ts > completeJob (fenced) a requeue with a backoff (D49): not_before = now() + the seconds, by the DATABASE clock; no dequeue before it; then attempt 2 with not_before cleared
+
+# Mutation check: 2026-11-14T16:30:36.583Z
+
+Each planted bug is a patch in `scripts/mutations/`; it must turn its tests red, and the tree must be exactly as before afterwards.
+
+| Mutant | What it plants | Tests run | Verdict | Failing tests |
+| --- | --- | --- | --- | --- |
+| 01 `01-t6-requeues-committing.patch` | Step 8 / Step 9's M2: recovery requeues an expired `committing` job (a blind retry after the intent) | `stateMachine.property.test.ts`, `stateMachine.test.ts` | caught | 18 |
+| 02 `02-t2-revives-expired-lease.patch` | Step 8: the heartbeat (T2) extends a lease that already expired (no `lease_expires_at > now()`) | `modelVsReal.db.test.ts` | caught | 2 |
+| 03 `03-t6-no-token-bump.patch` | Step 8: recovery (T6.1/T6.2/T6.6) does not bump the fencing token | `modelVsReal.db.test.ts` | caught | 2 |
+| 04 `04-m1-single-zero-decides.patch` | Step 9's M1: one 0-match lookup decides (no settle, no second lookup) | `stateMachine.property.test.ts` | caught | 10 |
+| 05 `05-m3-zero-one-not-committed.patch` | Step 9's M3: lookups [0, 1] read as not committed | `stateMachine.property.test.ts` | caught | 3 |
+| 06 `06-m4-refusal-retried.patch` | Step 9's M4: a refusal shown after Submit is retried instead of final | `stateMachine.property.test.ts` | caught | 1 |
+| 07 `07-reconcile-ignores-duplicates.patch` | Step 10: the reconcile pass reads 2+ matches as reconciled (the duplicate stays silent) | `stateMachine.property.test.ts`, `stateMachine.test.ts` | caught | 8 |
+| 08 `08-t4-requeue-without-not-before.patch` | Step 10: T4's requeue after a failure sets no not_before (retries do not back off) | `modelVsReal.db.test.ts`, `complete.db.test.ts` | caught | 3 |
+
+Caught: 8/8.
+
+RESULT: PASS

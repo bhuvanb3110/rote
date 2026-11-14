@@ -1,0 +1,13 @@
+diff --git a/src/fleet/stateMachine.ts b/src/fleet/stateMachine.ts
+index 94b8122..7d834ff 100644
+--- a/src/fleet/stateMachine.ts
++++ b/src/fleet/stateMachine.ts
+@@ -705,7 +705,7 @@ export function reconcileDecision(input: ReconcileInput): ReconcileDecision {
+   const { reading } = input;
+   switch (reading.kind) {
+     case "count":
+-      if (reading.n === 1) return { decision: "reconciled", to: "succeeded", outcome: null, matches: 1, firstMatchRef: reading.firstMatchRef, error: null };
++      if (reading.n >= 1) return { decision: "reconciled", to: "succeeded", outcome: null, matches: 1, firstMatchRef: reading.firstMatchRef, error: null };
+       if (reading.n >= 2) {
+         return {
+           decision: "duplicate_suspected",

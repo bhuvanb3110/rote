@@ -1,0 +1,13 @@
+diff --git a/src/fleet/stateMachine.ts b/src/fleet/stateMachine.ts
+index 94b8122..cba48e9 100644
+--- a/src/fleet/stateMachine.ts
++++ b/src/fleet/stateMachine.ts
+@@ -513,7 +513,7 @@ export function afterRetry(reading: LookupReading): LookupReading {
+ export function readingsComplete(readings: readonly LookupReading[]): boolean {
+   const first = readings[0];
+   if (!first) return false;
+-  if (first.kind !== "count" || first.n !== 0) return true;
++  if (first.kind !== "count" || first.n !== 0 || true) return true;
+   return readings.length >= 2;
+ }
+ 
