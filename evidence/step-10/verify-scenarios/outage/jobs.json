@@ -1,0 +1,144 @@
+[
+  {
+    "id": "b5985cd0-ff68-412e-bf15-ca1ea4e05c68",
+    "idempotency_key": "outage-0",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 8,
+    "trace_id": "7125cbfb2254cdf42f4b792138d1b1af",
+    "commit_intent_at": "2026-11-14T17:08:39.844Z",
+    "outcome": "already_done",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000001"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/step-10/verify-scenarios/outage/worker-evidence/transfer-history-lookup-2026-11-14T17-09-23-888Z-a3633354/run.jsonl",
+      "recoveredBy": "verify"
+    },
+    "memo_key": "rote-b5985cd0-ff68-412e-bf15-ca1ea4e05c68",
+    "created_at": "2026-11-14T17:08:34.748Z",
+    "updated_at": "2026-11-14T17:09:25.176Z",
+    "not_before": null,
+    "reconcile_after": null,
+    "reconciled_at": null
+  },
+  {
+    "id": "d30aa02c-f540-4301-beca-72fa8071b7dc",
+    "idempotency_key": "outage-1",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 2,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 10,
+    "trace_id": "c013668fb33cbb9dcd61273f921a38ee",
+    "commit_intent_at": "2026-11-14T17:09:33.762Z",
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000003"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/step-10/verify-scenarios/outage/worker-evidence/transfer-2026-11-14T17-09-32-426Z-e5499782/run.jsonl"
+    },
+    "memo_key": "rote-d30aa02c-f540-4301-beca-72fa8071b7dc",
+    "created_at": "2026-11-14T17:08:34.760Z",
+    "updated_at": "2026-11-14T17:10:10.330Z",
+    "not_before": null,
+    "reconcile_after": "2026-11-14T17:10:09.006Z",
+    "reconciled_at": "2026-11-14T17:10:10.330Z"
+  },
+  {
+    "id": "ea149f58-2310-4a88-8fb4-c96d4cfe856b",
+    "idempotency_key": "outage-2",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 8,
+    "trace_id": "ba9f2aa535f9324efad14b668f397fb1",
+    "commit_intent_at": "2026-11-14T17:08:40.805Z",
+    "outcome": "already_done",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000002"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/step-10/verify-scenarios/outage/worker-evidence/transfer-history-lookup-2026-11-14T17-09-31-395Z-67bee5f7/run.jsonl",
+      "recoveredBy": "verify"
+    },
+    "memo_key": "rote-ea149f58-2310-4a88-8fb4-c96d4cfe856b",
+    "created_at": "2026-11-14T17:08:34.765Z",
+    "updated_at": "2026-11-14T17:09:32.526Z",
+    "not_before": null,
+    "reconcile_after": null,
+    "reconciled_at": null
+  },
+  {
+    "id": "f44f475a-80db-4676-8e1f-da6f7a7ad799",
+    "idempotency_key": "outage-3",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 2,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 10,
+    "trace_id": "7db1c09f25ac482ba073bceaf019520d",
+    "commit_intent_at": "2026-11-14T17:09:33.940Z",
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000004"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/step-10/verify-scenarios/outage/worker-evidence/transfer-2026-11-14T17-09-32-605Z-4a054436/run.jsonl"
+    },
+    "memo_key": "rote-f44f475a-80db-4676-8e1f-da6f7a7ad799",
+    "created_at": "2026-11-14T17:08:34.770Z",
+    "updated_at": "2026-11-14T17:10:10.925Z",
+    "not_before": null,
+    "reconcile_after": "2026-11-14T17:10:09.171Z",
+    "reconciled_at": "2026-11-14T17:10:10.925Z"
+  }
+]

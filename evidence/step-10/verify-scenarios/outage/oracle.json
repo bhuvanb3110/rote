@@ -1,0 +1,82 @@
+{
+  "jobs": 4,
+  "ledgerRows": 4,
+  "drainTimedOut": false,
+  "byState": {
+    "succeeded": 4
+  },
+  "counts": {
+    "ok": 4,
+    "DUPLICATE": 0,
+    "MISSING_COMMIT": 0,
+    "UNRECORDED_COMMIT": 0,
+    "MISMATCH": 0,
+    "LOST": 0,
+    "PENDING": 0,
+    "ORPHAN": 0
+  },
+  "findings": [
+    {
+      "jobId": "b5985cd0-ff68-412e-bf15-ca1ea4e05c68",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "already_done",
+      "attempt": 1,
+      "memoKey": "rote-b5985cd0-ff68-412e-bf15-ca1ea4e05c68",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000001"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000001), confirmationRef matches"
+    },
+    {
+      "jobId": "d30aa02c-f540-4301-beca-72fa8071b7dc",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-d30aa02c-f540-4301-beca-72fa8071b7dc",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000003"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000003), confirmationRef matches"
+    },
+    {
+      "jobId": "ea149f58-2310-4a88-8fb4-c96d4cfe856b",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "already_done",
+      "attempt": 1,
+      "memoKey": "rote-ea149f58-2310-4a88-8fb4-c96d4cfe856b",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000002"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000002), confirmationRef matches"
+    },
+    {
+      "jobId": "f44f475a-80db-4676-8e1f-da6f7a7ad799",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-f44f475a-80db-4676-8e1f-da6f7a7ad799",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000004"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000004), confirmationRef matches"
+    }
+  ],
+  "orphans": [],
+  "pass": true
+}

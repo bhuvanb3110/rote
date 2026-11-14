@@ -1,0 +1,274 @@
+[
+  {
+    "id": 1,
+    "job_id": "b5985cd0-ff68-412e-bf15-ca1ea4e05c68",
+    "fencing_token": 2,
+    "worker_id": "clean-0",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:08:45.494Z",
+    "ended_at": "2026-11-14T17:08:45.947Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 5 s (deferral 1; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 2,
+    "job_id": "f44f475a-80db-4676-8e1f-da6f7a7ad799",
+    "fencing_token": 2,
+    "worker_id": "clean-0",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:08:45.956Z",
+    "ended_at": "2026-11-14T17:08:46.342Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 5 s (deferral 1; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 3,
+    "job_id": "d30aa02c-f540-4301-beca-72fa8071b7dc",
+    "fencing_token": 2,
+    "worker_id": "clean-1",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:08:46.024Z",
+    "ended_at": "2026-11-14T17:08:46.521Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 5 s (deferral 1; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 4,
+    "job_id": "ea149f58-2310-4a88-8fb4-c96d4cfe856b",
+    "fencing_token": 2,
+    "worker_id": "clean-0",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:08:46.350Z",
+    "ended_at": "2026-11-14T17:08:46.720Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 5 s (deferral 1; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 5,
+    "job_id": "b5985cd0-ff68-412e-bf15-ca1ea4e05c68",
+    "fencing_token": 4,
+    "worker_id": "clean-0",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:08:51.117Z",
+    "ended_at": "2026-11-14T17:08:51.519Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 10 s (deferral 2; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 6,
+    "job_id": "f44f475a-80db-4676-8e1f-da6f7a7ad799",
+    "fencing_token": 4,
+    "worker_id": "clean-0",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:08:51.526Z",
+    "ended_at": "2026-11-14T17:08:51.853Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 10 s (deferral 2; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 7,
+    "job_id": "d30aa02c-f540-4301-beca-72fa8071b7dc",
+    "fencing_token": 4,
+    "worker_id": "clean-0",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:08:51.859Z",
+    "ended_at": "2026-11-14T17:08:52.260Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 10 s (deferral 2; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 8,
+    "job_id": "ea149f58-2310-4a88-8fb4-c96d4cfe856b",
+    "fencing_token": 4,
+    "worker_id": "clean-0",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:08:52.267Z",
+    "ended_at": "2026-11-14T17:08:52.686Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 10 s (deferral 2; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 9,
+    "job_id": "b5985cd0-ff68-412e-bf15-ca1ea4e05c68",
+    "fencing_token": 6,
+    "worker_id": "clean-1",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:09:02.847Z",
+    "ended_at": "2026-11-14T17:09:03.205Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 20 s (deferral 3; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 10,
+    "job_id": "f44f475a-80db-4676-8e1f-da6f7a7ad799",
+    "fencing_token": 6,
+    "worker_id": "clean-1",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:09:03.211Z",
+    "ended_at": "2026-11-14T17:09:03.660Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 20 s (deferral 3; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 11,
+    "job_id": "d30aa02c-f540-4301-beca-72fa8071b7dc",
+    "fencing_token": 6,
+    "worker_id": "clean-0",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:09:03.324Z",
+    "ended_at": "2026-11-14T17:09:03.709Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 20 s (deferral 3; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 12,
+    "job_id": "ea149f58-2310-4a88-8fb4-c96d4cfe856b",
+    "fencing_token": 6,
+    "worker_id": "clean-1",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:09:03.668Z",
+    "ended_at": "2026-11-14T17:09:04.016Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 20 s (deferral 3; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 13,
+    "job_id": "b5985cd0-ff68-412e-bf15-ca1ea4e05c68",
+    "fencing_token": 8,
+    "worker_id": "clean-1",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:09:23.870Z",
+    "ended_at": "2026-11-14T17:09:25.176Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 14,
+    "job_id": "f44f475a-80db-4676-8e1f-da6f7a7ad799",
+    "fencing_token": 8,
+    "worker_id": "clean-0",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:09:24.262Z",
+    "ended_at": "2026-11-14T17:09:31.368Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 15,
+    "job_id": "d30aa02c-f540-4301-beca-72fa8071b7dc",
+    "fencing_token": 8,
+    "worker_id": "clean-1",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:09:25.192Z",
+    "ended_at": "2026-11-14T17:09:32.381Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 16,
+    "job_id": "ea149f58-2310-4a88-8fb4-c96d4cfe856b",
+    "fencing_token": 8,
+    "worker_id": "clean-0",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:09:31.375Z",
+    "ended_at": "2026-11-14T17:09:32.526Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 17,
+    "job_id": "d30aa02c-f540-4301-beca-72fa8071b7dc",
+    "fencing_token": 10,
+    "worker_id": "clean-1",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:10:09.371Z",
+    "ended_at": "2026-11-14T17:10:10.330Z",
+    "lookups": [
+      1
+    ],
+    "decision": "reconciled",
+    "error": null
+  },
+  {
+    "id": 18,
+    "job_id": "f44f475a-80db-4676-8e1f-da6f7a7ad799",
+    "fencing_token": 10,
+    "worker_id": "clean-0",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:10:09.952Z",
+    "ended_at": "2026-11-14T17:10:10.925Z",
+    "lookups": [
+      1
+    ],
+    "decision": "reconciled",
+    "error": null
+  }
+]
