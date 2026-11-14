@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "job_id": "0ebbd4a1-bc0b-48b2-91de-606c9c9a27f7",
+    "fencing_token": 2,
+    "worker_id": "clean-before-submit",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-14T07:13:08.514Z",
+    "ended_at": "2026-11-14T07:13:15.613Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  }
+]

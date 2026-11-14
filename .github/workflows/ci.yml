@@ -124,7 +124,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          npm run crash-matrix -- --lease-seconds 5 --heartbeat-seconds 2 --expect step-08 --drain-timeout 30s --out crash-matrix-report 2>&1 | tee crash-matrix-stdout.txt
+          npm run crash-matrix -- --lease-seconds 5 --heartbeat-seconds 2 --expect step-09 --drain-timeout 60s --out crash-matrix-report 2>&1 | tee crash-matrix-stdout.txt
       - if: always()
         name: matrix to the job summary
         shell: bash

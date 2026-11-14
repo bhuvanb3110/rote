@@ -3,7 +3,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { createFaultInjector, FaultConfigError, NO_FAULT, parseFaultConfig, TRANSFER_FAULT_POINTS } from "./fault.js";
+import { createFaultInjector, FaultConfigError, NO_FAULT, parseFaultConfig, RECOVERY_FAULT_POINTS, TRANSFER_FAULT_POINTS } from "./fault.js";
 
 const run = promisify(execFile);
 
@@ -24,11 +24,19 @@ describe("parseFaultConfig", () => {
     expect(() => parseFaultConfig({ ROTE_FAULT_ENABLE: "1" })).toThrow(/ROTE_FAULT is not/);
   });
 
-  it("refuses an unknown point; accepts every transfer point", () => {
-    for (const bad of ["after-submitt", "after-step-1", "before-dequeue", "AFTER-SUBMIT", "after-step-011"]) {
+  it("refuses an unknown point; accepts every transfer point and every recovery-internal point (Step 9)", () => {
+    for (const bad of ["after-submitt", "after-step-1", "before-dequeue", "AFTER-SUBMIT", "after-step-011", "verify-after", "recover-in-transactions"]) {
       expect(() => parseFaultConfig({ ROTE_FAULT: bad, ROTE_FAULT_ENABLE: "1" }), bad).toThrow(/not a known fault point/);
     }
-    for (const point of TRANSFER_FAULT_POINTS) expect(parseFaultConfig({ ROTE_FAULT: point, ROTE_FAULT_ENABLE: "1" })).toBe(point);
+    for (const point of [...TRANSFER_FAULT_POINTS, ...RECOVERY_FAULT_POINTS]) expect(parseFaultConfig({ ROTE_FAULT: point, ROTE_FAULT_ENABLE: "1" })).toBe(point);
+    expect(RECOVERY_FAULT_POINTS).toEqual([
+      "verify-after-login",
+      "verify-after-count",
+      "verify-before-result",
+      "verify-before-requeue",
+      "verify-after-requeue",
+      "recover-in-transaction",
+    ]);
   });
 
   it("the matrix covers every boundary of the 12-step transfer, in order", () => {
