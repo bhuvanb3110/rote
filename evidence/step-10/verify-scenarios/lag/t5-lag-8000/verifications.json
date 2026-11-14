@@ -1,0 +1,33 @@
+[
+  {
+    "id": 1,
+    "job_id": "e362074c-90b7-4c91-b4f1-a1c3b504f698",
+    "fencing_token": 2,
+    "worker_id": "worker-t5-lag-8000",
+    "reason": "commit_uncertain",
+    "prior_status": "failure",
+    "started_at": "2026-11-14T17:05:35.741Z",
+    "ended_at": "2026-11-14T17:05:42.814Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 2,
+    "job_id": "e362074c-90b7-4c91-b4f1-a1c3b504f698",
+    "fencing_token": 4,
+    "worker_id": "worker-t5-lag-8000",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:06:19.406Z",
+    "ended_at": "2026-11-14T17:06:20.473Z",
+    "lookups": [
+      2
+    ],
+    "decision": "duplicate_suspected",
+    "error": "reconcile found 2 transfers with this memo_key after the job succeeded on a resubmit (first TXN-000001): a duplicate is suspected (a zombie's late click?). A human must check"
+  }
+]

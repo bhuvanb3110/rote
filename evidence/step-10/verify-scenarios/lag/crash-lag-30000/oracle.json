@@ -1,0 +1,38 @@
+{
+  "jobs": 1,
+  "ledgerRows": 2,
+  "drainTimedOut": false,
+  "byState": {
+    "needs_human": 1
+  },
+  "counts": {
+    "ok": 0,
+    "DUPLICATE": 1,
+    "MISSING_COMMIT": 0,
+    "UNRECORDED_COMMIT": 0,
+    "MISMATCH": 0,
+    "LOST": 0,
+    "PENDING": 0,
+    "ORPHAN": 0
+  },
+  "findings": [
+    {
+      "jobId": "599357f6-5da0-45c5-bb92-760f60275f98",
+      "tenant": "tenant-a",
+      "state": "needs_human",
+      "outcome": "duplicate_suspected",
+      "attempt": 2,
+      "memoKey": "rote-599357f6-5da0-45c5-bb92-760f60275f98",
+      "leaseOwner": null,
+      "rows": 2,
+      "rowIds": [
+        "TXN-000001",
+        "TXN-000002"
+      ],
+      "verdict": "DUPLICATE",
+      "detail": "2 ledger rows (TXN-000001, TXN-000002) for one job"
+    }
+  ],
+  "orphans": [],
+  "pass": false
+}

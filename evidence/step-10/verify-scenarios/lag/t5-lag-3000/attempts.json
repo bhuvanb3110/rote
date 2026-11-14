@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "job_id": "36fd043f-1516-4a14-9c5f-7a231889044d",
+    "attempt": 1,
+    "worker_id": "worker-t5-lag-3000",
+    "fencing_token": 1,
+    "started_at": "2026-11-14T17:05:24.624Z",
+    "ended_at": "2026-11-14T17:05:25.987Z",
+    "outcome": "failure",
+    "commit_uncertain": true,
+    "trace_id": "69d504dd089aee7afcc6630401685ee2",
+    "error": "commit uncertain (not retried blindly): Attempted the irreversible step, then the run ended in failure (unexpected-state) at step-12: Could not resolve a live locator for \"Transfer reference value\" (only the visual fallback matched, which is a documented stub — no coordinate clicking implemented yet).. Verifying in the bank's history by memo_key (T5).",
+    "commit_intent_at": "2026-11-14T17:05:25.748Z"
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "path": "crash",
+  "lagMs": 8000,
+  "settleMs": 5000,
+  "leaseSeconds": 5,
+  "rowAt": "2026-11-14T17:04:15.939Z",
+  "rowVisibleInHistoryAt": "2026-11-14T17:04:23.939Z",
+  "lookups": [
+    {
+      "run": "transfer-history-lookup-2026-11-14T17-04-21-469Z-722fb5ac",
+      "status": "success",
+      "renderAfterWriteMs": [
+        6673,
+        6839
+      ],
+      "predicted": 0,
+      "counted": 0
+    },
+    {
+      "run": "transfer-history-lookup-2026-11-14T17-04-28-040Z-510d0213",
+      "status": "success",
+      "renderAfterWriteMs": [
+        12827,
+        12938
+      ],
+      "predicted": 1,
+      "counted": 1
+    }
+  ],
+  "toleranceMs": 250
+}
