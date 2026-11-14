@@ -17,11 +17,14 @@
 // Workers, API and bank are stopped at the end (8 GB laptop) unless --keep-up.
 //
 // Step 7 (before-day2): failed by design -- nothing expired a lease or recovered a job.
-// Step 8: leases of 30 s with a 10 s heartbeat, recovery before every dequeue, the fenced commit intent.
-// Expected: RESULT: PASS (0 DUPLICATE, 0 LOST); a job killed before its intent is requeued (T6.1) and
-// finished by another worker; a job killed after its intent is needs_human / commit_uncertain (T6.3,
-// the interim until Step 9's verify). The report counts recoveries by label (from the attempt rows) and
-// how often a heartbeat or a fenced intent stopped a worker (from the container logs).
+// Step 8: leases of 30 s with a 10 s heartbeat, recovery before every dequeue, the fenced commit intent;
+// a job killed after its intent was parked needs_human / commit_uncertain (T6.3, the interim).
+// Step 9 (verify): a job killed after its intent is claimed by a recovering worker (T6.4) and verified in
+// the bank's history: [1] -> succeeded / already_done, [0, 0] -> resubmitted -> another attempt.
+// Expected: RESULT: PASS = the oracle passes (0 DUPLICATE, 0 LOST) AND no job is left needs_human (no
+// bank faults are injected, so every job is decidable). The report counts recoveries by label (attempt
+// and verify-phase rows), the verify decisions (job_verifications), and how often a heartbeat or a fenced
+// intent stopped a worker (container logs).
 import "dotenv/config";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -84,7 +87,7 @@ async function main(): Promise<void> {
   const dbUrl = databaseUrlFromEnv();
   const pool = createPool({ connectionString: dbUrl, max: 4 });
   log(`database: ${redactDatabaseUrl(dbUrl)}`);
-  await pool.query("TRUNCATE jobs, job_attempts, breakers RESTART IDENTITY CASCADE");
+  await pool.query("TRUNCATE jobs, job_attempts, job_verifications, breakers RESTART IDENTITY CASCADE");
   const reset = await fetch(`${BANK}/control/ledger/reset`);
   if (!reset.ok) throw new Error(`ledger reset -> HTTP ${reset.status}`);
   log(`reset: queue tables truncated; bank ledger rows: ${(await fetchLedger(BANK)).length}`);
@@ -202,6 +205,7 @@ async function main(): Promise<void> {
   // 6. Oracle + evidence.
   const jobs = await readJobs(pool);
   const attempts = (await pool.query("SELECT * FROM job_attempts ORDER BY id")).rows;
+  const verifications = (await pool.query("SELECT * FROM job_verifications ORDER BY id")).rows;
   const ledger = await fetchLedger(BANK);
   const report = checkLedger({ jobs, ledger, drainTimedOut });
   const killEvents = events.map((e) => JSON.parse(e)).filter((e) => e.kind === "kill" || e.kind === "pause");
@@ -218,18 +222,26 @@ async function main(): Promise<void> {
   log("");
   log(`kills executed: ${killEvents.filter((e) => e.kind === "kill").length}; restarts: ${events.filter((e) => JSON.parse(e).kind === "start").length}; ` +
     `errors: ${events.filter((e) => /-error"/.test(e)).length}`);
-  // Day 2: what recovered what (attempt rows closed by recovery carry "(T6.x kind)"), and the protections
-  // that fired in the workers (their own log lines).
+  // Day 2: what recovered what (attempt rows and verify-phase rows closed by recovery carry "(T6.x kind)"),
+  // what every verify phase decided, and the protections that fired in the workers (their own log lines).
   const labels = new Map<string, number>();
-  for (const a of attempts as Array<{ outcome: string | null; error: string | null }>) {
+  for (const a of [...attempts, ...verifications] as Array<{ outcome?: string | null; decision?: string | null; error: string | null }>) {
     const m = a.error ? /\((T6\.\d) (\w+)\)/.exec(a.error) : null;
-    if (a.outcome === "crashed" && m) labels.set(`${m[1]} ${m[2]}`, (labels.get(`${m[1]} ${m[2]}`) ?? 0) + 1);
+    if ((a.outcome === "crashed" || a.decision === "crashed") && m) labels.set(`${m[1]} ${m[2]}`, (labels.get(`${m[1]} ${m[2]}`) ?? 0) + 1);
   }
+  const decisions = new Map<string, number>();
+  for (const v of verifications as Array<{ reason: string; decision: string | null; lookups: Array<number | null> | null }>) {
+    const k = `${v.decision ?? "(open)"}${v.lookups ? JSON.stringify(v.lookups) : ""} (${v.reason})`;
+    decisions.set(k, (decisions.get(k) ?? 0) + 1);
+  }
+  const needsHuman = jobs.filter((j) => j.state === "needs_human");
   const attemptOutcomes = new Map<string, number>();
   for (const a of attempts as Array<{ outcome: string | null }>) attemptOutcomes.set(a.outcome ?? "(open)", (attemptOutcomes.get(a.outcome ?? "(open)") ?? 0) + 1);
   const states = new Map<string, number>();
   for (const j of jobs) states.set(`${j.state}${j.outcome ? `/${j.outcome}` : ""}`, (states.get(`${j.state}${j.outcome ? `/${j.outcome}` : ""}`) ?? 0) + 1);
-  log(`recoveries (T6, from the attempt rows): ${[...labels].sort().map(([k, n]) => `${k} x${n}`).join(", ") || "none"}`);
+  log(`recoveries (T6, from the attempt and verify-phase rows): ${[...labels].sort().map(([k, n]) => `${k} x${n}`).join(", ") || "none"}`);
+  log(`verify phases (job_verifications: decision[lookups] (reason)): ${[...decisions].sort().map(([k, n]) => `${k} x${n}`).join(", ") || "none"}`);
+  log(`needs_human jobs: ${needsHuman.length}${needsHuman.length ? ` (${needsHuman.map((j) => `${j.id} ${j.outcome}`).join(", ")})` : ""} (Step 9 expects 0: every job killed after its intent is verified)`);
   log(`attempt outcomes: ${[...attemptOutcomes].sort().map(([k, n]) => `${k} x${n}`).join(", ")}`);
   log(`final job states: ${[...states].sort().map(([k, n]) => `${k} x${n}`).join(", ")}`);
   const notTerminal = report.findings.filter((f) => f.verdict === "LOST" || f.verdict === "PENDING");
@@ -252,7 +264,8 @@ async function main(): Promise<void> {
   log(
     `worker protections fired (container logs): heartbeat lease lost x${count(/heartbeat: lease lost; aborting the job/)}, ` +
       `fenced commit intent x${count(/FencingError: commit intent refused/)}, completion fenced out x${count(/lease lost; outcome NOT recorded on the job/)}, ` +
-      `run aborted on a lost lease x${count(/lease lost; run aborted, outcome NOT recorded/)}`,
+      `run aborted on a lost lease x${count(/lease lost; run aborted, outcome NOT recorded/)}, ` +
+      `verify phase aborted on a lost lease x${count(/verify: lease lost; phase aborted/)}, verify decision fenced out x${count(/verify: lease lost; decision NOT recorded/)}`,
   );
   const leaks = Object.entries(FAKE_CREDS).filter(([, v]) =>
     [JSON.stringify(jobs), JSON.stringify(attempts), apiResponses.join("\n"), composeLogs].some((t) => t.includes(v)),
@@ -263,14 +276,21 @@ async function main(): Promise<void> {
   log("");
   // The oracle's report, then ONE final RESULT line (the oracle's own, unless a leak or OOM overrides it).
   for (const line of report.text.split("\n").slice(0, -1)) log(line);
-  const pass = report.pass && leaks.length === 0 && oom.length === 0;
-  log(pass ? "RESULT: PASS" : report.pass ? "RESULT: FAIL (the oracle passed, but a credential leaked or a worker was OOM-killed)" : "RESULT: FAIL");
+  const pass = report.pass && leaks.length === 0 && oom.length === 0 && needsHuman.length === 0;
+  log(
+    pass
+      ? "RESULT: PASS"
+      : report.pass
+        ? "RESULT: FAIL (the oracle passed, but a credential leaked, a worker was OOM-killed, or a job was left needs_human)"
+        : "RESULT: FAIL",
+  );
 
   await writeFile(path.join(OUT, "events.jsonl"), events.join("\n") + "\n");
   const { text: _text, ...reportJson } = report;
   await writeFile(path.join(OUT, "oracle.json"), JSON.stringify(reportJson, null, 2));
   await writeFile(path.join(OUT, "jobs.json"), JSON.stringify(jobs, null, 2));
   await writeFile(path.join(OUT, "attempts.json"), JSON.stringify(attempts, null, 2));
+  await writeFile(path.join(OUT, "verifications.json"), JSON.stringify(verifications, null, 2));
   await writeFile(path.join(OUT, "ledger.json"), JSON.stringify({ entries: ledger }, null, 2));
   await writeFile(path.join(OUT, "submitted.json"), JSON.stringify(submitted, null, 2));
   await writeFile(path.join(OUT, "docker-stats.jsonl"), statsLines.join("\n") + "\n");
