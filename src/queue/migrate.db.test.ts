@@ -32,15 +32,16 @@ async function tables(pool: Pool): Promise<string[]> {
 }
 
 describe("migrate()", () => {
-  it("applies 0001_init, 0002_day2 and 0003_verify once, in order, into an empty schema", async () => {
+  it("applies 0001_init, 0002_day2, 0003_verify and 0004_day2_exit once, in order, into an empty schema", async () => {
     const result = await migrate(db.pool, { dir });
-    expect(result).toEqual({ applied: ["0001_init", "0002_day2", "0003_verify"], alreadyApplied: [] });
+    expect(result).toEqual({ applied: ["0001_init", "0002_day2", "0003_verify", "0004_day2_exit"], alreadyApplied: [] });
     expect(await tables(db.pool)).toEqual(["breakers", "job_attempts", "job_verifications", "jobs", "schema_migrations", "tenants"]);
     const { rows } = await db.pool.query("SELECT version, length(checksum) AS len FROM schema_migrations ORDER BY version");
     expect(rows).toEqual([
       { version: "0001_init", len: 64 },
       { version: "0002_day2", len: 64 },
       { version: "0003_verify", len: 64 },
+      { version: "0004_day2_exit", len: 64 },
     ]);
     const seeded = await db.pool.query("SELECT id, max_concurrent FROM tenants ORDER BY id");
     expect(seeded.rows).toEqual([
@@ -52,8 +53,8 @@ describe("migrate()", () => {
 
   it("a rerun applies nothing", async () => {
     await migrate(db.pool, { dir });
-    expect(await migrate(db.pool, { dir })).toEqual({ applied: [], alreadyApplied: ["0001_init", "0002_day2", "0003_verify"] });
-    expect((await db.pool.query("SELECT count(*) AS n FROM schema_migrations")).rows[0].n).toBe(3);
+    expect(await migrate(db.pool, { dir })).toEqual({ applied: [], alreadyApplied: ["0001_init", "0002_day2", "0003_verify", "0004_day2_exit"] });
+    expect((await db.pool.query("SELECT count(*) AS n FROM schema_migrations")).rows[0].n).toBe(4);
   });
 
   it("an applied file that was edited fails loudly, naming it", async () => {
@@ -67,7 +68,7 @@ describe("migrate()", () => {
     await migrate(db.pool, { dir });
     const file = path.join(dir, "0001_init.sql");
     await writeFile(file, (await readFile(file, "utf8")).replace(/\n/g, "\r\n"));
-    expect(await migrate(db.pool, { dir })).toEqual({ applied: [], alreadyApplied: ["0001_init", "0002_day2", "0003_verify"] });
+    expect(await migrate(db.pool, { dir })).toEqual({ applied: [], alreadyApplied: ["0001_init", "0002_day2", "0003_verify", "0004_day2_exit"] });
   });
 
   it("an applied migration missing from the directory fails loudly", async () => {
@@ -80,9 +81,9 @@ describe("migrate()", () => {
     const other = createPool({ connectionString: testDatabaseUrl(), max: 2, searchPath: db.schema });
     extraPools.push(other);
     const [r1, r2] = await Promise.all([migrate(db.pool, { dir }), migrate(other, { dir })]);
-    expect([r1.applied, r2.applied].flat()).toEqual(["0001_init", "0002_day2", "0003_verify"]);
-    expect([r1.alreadyApplied, r2.alreadyApplied].flat()).toEqual(["0001_init", "0002_day2", "0003_verify"]);
-    expect((await db.pool.query("SELECT count(*) AS n FROM schema_migrations")).rows[0].n).toBe(3);
+    expect([r1.applied, r2.applied].flat()).toEqual(["0001_init", "0002_day2", "0003_verify", "0004_day2_exit"]);
+    expect([r1.alreadyApplied, r2.alreadyApplied].flat()).toEqual(["0001_init", "0002_day2", "0003_verify", "0004_day2_exit"]);
+    expect((await db.pool.query("SELECT count(*) AS n FROM schema_migrations")).rows[0].n).toBe(4);
   });
 
   it("a failing migration rolls back whole: no partial tables, no schema_migrations row, earlier ones kept", async () => {
@@ -91,7 +92,7 @@ describe("migrate()", () => {
     await expect(migrate(db.pool, { dir })).rejects.toThrow(/0099_broken failed and was rolled back: division by zero/);
     expect(await tables(db.pool)).not.toContain("half_done");
     const { rows } = await db.pool.query("SELECT version FROM schema_migrations ORDER BY 1");
-    expect(rows).toEqual([{ version: "0001_init" }, { version: "0002_day2" }, { version: "0003_verify" }]);
+    expect(rows).toEqual([{ version: "0001_init" }, { version: "0002_day2" }, { version: "0003_verify" }, { version: "0004_day2_exit" }]);
     // The runner released its advisory lock: a fixed file applies on the next run.
     await writeFile(path.join(dir, "0099_broken.sql"), "CREATE TABLE half_done (x int);\n");
     expect((await migrate(db.pool, { dir })).applied).toEqual(["0099_broken"]);

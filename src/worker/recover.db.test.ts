@@ -71,7 +71,8 @@ describe("T6: one row per line of the recovery table", () => {
     expect(r).toMatchObject({ jobId: job.id, from: "running", action: { kind: "requeue", label: "T6.1" }, previousToken: 1, fencingToken: 2, deadOwner: "dead-worker" });
     expect(r!.claim).toBeUndefined();
     const after = await row(job.id);
-    expect(after).toMatchObject({ state: "queued", fencing_token: 2, lease_owner: null, lease_expires_at: null, outcome: null, attempt: 1 });
+    // A crash requeue does not back off (D49): dequeueable at once.
+    expect(after).toMatchObject({ state: "queued", fencing_token: 2, lease_owner: null, lease_expires_at: null, outcome: null, attempt: 1, not_before: null });
     expect(after.error).toMatch(/lease expired while running \(attempt 1\/3\), before any commit intent; requeued \(T6\.1: the lease of dead-worker expired; recovered by rescuer\)/);
     const [a] = await attemptRows(job.id);
     expect(a).toMatchObject({ outcome: "crashed", fencing_token: 1 });

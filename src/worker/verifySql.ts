@@ -7,7 +7,8 @@
 //                                 verify phase: running/committing -> verifying, token + 1, a fresh lease,
 //                                 its attempt row closed, a job_verifications row (starts a verify cycle)
 //   T7  VERIFY_RESULT_SQL         the verifier writes its decision and releases the job (a resubmit
-//                                 clears commit_intent_at); its phase row gets the decision and lookups
+//                                 clears commit_intent_at, and is dequeueable at once: not_before NULL,
+//                                 D49); its phase row gets the decision and lookups
 //   T8  VERIFY_DEFER_SQL          the bank is unavailable: the job STAYS verifying, token + 1 (the
 //                                 deferring verifier is fenced out of its own job), the lease set to
 //                                 now + the backoff, lease_owner kept (jobs_active_has_owner); recovery
@@ -144,6 +145,7 @@ SET state = $4, outcome = $5, error = $6,
     result = CASE WHEN $4 = 'succeeded' THEN $7::jsonb
                   ELSE COALESCE(result, '{}'::jsonb) || jsonb_build_object('verify', $8::jsonb) END,
     commit_intent_at = CASE WHEN $4 = 'queued' THEN NULL ELSE commit_intent_at END,
+    not_before = NULL,
     lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
 WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3 AND state = 'verifying'
   AND $4 IN ('succeeded', 'queued', 'failed', 'business_outcome', 'needs_human')

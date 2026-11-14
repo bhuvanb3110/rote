@@ -25,6 +25,9 @@
 //   property 2  no duplicate at all when no click lands more than lease + settle after the clicker's
 //               lease was last extended (no pause spans lease + settle), with no history lag;
 //   property 5  every requeue after an intent passed through a verify whose two lookups counted 0.
+//
+// Step 10 adds the requeue backoff (D49): T4's requeue after a failure sets not_before, and a separate
+// simulation (below) proves that an outage shorter than the backoff schedule fails no job.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import type { ReplayResult } from "../artifact/index.js";
@@ -50,8 +53,11 @@ import {
   alreadyDoneResult,
   jobOutcomeFor,
   lookupsColumn,
+  minRequeueScheduleSeconds,
   readingsComplete,
+  requeueBackoffSeconds,
   verifyDecision,
+  type CompletionTarget,
   type DeferConfig,
   type LookupReading,
   type RunEnd,
@@ -321,7 +327,9 @@ function finishRun(world: World, w: SimWorker, end: RunEnd, irreversibleStarted:
     Object.assign(w, IDLE());
     return;
   }
-  const { db, result } = modelComplete(world.db, refOf(w), outcome.state, outcome.outcome, outcome.result);
+  // A requeue backs off as the worker's does (D49), with the jitter at its middle (x 1.0): 10 s, 30 s.
+  const notBeforeSeconds = outcome.state === "queued" ? requeueBackoffSeconds(attempt, () => 0.5) : null;
+  const { db, result } = modelComplete(world.db, refOf(w), outcome.state, outcome.outcome, outcome.result, { notBeforeSeconds });
   if (result === "check_violation") world.violations.push(`T4 would violate jobs_queued_has_attempts_left (${outcome.state} at attempt ${attempt})`);
   commit(world, db);
   Object.assign(w, IDLE());
@@ -1011,5 +1019,118 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
     ]);
     expect(job(world)).toMatchObject({ state: "needs_human", outcome: "verify_exhausted" });
     expect(job(world).phases.map((p) => p.decision)).toEqual(["crashed", "crashed", "crashed"]);
+  });
+});
+
+// ------------------------------------------------------------------------- requeue backoff (D49)
+//
+// Step 10 (docs/plans/step-10.md section 1, reviewer decision 2): retries back off. A separate, smaller
+// simulation, because the property is about time, not interleavings: ONE job (3 attempts), 1-3 workers
+// that poll as eagerly as possible (every worker after every clock step: the worst case for retry
+// pressure), and ONE bank outage [start, start + D). A run is instantaneous at its dequeue: while the
+// bank is down it fails before Submit (the bank's 503 page, a `failure` result), else it transfers.
+// Every transition goes through the model (modelDequeue, modelComplete with the backoff, modelIntent) and
+// the real jobOutcomeFor / requeueBackoffSeconds.
+
+interface OutageScenario {
+  workers: number;
+  outageStart: number;
+  outageSeconds: number;
+  /** Clock steps; after each, every worker polls. */
+  steps: number[];
+  /** The jitter draw (random() in [0, 1)) of each requeue, in order. */
+  jitters: number[];
+}
+
+const BACKOFF_MAX_ATTEMPTS = 3;
+const MIN_SCHEDULE = minRequeueScheduleSeconds(BACKOFF_MAX_ATTEMPTS); // 32 s with the defaults
+
+function outageArbOf(outage: fc.Arbitrary<number>): fc.Arbitrary<OutageScenario> {
+  return fc.record({
+    workers: fc.integer({ min: 1, max: 3 }),
+    outageStart: fc.oneof(fc.constant(0), fc.double({ min: 0, max: 60, noNaN: true })),
+    outageSeconds: outage,
+    steps: fc.array(fc.constantFrom(0.25, 0.5, 1, 2, 5), { minLength: 1, maxLength: 80 }),
+    jitters: fc.array(fc.oneof(fc.constant(0), fc.double({ min: 0, max: 1, maxExcluded: true, noNaN: true })), { minLength: BACKOFF_MAX_ATTEMPTS, maxLength: BACKOFF_MAX_ATTEMPTS }),
+  });
+}
+
+const FAILURE_503: ReplayResult = { status: "failure", atStepId: "step-03", expected: "the member search page", observed: "503 System unavailable", category: "unexpected-state", evidenceRef: EV };
+
+/** Runs the scenario to the end (eager polling continues, 1 s steps, until the job is terminal). */
+function simulateOutage(s: OutageScenario, backoff: (attempt: number, random: () => number) => number): { final: ModelJob; rows: number; attemptsDuringOutage: number } {
+  let db: ModelDb = { now: 0, caps: { [TENANT]: 2 }, jobs: [newJob({ id: JOB_ID, tenant: TENANT, seq: 1, maxAttempts: BACKOFF_MAX_ATTEMPTS })] };
+  let rows = 0;
+  let requeues = 0;
+  let attemptsDuringOutage = 0;
+  const down = () => db.now >= s.outageStart && db.now < s.outageStart + s.outageSeconds;
+  const poll = (w: number) => {
+    const owner = `w${w}`;
+    const { db: leased, job: j } = modelDequeue(db, owner, LEASE);
+    db = leased;
+    if (!j) return;
+    const ref: LeaseRef = { jobId: j.id, token: j.token, owner };
+    if (down()) {
+      attemptsDuringOutage += 1;
+      const outcome = jobOutcomeFor({ kind: "result", result: FAILURE_503 }, { attempt: j.attempt, maxAttempts: j.maxAttempts, irreversibleStarted: false });
+      const jitter = s.jitters[requeues] ?? 0.5;
+      if (outcome.state === "queued") requeues += 1;
+      const notBeforeSeconds = outcome.state === "queued" ? backoff(j.attempt, () => jitter) : null;
+      db = modelComplete(db, ref, outcome.state as CompletionTarget, outcome.outcome, outcome.result, { notBeforeSeconds }).db;
+      return;
+    }
+    db = modelIntent(db, ref, LEASE).db;
+    rows += 1;
+    db = modelComplete(db, ref, "succeeded", "success", { status: "success", outputs: { confirmationRef: `TXN-${rows}` } }).db;
+  };
+  const pollAll = () => {
+    for (let w = 0; w < s.workers && !isTerminal(db.jobs[0]!.state); w += 1) poll(w);
+  };
+  pollAll();
+  for (const dt of s.steps) {
+    if (isTerminal(db.jobs[0]!.state)) break;
+    db = modelTick(db, dt);
+    pollAll();
+  }
+  for (let guard = 0; guard < 1000 && !isTerminal(db.jobs[0]!.state); guard += 1) {
+    db = modelTick(db, 1);
+    pollAll();
+  }
+  return { final: db.jobs[0]!, rows, attemptsDuringOutage };
+}
+
+describe(`the requeue backoff (Step 10, D49): retries back off; the shortest schedule to the 3rd attempt is ${MIN_SCHEDULE} s`, () => {
+  it(`property 7: a bank outage shorter than the backoff schedule (< ${MIN_SCHEDULE} s, 3 attempts) fails no job, however eagerly the workers poll: it ends succeeded with exactly 1 row`, () => {
+    fc.assert(
+      fc.property(outageArbOf(fc.double({ min: 0.5, max: MIN_SCHEDULE, maxExcluded: true, noNaN: true })), (s) => {
+        const r = simulateOutage(s, requeueBackoffSeconds);
+        expect(r.final.state, `attempts during the outage: ${r.attemptsDuringOutage}`).toBe("succeeded");
+        expect(r.final.attempt).toBeLessThanOrEqual(BACKOFF_MAX_ATTEMPTS);
+        expect(r.rows).toBe(1);
+      }),
+      params,
+    );
+  }, PROPERTY_TIMEOUT_MS);
+
+  it("property 7's bound is tight, and the backoff is what holds it: a longer outage can fail a job, and so can a 30 s outage with no backoff (the 'T4 requeue without not_before' mutant)", () => {
+    const longer = fc.check(
+      fc.property(outageArbOf(fc.double({ min: MIN_SCHEDULE + 0.5, max: 90, noNaN: true })), (s) => simulateOutage(s, requeueBackoffSeconds).final.state !== "failed"),
+      params,
+    );
+    expect(longer.failed, "fast-check found no failed job with an outage longer than the schedule").toBe(true);
+    const noBackoff = fc.check(
+      fc.property(outageArbOf(fc.constant(30)), (s) => simulateOutage(s, () => 0).final.state !== "failed"),
+      params,
+    );
+    expect(noBackoff.failed, "fast-check found no failed job without the backoff").toBe(true);
+    // The shrunk counterexample: every attempt landed inside the outage.
+    const [shrunk] = noBackoff.counterexample!;
+    const r = simulateOutage(shrunk, () => 0);
+    expect(r).toMatchObject({ final: { state: "failed", attempt: BACKOFF_MAX_ATTEMPTS }, rows: 0, attemptsDuringOutage: BACKOFF_MAX_ATTEMPTS });
+  }, PROPERTY_TIMEOUT_MS);
+
+  it("deterministic: the brief's 30 s outage starting with the first attempt, the smallest jitter, a worker polling every 250 ms: attempts at 0 s, 8 s and 32 s; the third succeeds", () => {
+    const r = simulateOutage({ workers: 1, outageStart: 0, outageSeconds: 30, steps: Array.from({ length: 200 }, () => 0.25), jitters: [0, 0, 0] }, requeueBackoffSeconds);
+    expect(r).toMatchObject({ final: { state: "succeeded", attempt: 3 }, rows: 1, attemptsDuringOutage: 2 });
   });
 });

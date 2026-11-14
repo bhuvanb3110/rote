@@ -42,6 +42,12 @@ export const JobRowSchema = z.object({
   memo_key: z.string().length(41),
   created_at: z.date(),
   updated_at: z.date(),
+  /** 0004 (D49): a queued job is not dequeued before this (the requeue backoff); NULL = at once. */
+  not_before: z.date().nullable(),
+  /** 0004 (D50): set when a job succeeds after a resubmit; the reconcile pass re-reads it from then. */
+  reconcile_after: z.date().nullable(),
+  /** 0004 (D50): when the reconcile pass decided (reconciled, duplicate_suspected or reconcile_unreadable). */
+  reconciled_at: z.date().nullable(),
 });
 export type JobRow = z.infer<typeof JobRowSchema>;
 

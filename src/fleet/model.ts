@@ -1,10 +1,11 @@
 // A pure model of the `jobs` table under the fleet's SQL (docs/plans/step-08.md section 7, reviewer
 // addition R1). Each function mirrors ONE statement's guard and effect, line for line:
 //
-//   modelDequeue            src/queue/dequeue.ts     CLAIM_TENANT_SQL + PICK_JOB_SQL + LEASE_SQL
+//   modelDequeue            src/queue/dequeue.ts     CLAIM_TENANT_SQL + PICK_JOB_SQL + LEASE_SQL (due jobs only: not_before)
 //   modelHeartbeat          src/worker/heartbeat.ts  T2  HEARTBEAT_SQL
 //   modelIntent             src/worker/intent.ts     T3  COMMIT_INTENT_SQL
-//   modelComplete           src/worker/complete.ts   T4  COMPLETE_JOB_SQL (+ the jobs_queued_has_attempts_left CHECK)
+//   modelComplete           src/worker/complete.ts   T4  COMPLETE_JOB_SQL (+ the jobs_queued_has_attempts_left CHECK;
+//                                                        a requeue's not_before backoff, D49)
 //   modelCompleteIntoVerify src/worker/verifySql.ts  T5  COMPLETE_INTO_VERIFY_SQL + its job_verifications row
 //   modelVerifyResult       src/worker/verifySql.ts  T7  VERIFY_RESULT_SQL + the phase's decision
 //   modelVerifyDefer        src/worker/verifySql.ts  T8  VERIFY_DEFER_SQL + the phase's decision (step-09 decision 5)
@@ -57,6 +58,8 @@ export interface ModelJob {
   readonly owner: string | null;
   /** Seconds on the database clock; null = no lease. */
   readonly leaseExpiresAt: number | null;
+  /** A queued job is not dequeued before this (T4's requeue backoff, D49); null = at once. */
+  readonly notBefore: number | null;
   readonly commitIntentAt: number | null;
   readonly outcome: string | null;
   /** What T4 wrote (the ReplayResult); the oracle reads result.outputs.confirmationRef. */
@@ -104,6 +107,7 @@ export function newJob(fields: { id: string; tenant: string; seq: number; maxAtt
     token: 0,
     owner: null,
     leaseExpiresAt: null,
+    notBefore: null,
     commitIntentAt: null,
     outcome: null,
     result: null,
@@ -127,14 +131,17 @@ const leaseAlive = (job: ModelJob, now: number) => job.leaseExpiresAt !== null &
 const leaseExpired = (job: ModelJob, now: number) => job.leaseExpiresAt !== null && job.leaseExpiresAt < now;
 const holds = (job: ModelJob, ref: LeaseRef) => job.token === ref.token && job.owner === ref.owner;
 
+/** A queued job's backoff has passed: `not_before IS NULL OR not_before <= now()` (D49). */
+const due = (job: ModelJob, now: number) => job.notBefore === null || job.notBefore <= now;
+
 /**
- * dequeue(): claim the tenant whose oldest queued job is oldest, among tenants with queued work and
- * fewer active jobs than max_concurrent (an expired, unrecovered lease still counts as active); lease
- * its oldest queued job: running, attempt + 1, token + 1, owner, lease = now + leaseSeconds.
+ * dequeue(): claim the tenant whose oldest DUE queued job is oldest, among tenants with due queued work
+ * and fewer active jobs than max_concurrent (an expired, unrecovered lease still counts as active); lease
+ * that job: running, attempt + 1, token + 1, owner, lease = now + leaseSeconds, not_before cleared.
  */
 export function modelDequeue(db: ModelDb, owner: string, leaseSeconds: number): { db: ModelDb; job: ModelJob | null } {
   const queuedOf = (tenant: string) =>
-    db.jobs.filter((j) => j.tenant === tenant && j.state === "queued" && j.attempt < j.maxAttempts).sort((a, b) => a.seq - b.seq);
+    db.jobs.filter((j) => j.tenant === tenant && j.state === "queued" && j.attempt < j.maxAttempts && due(j, db.now)).sort((a, b) => a.seq - b.seq);
   const active = (tenant: string) => db.jobs.filter((j) => j.tenant === tenant && isActive(j.state)).length;
   const tenants = [...new Set(db.jobs.map((j) => j.tenant))]
     .filter((t) => queuedOf(t).length > 0 && active(t) < (db.caps[t] ?? 0))
@@ -149,6 +156,7 @@ export function modelDequeue(db: ModelDb, owner: string, leaseSeconds: number): 
     token: picked.token + 1,
     owner,
     leaseExpiresAt: db.now + leaseSeconds,
+    notBefore: null,
   };
   return { db: replace(db, leased), job: leased };
 }
@@ -179,10 +187,16 @@ export type ModelCompleteResult = "recorded" | "fenced" | "illegal_transition" |
 const fencedOut = (job: ModelJob, ref: LeaseRef): "fenced" | "illegal_transition" =>
   job.token === ref.token ? "illegal_transition" : "fenced";
 
+export interface ModelCompleteOptions {
+  /** A requeue's backoff (T4's $8, D49): not_before = now + this; null / omitted = dequeueable at once. */
+  notBeforeSeconds?: number | null;
+}
+
 /**
  * T4: the holder (token + owner) records its outcome and releases the lease. Not lease-checked: a
  * holder whose lease expired but was not yet recovered is still the only one who ran the job.
- * `check_violation` = Postgres would reject the UPDATE (a requeue with no attempt left, D21).
+ * `check_violation` = Postgres would reject the UPDATE (a requeue with no attempt left, D21). A requeue
+ * backs off (not_before = now + notBeforeSeconds); any other target leaves not_before null.
  */
 export function modelComplete(
   db: ModelDb,
@@ -190,12 +204,14 @@ export function modelComplete(
   to: CompletionTarget,
   outcome: string | null,
   result: unknown = null,
+  options: ModelCompleteOptions = {},
 ): { db: ModelDb; result: ModelCompleteResult } {
   const job = find(db, ref.jobId);
   if (!(holds(job, ref) && completionAllowed(job.state, to))) return { db, result: fencedOut(job, ref) };
   if (to === "queued" && !(job.attempt < job.maxAttempts)) return { db, result: "check_violation" };
+  const notBefore = to === "queued" && options.notBeforeSeconds != null ? db.now + options.notBeforeSeconds : null;
   return {
-    db: replace(db, { ...job, state: to, outcome, result, owner: null, leaseExpiresAt: null }),
+    db: replace(db, { ...job, state: to, outcome, result, notBefore, owner: null, leaseExpiresAt: null }),
     result: "recorded",
   };
 }
@@ -295,6 +311,7 @@ export function modelVerifyResult(
       outcome: decision.outcome,
       result: result === undefined ? job.result : result,
       commitIntentAt: decision.to === "queued" ? null : job.commitIntentAt,
+      notBefore: null, // a verified resubmit is dequeueable at once (D49)
       owner: null,
       leaseExpiresAt: null,
     },
@@ -408,6 +425,7 @@ export function modelRecover(
         token,
         owner: null,
         leaseExpiresAt: null,
+        notBefore: null, // a crash requeue (T6.1) does not back off (D49)
       };
     }
     current = replace(current, next);
@@ -426,4 +444,9 @@ export function modelTick(db: ModelDb, seconds: number): ModelDb {
 /** Seconds left on a job's lease (negative = expired), or null when it has none. */
 export function leaseRemaining(job: ModelJob, now: number): number | null {
   return job.leaseExpiresAt === null ? null : job.leaseExpiresAt - now;
+}
+
+/** Seconds until a queued job's backoff has passed (negative = due), or null when it has none (D49). */
+export function notBeforeRemaining(job: ModelJob, now: number): number | null {
+  return job.notBefore === null ? null : job.notBefore - now;
 }

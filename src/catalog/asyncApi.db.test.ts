@@ -202,9 +202,9 @@ describe("GET /jobs/:id?tenant=", () => {
     const res = await call(`${base}/jobs/${id}?tenant=tenant-b`, { method: "GET" });
     expect(res.status).toBe(200);
     expect(Object.keys(res.json).sort()).toEqual(
-      ["attempt", "capabilityId", "createdAt", "error", "id", "maxAttempts", "memoKey", "outcome", "result", "state", "tenant", "traceId", "updatedAt"].sort(),
+      ["attempt", "capabilityId", "createdAt", "error", "id", "maxAttempts", "memoKey", "notBefore", "outcome", "result", "state", "tenant", "traceId", "updatedAt"].sort(),
     );
-    expect(res.json).toMatchObject({ id, tenant: "tenant-b", state: "queued", attempt: 0, maxAttempts: 3, memoKey: `rote-${id}` });
+    expect(res.json).toMatchObject({ id, tenant: "tenant-b", state: "queued", attempt: 0, maxAttempts: 3, memoKey: `rote-${id}`, notBefore: null });
     expect(res.json.traceId).toMatch(/^[0-9a-f]{32}$/);
 
     const other = await call(`${base}/jobs/${id}?tenant=tenant-a`, { method: "GET" });

@@ -303,6 +303,54 @@ describe("reviewer decision 7: the database clock, never the worker's", () => {
   });
 });
 
+describe("the requeue backoff (Step 10, D49): a queued job is not dequeued before its not_before", () => {
+  const holdBack = (id: string, seconds: number) => pool.query("UPDATE jobs SET not_before = now() + make_interval(secs => $2) WHERE id = $1", [id, seconds]);
+
+  it("a job whose not_before is in the future is skipped; once it has passed (database clock) the job is leased and not_before is cleared", async () => {
+    const [id] = await seed("tenant-a", 1);
+    await holdBack(id!, 30);
+    expect(await dequeue(pool, { workerId: "w" })).toBeNull();
+    await pool.query("UPDATE jobs SET not_before = now() - interval '1 millisecond' WHERE id = $1", [id]);
+    const job = await dequeue(pool, { workerId: "w" });
+    expect(job).toMatchObject({ id, state: "running", attempt: 1, not_before: null });
+  });
+
+  it("a held-back job does not block the next due one of the same tenant: the oldest DUE job is picked", async () => {
+    const [older, newer] = await seed("tenant-a", 2);
+    await holdBack(older!, 60);
+    expect((await dequeue(pool, { workerId: "w" }))!.id).toBe(newer);
+    expect(await dequeue(pool, { workerId: "w" })).toBeNull();
+  });
+
+  it("the tenant claim skips a tenant whose only queued jobs are not due: another tenant's younger due job is leased, and that tenant is never claimed in vain", async () => {
+    const [heldA] = await seed("tenant-a", 1, { ageSeconds: 100 }); // the oldest queued job overall
+    const [dueB] = await seed("tenant-b", 1);
+    await holdBack(heldA!, 60);
+    // CLAIM_TENANT_SQL alone: tenant-a is not even a candidate (its EXISTS and its ORDER BY see due jobs only).
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const claimed = await client.query<{ id: string }>(CLAIM_TENANT_SQL, [[]]);
+      expect(claimed.rows.map((r) => r.id)).toEqual(["tenant-b"]);
+      await client.query("ROLLBACK");
+    } finally {
+      client.release();
+    }
+    expect((await dequeue(pool, { workerId: "w" }))!.id).toBe(dueB);
+    expect(await dequeue(pool, { workerId: "w" })).toBeNull();
+  });
+
+  it("fairness counts only due work: a tenant's held-back OLD job does not put its younger due job first", async () => {
+    const [heldA] = await seed("tenant-a", 1, { ageSeconds: 100 });
+    const [dueA] = await seed("tenant-a", 1, { ageSeconds: 10 });
+    const [dueB] = await seed("tenant-b", 1, { ageSeconds: 50 });
+    await holdBack(heldA!, 60);
+    // By due work, tenant-b (50 s) waits longer than tenant-a (10 s); counting heldA would put tenant-a first.
+    expect((await dequeue(pool, { workerId: "w" }))!.id).toBe(dueB);
+    expect((await dequeue(pool, { workerId: "w" }))!.id).toBe(dueA);
+  });
+});
+
 describe("argument checks", () => {
   it("rejects a missing worker id and an out-of-range lease", async () => {
     await expect(dequeue(pool, { workerId: "" })).rejects.toThrow(/workerId/);

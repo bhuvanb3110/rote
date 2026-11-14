@@ -6,6 +6,8 @@
 //
 //   jobOutcomeFor     how a run's end maps to a job state (Step 6, D25; moved from src/worker/outcome.ts)
 //   completionAllowed which state T4 may write from which (Step 8: requeue/fail only from `running`)
+//   requeueBackoffSeconds  how long T4's requeue after a failure waits before the job may be dequeued
+//                     again (Step 10, D49: retries back off)
 //   recoveryAction    what T6 does with an expired lease (T6.1 requeue, T6.2 fail; Step 9: T6.4 claim a
 //                     `committing` job to verify, T6.5 re-claim a dead verifier's job, T6.6 escalate after
 //                     3 dead verify phases, T6.7 resume a deferred or handed-off verify)
@@ -212,6 +214,62 @@ export function completionAllowed(from: JobState, to: CompletionTarget): boolean
   if (from === "running") return true;
   if (from === "committing") return to === "succeeded" || to === "needs_human";
   return false;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Requeue backoff (Step 10: docs/plans/step-10.md section 1; reviewer decision 2, option B; D49).
+//
+// A failure BEFORE the commit intent is requeued by T4 (jobOutcomeFor's "queued"). Without a backoff the
+// next worker picks it up at once, so during a 30 s bank outage every attempt fails in about a second
+// and a job burns all of its attempts. T4 therefore sets `not_before = now() + requeueBackoffSeconds(..)`
+// (database clock, D22) and the dequeue skips a queued job until then. Each retry still consumes an
+// attempt (D21 unchanged). Only T4's requeue backs off: a crash requeue (T6.1) and a verified resubmit
+// (T7) were not the bank's doing and are picked up at once.
+//
+//   attempt that failed   1      2      3      4+
+//   backoff (no jitter)   10 s   30 s   90 s   120 s (the cap)
+//
+// The jitter (x [0.8, 1.2], to the millisecond) spreads a fleet's retries after a shared outage. With
+// max_attempts 3 the retries come at about +10 s and +40 s; the earliest the third attempt can run is
+// 0.8 x (10 + 30) = 32 s after the first failure, so an outage shorter than that fails no job (the
+// property test). Longer outages are Day 4's circuit breaker.
+
+export interface RequeueBackoffConfig {
+  baseSeconds: number;
+  factor: number;
+  capSeconds: number;
+  /** The backoff is multiplied by a factor drawn uniformly from [1 - jitter, 1 + jitter) (then rounded to the ms). */
+  jitter: number;
+}
+
+export const DEFAULT_REQUEUE_BACKOFF: RequeueBackoffConfig = { baseSeconds: 10, factor: 3, capSeconds: 120, jitter: 0.2 };
+
+/** The un-jittered backoff after attempt `attempt` (1-based) failed: min(cap, base * factor^(attempt - 1)). */
+export function requeueBackoffBaseSeconds(attempt: number, config: RequeueBackoffConfig = DEFAULT_REQUEUE_BACKOFF): number {
+  if (!(Number.isInteger(attempt) && attempt >= 1)) throw new RangeError(`requeue backoff: attempt must be a positive integer (got ${attempt})`);
+  return Math.min(config.capSeconds, config.baseSeconds * config.factor ** Math.min(attempt - 1, 30));
+}
+
+/**
+ * Seconds until a requeued job may be dequeued again, after attempt `attempt` failed before its intent.
+ * `random` (in [0, 1)) picks the jitter: Math.random in the worker, fixed in tests. Millisecond precision.
+ */
+export function requeueBackoffSeconds(attempt: number, random: () => number = Math.random, config: RequeueBackoffConfig = DEFAULT_REQUEUE_BACKOFF): number {
+  const r = random();
+  if (!(r >= 0 && r < 1)) throw new RangeError(`requeue backoff: random() must be in [0, 1) (got ${r})`);
+  const factor = 1 - config.jitter + 2 * config.jitter * r;
+  return Math.round(requeueBackoffBaseSeconds(attempt, config) * factor * 1000) / 1000;
+}
+
+/**
+ * The shortest possible time from a job's first failure to its last attempt: the backoffs after attempts
+ * 1 .. maxAttempts - 1 at the smallest jitter. A bank outage shorter than this cannot fail every attempt
+ * (32 s for 3 attempts with the defaults).
+ */
+export function minRequeueScheduleSeconds(maxAttempts: number, config: RequeueBackoffConfig = DEFAULT_REQUEUE_BACKOFF): number {
+  let sum = 0;
+  for (let a = 1; a < maxAttempts; a += 1) sum += requeueBackoffBaseSeconds(a, config) * (1 - config.jitter);
+  return sum;
 }
 
 // ---------------------------------------------------------------------------------------------------

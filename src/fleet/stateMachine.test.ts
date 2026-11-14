@@ -1,6 +1,6 @@
 // recoveryAction (T6), completionAllowed (T4's guard), classifyLookup and verifyDecision (Step 9): one
 // case per row of docs/plans/step-08.md sections 3, 4 and 5, plus step-09 reviewer decision 5 (the
-// deferral). jobOutcomeFor's rows are in jobOutcome.test.ts.
+// deferral); Step 10: the requeue backoff (D49). jobOutcomeFor's rows are in jobOutcome.test.ts.
 import { describe, expect, it } from "vitest";
 import type { ReplayResult } from "../artifact/index.js";
 import { JOB_STATES } from "../queue/types.js";
@@ -12,9 +12,13 @@ import {
   DEFAULT_DEFER_CONFIG,
   deferBackoffSeconds,
   EMPTY_VERIFY_CYCLE,
+  DEFAULT_REQUEUE_BACKOFF,
   lookupsColumn,
+  minRequeueScheduleSeconds,
   readingsComplete,
   recoveryAction,
+  requeueBackoffBaseSeconds,
+  requeueBackoffSeconds,
   verifyDecision,
   type CompletionTarget,
   type LookupReading,
@@ -250,5 +254,40 @@ describe("completionAllowed (T4's state guard, section 3)", () => {
     for (const from of JOB_STATES.filter((s) => s !== "running" && s !== "committing")) {
       for (const to of targets) expect(completionAllowed(from, to), `${from} -> ${to}`).toBe(false);
     }
+  });
+});
+
+describe("requeueBackoffSeconds (Step 10 section 1, reviewer decision 2: option B; D49)", () => {
+  it("10 s x 3^(attempt - 1), capped at 120 s: 10, 30, 90, 120, 120", () => {
+    expect([1, 2, 3, 4, 9].map((a) => requeueBackoffBaseSeconds(a))).toEqual([10, 30, 90, 120, 120]);
+    expect(DEFAULT_REQUEUE_BACKOFF).toEqual({ baseSeconds: 10, factor: 3, capSeconds: 120, jitter: 0.2 });
+  });
+
+  it("jittered x [0.8, 1.2] (random 0 -> x 0.8, 0.5 -> x 1.0, 0.99 -> x 1.196), rounded to the millisecond (so a draw just under 1 can round up to x 1.2)", () => {
+    expect(requeueBackoffSeconds(1, () => 0)).toBe(8);
+    expect(requeueBackoffSeconds(1, () => 0.5)).toBe(10);
+    expect(requeueBackoffSeconds(2, () => 0.5)).toBe(30);
+    expect(requeueBackoffSeconds(2, () => 0.99)).toBe(35.88);
+    expect(requeueBackoffSeconds(2, () => 0.999999)).toBe(36);
+    expect(requeueBackoffSeconds(9, () => 0)).toBe(96);
+    for (let i = 0; i < 200; i += 1) {
+      const s = requeueBackoffSeconds(1);
+      expect(s).toBeGreaterThanOrEqual(8);
+      expect(s).toBeLessThanOrEqual(12);
+      expect(Math.abs(s * 1000 - Math.round(s * 1000))).toBeLessThan(1e-6); // whole milliseconds
+    }
+  });
+
+  it("refuses a non-positive attempt and a random() outside [0, 1)", () => {
+    expect(() => requeueBackoffSeconds(0)).toThrow(RangeError);
+    expect(() => requeueBackoffSeconds(1.5)).toThrow(RangeError);
+    expect(() => requeueBackoffSeconds(1, () => 1)).toThrow(RangeError);
+    expect(() => requeueBackoffSeconds(1, () => -0.1)).toThrow(RangeError);
+  });
+
+  it("the shortest schedule to the last attempt: 3 attempts -> 0.8 x (10 + 30) = 32 s (longer than the brief's 30 s outage); 1 attempt -> 0", () => {
+    expect(minRequeueScheduleSeconds(3)).toBeCloseTo(32, 9);
+    expect(minRequeueScheduleSeconds(2)).toBeCloseTo(8, 9);
+    expect(minRequeueScheduleSeconds(1)).toBe(0);
   });
 });

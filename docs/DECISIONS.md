@@ -1513,3 +1513,54 @@ where they can run without making the suite slower or flakier: in the pool they 
 same order.
 
 **Date.** 2026-11-14
+
+## D49: A requeue after a failure backs off: `not_before`, 10 s × 3^(attempt−1), jittered, capped at 120 s
+
+(Step 10, plan section 1; reviewer decision 2: option B.)
+
+**Decision.** Migration **`0004_day2_exit.sql`** (all of Step 10's schema) adds `jobs.not_before`, with the
+CHECK `jobs_not_before_only_queued` (`state = 'queued' OR not_before IS NULL`).
+- **T4's requeue** (`COMPLETE_JOB_SQL`) sets `not_before = now() + make_interval(secs => $8)` (database
+  clock, D22). The worker computes `$8` with the pure `requeueBackoffSeconds(attempt, random)`:
+  `min(120, 10 · 3^(attempt−1))` × a jitter in [0.8, 1.2), so 10 s, 30 s, 90 s, then 120 s. Any other T4
+  target leaves it NULL. Each retry still consumes an attempt (D21 unchanged).
+- **The dequeue** skips a job until its backoff has passed. `CLAIM_TENANT_SQL`'s `EXISTS` and its `ORDER BY`
+  subquery, and `PICK_JOB_SQL`, each test `(not_before IS NULL OR not_before <= now())`. Otherwise a tenant
+  whose only queued jobs are not yet due would be claimed, yield nothing and be excluded on every dequeue,
+  and fairness would rank a tenant by work it may not run yet. `LEASE_SQL` clears `not_before`.
+- **No backoff** for a crash requeue (T6.1, `RECOVER_JOB_SQL`) or a verified resubmit (T7,
+  `VERIFY_RESULT_SQL`): neither failure was the bank's, and T6.1 already waited out a lease.
+- The worker logs `retryInSeconds` on a requeue; `GET /jobs/:id` shows `notBefore`.
+
+With 3 attempts, the earliest the third attempt can run is 0.8 × (10 + 30) = **32 s** after the first
+failure (`minRequeueScheduleSeconds`), so the brief's 30 s bank outage fails no job. Longer outages are Day
+4's circuit breaker (reviewer decision 2).
+
+**Tests.** Unit: the schedule, the jitter bounds, the refusals, the 32 s bound. **Property 7** (a new,
+smaller simulation: one job, 1–3 workers polling as eagerly as possible, one outage, every transition
+through the model and the real `jobOutcomeFor`): an outage shorter than 32 s never fails the job (10 000
+runs), and the bound is tight: fast-check finds a failed job with a longer outage, and with a 30 s outage
+and no backoff (the "T4 requeue without `not_before`" mutant, in the model). The main simulation's T4
+requeue backs off too. Model vs real: `not_before` is compared after every command (within 1 s), T4
+requeues are generated with backoffs, the tick shifts `not_before` with the leases, and the test requires
+that a dequeue was held back by a backoff at least once. DB: the dequeue respects `not_before`; the oldest
+DUE job is picked; the tenant claim skips a tenant with no due work; fairness ranks by due work only (a
+test that fails if the held-back job were counted); T4 sets it by the database clock and only for a
+requeue; T6.1 and T7 leave it NULL; the 0004 CHECK. Integration (`faults.db.test.ts`, slow project): the
+brief's 30 s `errors/on` from the first attempt: the attempts back off (each ≥ 8 s apart), the attempt
+after the outage succeeds, 1 ledger row.
+
+**Alternatives considered.**
+- **A.** A bank-unavailable failure before Submit costs no attempt: transfer 1.2.0 to recognize the 503
+  page, re-approval with override digests, and a free-attempt count in D21's CHECK. It survives outages of
+  any length, but it is a capability change and a CHECK change for a case Day 4's breaker owns.
+- **C.** Bring Day 4's circuit breaker forward (the `breakers` table exists): Day 4 work either way.
+- Back off in the worker (sleep before releasing the job): holds a worker, a browser and a tenant slot
+  while waiting, and uses the worker's clock.
+- Back off T6.1 too: a crash is not the bank's fault, and the lease expiry already cost 30 s.
+
+**Why.** "Retries back off" is the brief's bank-slow/down row. A database-clock `not_before` is the
+smallest change that meets it: one column, one CHECK, one clause in each dequeue query, and nothing held
+while a job waits.
+
+**Date.** 2026-11-14

@@ -87,6 +87,8 @@ export function jobView(job: JobRow) {
     result: job.result,
     memoKey: job.memo_key,
     traceId: job.trace_id,
+    /** A queued job that failed an attempt is retried no earlier than this (the requeue backoff, D49). */
+    notBefore: job.not_before?.toISOString() ?? null,
     createdAt: job.created_at.toISOString(),
     updatedAt: job.updated_at.toISOString(),
   };

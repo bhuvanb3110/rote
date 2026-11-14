@@ -70,6 +70,29 @@ describe("completeJob (fenced)", () => {
     expect(again).toMatchObject({ id: job.id, attempt: 2, fencing_token: 2, lease_owner: "w2" });
   });
 
+  it("a requeue with a backoff (D49): not_before = now() + the seconds, by the DATABASE clock; no dequeue before it; then attempt 2 with not_before cleared", async () => {
+    const job = await leasedJob();
+    const outcome = jobOutcomeFor({ kind: "result", result: failure }, { attempt: 1, maxAttempts: 3, irreversibleStarted: false });
+    expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome, requeueAfterSeconds: 10.5 })).toEqual({ recorded: true });
+    const { rows } = await pool.query("SELECT state, EXTRACT(EPOCH FROM not_before - now())::float8 AS secs FROM jobs WHERE id = $1", [job.id]);
+    expect(rows[0].state).toBe("queued");
+    expect(rows[0].secs).toBeGreaterThan(9.5);
+    expect(rows[0].secs).toBeLessThanOrEqual(10.5);
+    expect(await dequeue(pool, { workerId: "w2", leaseSeconds: 300 })).toBeNull();
+    await pool.query("UPDATE jobs SET not_before = now() - interval '1 millisecond' WHERE id = $1", [job.id]); // the backoff has passed
+    expect(await dequeue(pool, { workerId: "w2", leaseSeconds: 300 })).toMatchObject({ id: job.id, attempt: 2, not_before: null });
+  });
+
+  it("a backoff is only ever a requeue's: every other target leaves not_before NULL, even if one is passed", async () => {
+    for (const result of [success, { ...failure }] as const) {
+      const job = await leasedJob(1); // max 1 attempt: the failure is final (failed), not a requeue
+      const outcome = jobOutcomeFor({ kind: "result", result }, { attempt: 1, maxAttempts: 1, irreversibleStarted: false });
+      expect(outcome.state).not.toBe("queued");
+      expect(await completeJob(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "w1", outcome, requeueAfterSeconds: 30 })).toEqual({ recorded: true });
+      expect(await row(job.id)).toMatchObject({ state: outcome.state, not_before: null });
+    }
+  });
+
   it("stale completion: the fencing token moved under the worker -> 0 rows on jobs, attempt marked lease_lost", async () => {
     const job = await leasedJob();
     // Stand-in for Day-2 recovery having re-leased the job to someone else.

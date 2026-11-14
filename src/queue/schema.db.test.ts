@@ -258,12 +258,64 @@ describe("0003_verify: the Step 9 values and the open/ended rule on job_verifica
   });
 });
 
+describe("0004_day2_exit: the requeue backoff and the reconcile pass (D49, D50)", () => {
+  const insert = (jobId: unknown, cols: Record<string, unknown>) => {
+    const row = { job_id: jobId, fencing_token: 3, worker_id: "w", reason: "reconcile", ...cols };
+    const names = Object.keys(row);
+    return pool.query(
+      `INSERT INTO job_verifications (${names.join(", ")}) VALUES (${names.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING *`,
+      names.map((n) => (row as Record<string, unknown>)[n]),
+    );
+  };
+  const later = () => new Date(Date.now() + 1000);
+
+  it("jobs_not_before_only_queued: only a queued job may carry not_before", async () => {
+    const queued = await insertJob({ not_before: later() });
+    expect(queued.not_before).toBeInstanceOf(Date);
+    expect(await rejection(insertJob({ state: "failed", not_before: later() }))).toEqual({ code: "23514", constraint: "jobs_not_before_only_queued" });
+    expect(await rejection(pool.query("UPDATE jobs SET state = 'running', lease_owner = 'w', lease_expires_at = now() WHERE id = $1", [queued.id]))).toEqual({
+      code: "23514",
+      constraint: "jobs_not_before_only_queued",
+    });
+  });
+
+  it("a succeeded job may hold a reconcile lease (jobs_lease_pair still holds) and carry reconcile_after / reconciled_at", async () => {
+    const job = await insertJob({ state: "succeeded", reconcile_after: new Date(), lease_owner: "reconciler", lease_expires_at: later() });
+    expect(job).toMatchObject({ state: "succeeded", lease_owner: "reconciler", reconciled_at: null });
+    expect(await rejection(insertJob({ state: "succeeded", lease_owner: "reconciler" }))).toEqual({ code: "23514", constraint: "jobs_lease_pair" });
+  });
+
+  it("job_verifications: reason 'reconcile' and its four decisions", async () => {
+    const job = await insertJob({ state: "succeeded" });
+    let token = 1;
+    for (const decision of ["reconciled", "duplicate_suspected", "reconcile_unreadable", "reconcile_deferred", "crashed", "lease_lost"]) {
+      const { rows } = await insert(job.id, { fencing_token: token++, decision, ended_at: later(), lookups: [2] });
+      expect(rows[0]).toMatchObject({ reason: "reconcile", decision });
+    }
+    await insert(job.id, { fencing_token: token++ }); // open
+  });
+
+  it("job_verifications_reconcile_decisions: a reconcile decision only on a reconcile row, and a reconcile row never ends like a verify", async () => {
+    const job = await insertJob({ state: "succeeded" });
+    expect(await rejection(insert(job.id, { reason: "lease_expired_in_committing", decision: "reconciled", ended_at: later() }))).toEqual({
+      code: "23514",
+      constraint: "job_verifications_reconcile_decisions",
+    });
+    expect(await rejection(insert(job.id, { fencing_token: 4, decision: "resubmitted", ended_at: later() }))).toEqual({
+      code: "23514",
+      constraint: "job_verifications_reconcile_decisions",
+    });
+    expect((await rejection(insert(job.id, { fencing_token: 5, decision: "reconciled_maybe", ended_at: later() }))).constraint).toBe("job_verifications_decision_check");
+  });
+});
+
 describe("Zod row schemas parse real rows", () => {
   it("JobRowSchema and AttemptRowSchema accept rows straight from SELECT *", async () => {
     const job = await insertJob();
     const parsed = JobRowSchema.parse((await pool.query("SELECT * FROM jobs WHERE id = $1", [job.id])).rows[0]);
     expect(parsed.fencing_token).toBe(0); // int8 parsed to a number
     expect(parsed.created_at).toBeInstanceOf(Date);
+    expect(parsed).toMatchObject({ not_before: null, reconcile_after: null, reconciled_at: null }); // 0004
     await pool.query("INSERT INTO job_attempts (job_id, attempt, worker_id, fencing_token) VALUES ($1, 1, 'w', 1)", [job.id]);
     const attempt = AttemptRowSchema.parse((await pool.query("SELECT * FROM job_attempts")).rows[0]);
     expect(attempt.id).toBe(1);

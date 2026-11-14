@@ -158,6 +158,10 @@ describe("the fenced commit intent (T3) in a running worker", () => {
     expect((await env.jobs())[0]).toMatchObject({ state: "queued", attempt: 1, lease_owner: null });
     expect((await env.jobs())[0]!.error).toMatch(/FencingError: commit intent refused/);
     expect(await env.ledger()).toHaveLength(0);
+    // A requeue after a failure backs off (D49); this test is about the fence, so the backoff is skipped.
+    expect((await env.jobs())[0]!.not_before).toBeInstanceOf(Date);
+    expect(await worker.tick()).toBe("idle");
+    await env.pool.query("UPDATE jobs SET not_before = now() WHERE id = $1", [job!.id]);
 
     expect(await worker.tick()).toBe("ran");
     expect((await env.jobs())[0]).toMatchObject({ id: job!.id, state: "succeeded", attempt: 2 });

@@ -53,10 +53,12 @@ FOR UPDATE SKIP LOCKED`;
 /**
  * T6.1/T6.2/T6.6: the decided state ($4) and outcome ($5; NULL keeps it, for a requeue), token + 1,
  * lease cleared. The jobs_queued_has_attempts_left CHECK still refuses a requeue with no attempt left (D21).
+ * A crash requeue (T6.1) does not back off (not_before NULL, D49): the bank did nothing wrong, and the
+ * lease expiry already cost a full lease.
  */
 export const RECOVER_JOB_SQL = `
 UPDATE jobs
-SET state = $4, outcome = COALESCE($5, outcome), error = $6,
+SET state = $4, outcome = COALESCE($5, outcome), error = $6, not_before = NULL,
     fencing_token = fencing_token + 1, lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
 WHERE id = $1 AND fencing_token = $2 AND state = $3 AND lease_expires_at < now()
 RETURNING fencing_token`;

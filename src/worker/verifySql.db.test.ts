@@ -144,7 +144,8 @@ describe("T7: the verify result, one row per decision", () => {
     const { job, token } = await verifying();
     expect(await t7(job, token, decide([count(0), count(0)]), [0, 0])).toEqual({ recorded: true });
     const r = await row(job.id);
-    expect(r).toMatchObject({ state: "queued", outcome: null, commit_intent_at: null, lease_owner: null, attempt: 1 });
+    // A verified resubmit does not back off (D49): not_before NULL, dequeued at once below.
+    expect(r).toMatchObject({ state: "queued", outcome: null, commit_intent_at: null, lease_owner: null, attempt: 1, not_before: null });
     expect(r.result).toMatchObject({ ...cuFailure, verify: { decision: "resubmitted", lookups: [0, 0], phaseToken: token } });
     expect((await phases(job.id))[0]).toMatchObject({ decision: "resubmitted", lookups: [0, 0] });
     expect(await dequeue(pool, { workerId: "w2", leaseSeconds: LEASE })).toMatchObject({ id: job.id, attempt: 2 }); // the resubmit

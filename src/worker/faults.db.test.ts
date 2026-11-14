@@ -1,6 +1,7 @@
-// Worker fault handling (step-06 section 8): a failure before Submit is retried, a write-then-error is
-// verified in the bank's history and never retried blindly (Step 9; Steps 6-8 parked it), graceful
-// shutdown finishes or aborts the in-flight job, and a Postgres blip never kills the worker.
+// Worker fault handling (step-06 section 8): a failure before Submit is retried -- after a backoff
+// (Step 10, D49), so the brief's 30 s bank outage fails no job --, a write-then-error is verified in the
+// bank's history and never retried blindly (Step 9; Steps 6-8 parked it), graceful shutdown finishes or
+// aborts the in-flight job, and a Postgres blip never kills the worker.
 import net from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createPool } from "../queue/index.js";
@@ -32,7 +33,7 @@ async function waitFor(check: () => Promise<boolean>, timeoutMs: number, what: s
 }
 
 describe("worker faults", () => {
-  it("failure BEFORE Submit (bank errors/on) -> requeued; attempt 2 succeeds; exactly 1 row", async () => {
+  it("failure BEFORE Submit (bank errors/on) -> requeued with a backoff (not_before 8-12 s out, D49), not dequeued before it; attempt 2 succeeds; exactly 1 row", async () => {
     const [job] = await env.enqueueTransfers(1);
     const worker = env.newWorker();
     await env.control("errors/on");
@@ -40,15 +41,57 @@ describe("worker faults", () => {
     const [afterFirst] = await env.jobs();
     expect(afterFirst).toMatchObject({ state: "queued", attempt: 1, lease_owner: null, outcome: null });
     expect(afterFirst!.error).toMatch(/attempt 1\/3 \(retrying\)/);
+    const backoff = (await env.pool.query("SELECT EXTRACT(EPOCH FROM not_before - now())::float8 AS s FROM jobs WHERE id = $1", [job!.id])).rows[0].s;
+    expect(backoff).toBeGreaterThan(6); // 10 s x [0.8, 1.2), minus the time since T4
+    expect(backoff).toBeLessThan(12);
     expect(await env.ledger()).toHaveLength(0);
 
     await env.control("errors/off");
+    expect(await worker.tick()).toBe("idle"); // held back by its not_before
+    await env.pool.query("UPDATE jobs SET not_before = now() WHERE id = $1", [job!.id]); // the backoff has passed
     expect(await worker.tick()).toBe("ran");
     const [afterSecond] = await env.jobs();
     expect(afterSecond).toMatchObject({ id: job!.id, state: "succeeded", attempt: 2 });
     expect((await attempts(job!.id)).map((a) => a.outcome)).toEqual(["failure", "success"]);
     expect(await env.ledger()).toHaveLength(1);
   }, 60_000);
+
+  it("Step 10 (D49): the brief's 30 s bank outage (errors/on) starting with attempt 1 -> attempts back off (about +10 s, +40 s) and the job is not failed: the outage ends, the next attempt succeeds; exactly 1 row", async () => {
+    const [job] = await env.enqueueTransfers(1, {}, ["tenant-a"]);
+    const worker = env.newWorker();
+    const log: Array<{ t: number; state: string; attempt: number }> = [];
+    await env.control("errors/on");
+    const outageStart = Date.now();
+    const running = worker.run();
+    const restore = setTimeout(() => void env.control("errors/off"), 30_000);
+    try {
+      const deadline = Date.now() + 120_000;
+      for (;;) {
+        const [row] = await env.jobs();
+        const last = log.at(-1);
+        if (!last || last.state !== row!.state || last.attempt !== row!.attempt) log.push({ t: Date.now() - outageStart, state: row!.state, attempt: row!.attempt });
+        if (["succeeded", "failed", "needs_human", "business_outcome"].includes(row!.state)) break;
+        if (Date.now() > deadline) throw new Error(`not terminal after 120 s: ${JSON.stringify(log)}`);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    } finally {
+      clearTimeout(restore);
+      await env.control("errors/off");
+      worker.stop();
+      await running;
+    }
+    const [final] = await env.jobs();
+    const outcomes = (await attempts(job!.id)).map((a) => a.outcome);
+    expect(final, JSON.stringify(log)).toMatchObject({ id: job!.id, state: "succeeded", outcome: "success" });
+    // Each failed attempt was inside the outage; the last one, after it.
+    expect(outcomes.slice(0, -1).every((o) => o === "failure"), JSON.stringify(outcomes)).toBe(true);
+    expect(outcomes.at(-1)).toBe("success");
+    expect(final!.attempt).toBeLessThanOrEqual(3);
+    const starts = (await env.pool.query<{ s: number }>("SELECT EXTRACT(EPOCH FROM started_at)::float8 * 1000 AS s FROM job_attempts WHERE job_id = $1 ORDER BY attempt", [job!.id])).rows.map((r) => r.s);
+    for (let i = 1; i < starts.length; i += 1) expect(starts[i]! - starts[i - 1]!, `attempt ${i + 1} came ${starts[i]! - starts[i - 1]!} ms after attempt ${i}`).toBeGreaterThanOrEqual(8_000);
+    expect(starts.at(-1)! - outageStart).toBeGreaterThanOrEqual(30_000); // the successful attempt began after the outage
+    expect(await env.ledger()).toHaveLength(1);
+  }, 180_000);
 
   it("Step 9: errors/after-write (bank commits, then errors) -> commit uncertain -> verify (T5) [1] -> succeeded / already_done on attempt 1; confirmationRef = the row's id; exactly 1 row; never retried", async () => {
     const [job] = await env.enqueueTransfers(1);

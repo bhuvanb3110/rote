@@ -41,7 +41,7 @@ describe("migration files", () => {
 
   it("the committed migrations are LF on disk (.gitattributes) and load in order", async () => {
     const loaded = await loadMigrations();
-    expect(loaded.map((m) => m.version)).toEqual(["0001_init", "0002_day2", "0003_verify"]);
+    expect(loaded.map((m) => m.version)).toEqual(["0001_init", "0002_day2", "0003_verify", "0004_day2_exit"]);
     for (const m of loaded) expect(m.sql.includes("\r\n"), m.version).toBe(false);
   });
 });

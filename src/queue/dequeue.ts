@@ -17,6 +17,11 @@
 //
 // Clock rule (reviewer decision 7, D22): lease expiry is computed by the DATABASE (now()), never
 // from a worker's clock. No timestamp computed in TypeScript is ever sent.
+//
+// Requeue backoff (Step 10, D49): a queued job whose not_before is still in the future is not
+// dequeueable. Every "queued work" test below repeats `(not_before IS NULL OR not_before <= now())`:
+// the tenant claim's EXISTS and its ORDER BY, and the pick. Otherwise a tenant whose only queued jobs
+// are not yet due would be claimed, yield nothing and be excluded on every single dequeue.
 import type { Pool, PoolClient } from "./db.js";
 import { JobRowSchema, type JobRow } from "./types.js";
 
@@ -38,10 +43,12 @@ export const CLAIM_TENANT_SQL = `
 SELECT t.id, t.max_concurrent
 FROM tenants t
 WHERE t.id <> ALL ($1::text[])
-  AND EXISTS (SELECT 1 FROM jobs q WHERE q.tenant_id = t.id AND q.state = 'queued')
+  AND EXISTS (SELECT 1 FROM jobs q WHERE q.tenant_id = t.id AND q.state = 'queued'
+              AND (q.not_before IS NULL OR q.not_before <= now()))
   AND (SELECT count(*) FROM jobs a
        WHERE a.tenant_id = t.id AND a.state IN ('running', 'committing', 'verifying')) < t.max_concurrent
-ORDER BY (SELECT min(q.created_at) FROM jobs q WHERE q.tenant_id = t.id AND q.state = 'queued'), t.id
+ORDER BY (SELECT min(q.created_at) FROM jobs q WHERE q.tenant_id = t.id AND q.state = 'queued'
+          AND (q.not_before IS NULL OR q.not_before <= now())), t.id
 LIMIT 1
 FOR UPDATE OF t SKIP LOCKED`;
 
@@ -54,15 +61,19 @@ export const COUNT_ACTIVE_SQL = `
 SELECT count(*) AS n FROM jobs
 WHERE tenant_id = $1 AND state IN ('running', 'committing', 'verifying')`;
 
-/** (3) The tenant's oldest queued job; SKIP LOCKED still guards against any other row locker. */
+/** (3) The tenant's oldest due queued job; SKIP LOCKED still guards against any other row locker. */
 export const PICK_JOB_SQL = `
 SELECT id FROM jobs
 WHERE tenant_id = $1 AND state = 'queued' AND attempt < max_attempts
+  AND (not_before IS NULL OR not_before <= now())
 ORDER BY created_at, id
 LIMIT 1
 FOR UPDATE SKIP LOCKED`;
 
-/** (4) Lease it: owner, expiry (database clock), attempt + 1 and fencing_token + 1 together. */
+/**
+ * (4) Lease it: owner, expiry (database clock), attempt + 1 and fencing_token + 1 together. The backoff
+ * is spent: not_before is cleared (jobs_not_before_only_queued, 0004).
+ */
 export const LEASE_SQL = `
 UPDATE jobs
 SET state = 'running',
@@ -70,6 +81,7 @@ SET state = 'running',
     fencing_token = fencing_token + 1,
     lease_owner = $2,
     lease_expires_at = now() + make_interval(secs => $3),
+    not_before = NULL,
     updated_at = now()
 WHERE id = $1
 RETURNING *`;

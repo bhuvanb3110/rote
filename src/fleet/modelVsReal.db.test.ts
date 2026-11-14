@@ -3,7 +3,8 @@
 // sequences against the pure model (src/fleet/model.ts) and the real SQL on a test Postgres schema, and
 // compares, after EVERY command, each job's state, fencing token, owner, attempt, outcome and lease, its
 // verify cycle as VERIFY_CYCLE_SQL derives it from job_verifications (phases, dead phases, deferrals,
-// deferred-for, prior status, the newest phase's decision), plus each command's own answer (leased which
+// deferred-for, prior status, the newest phase's decision), its requeue backoff (not_before, Step 10 D49),
+// plus each command's own answer (leased which
 // job, extended or not, recorded / fenced (lease_lost) / illegal_transition / CHECK violation, which jobs
 // recovered how, which one was claimed to verify). This is what catches drift between the model the
 // property tests trust and the SQL the workers run.
@@ -52,6 +53,7 @@ import {
   modelVerifyDefer,
   modelVerifyResult,
   newJob,
+  notBeforeRemaining,
   type ModelDb,
   type ModelFencedResult,
   type ModelJob,
@@ -112,7 +114,11 @@ async function sync(r: Real): Promise<void> {
   // exist for all of it): well inside the 1 s slack, but enough to push a started_at past a later
   // ended_at = now(), so started_at is never shifted forward (moving ended_at forward keeps
   // ended_at >= started_at).
-  await r.pool.query("UPDATE jobs SET lease_expires_at = lease_expires_at + make_interval(secs => $1) WHERE lease_expires_at IS NOT NULL", [elapsed]);
+  await r.pool.query(
+    `UPDATE jobs SET lease_expires_at = lease_expires_at + make_interval(secs => $1), not_before = not_before + make_interval(secs => $1)
+     WHERE lease_expires_at IS NOT NULL OR not_before IS NOT NULL`,
+    [elapsed],
+  );
   await r.pool.query("UPDATE job_verifications SET ended_at = ended_at + make_interval(secs => $1) WHERE ended_at IS NOT NULL", [elapsed]);
 }
 
@@ -129,13 +135,16 @@ interface RealJob {
   lease_owner: string | null;
   outcome: string | null;
   remaining: number | null;
+  /** Seconds until not_before (negative = due), or null. */
+  not_before_in: number | null;
 }
 
 async function readReal(pool: Pool): Promise<RealJob[]> {
   return (
     await pool.query<RealJob>(
       `SELECT id, state, attempt, fencing_token, lease_owner, outcome,
-              EXTRACT(EPOCH FROM (lease_expires_at - now()))::float8 AS remaining
+              EXTRACT(EPOCH FROM (lease_expires_at - now()))::float8 AS remaining,
+              EXTRACT(EPOCH FROM (not_before - now()))::float8 AS not_before_in
        FROM jobs ORDER BY created_at, id`,
     )
   ).rows;
@@ -165,6 +174,13 @@ async function compare(m: Model, r: Real, after: string): Promise<void> {
       expect(rj.remaining, `${where}: lease`).not.toBeNull();
       expect(Math.abs(rj.remaining! - mRemaining), `${where}: lease remaining real ${rj.remaining} vs model ${mRemaining} (slack ${slack.toFixed(3)} s)`).toBeLessThan(slack);
     }
+    // The requeue backoff (D49).
+    const mNotBefore = notBeforeRemaining(mj, m.db.now);
+    if (mNotBefore === null) expect(rj.not_before_in, `${where}: not_before`).toBeNull();
+    else {
+      expect(rj.not_before_in, `${where}: not_before`).not.toBeNull();
+      expect(Math.abs(rj.not_before_in! - mNotBefore), `${where}: not_before in real ${rj.not_before_in} vs model ${mNotBefore} (slack ${slack.toFixed(3)} s)`).toBeLessThan(slack);
+    }
     // The verify cycle (VERIFY_CYCLE_SQL vs the model's phases).
     const rc = cycles[i]!;
     const mc = modelVerifyCycle(mj, m.db.now);
@@ -190,6 +206,11 @@ function nearBoundary(m: Model, jobId?: string): boolean {
   return m.db.jobs.some((j) => (jobId === undefined || j.id === jobId) && isActive(j.state) && j.leaseExpiresAt !== null && Math.abs(j.leaseExpiresAt - m.db.now) < 1);
 }
 
+/** A queued job's backoff within 1 s of passing: whether a dequeue takes it could differ by the few ms of real time. */
+function nearDue(m: Model): boolean {
+  return m.db.jobs.some((j) => j.state === "queued" && j.notBefore !== null && Math.abs(j.notBefore - m.db.now) < 1);
+}
+
 type Cmd = fc.AsyncCommand<Model, Real>;
 
 /** How often each interesting answer happened (the agreement must not be vacuous). */
@@ -198,11 +219,13 @@ const hit = (key: string) => hits.set(key, (hits.get(key) ?? 0) + 1);
 
 class DequeueCmd implements Cmd {
   constructor(readonly w: W) {}
-  check = () => true;
+  check = (m: Readonly<Model>) => !nearDue(m as Model);
   async run(m: Model, r: Real) {
     const { db: next, job } = modelDequeue(m.db, this.w, LEASE);
     const real = await dequeue(r.pool, { workerId: this.w, leaseSeconds: LEASE });
     expect(real ? { id: real.id, token: real.fencing_token } : null, this.toString()).toEqual(job ? { id: job.id, token: job.token } : null);
+    // A queued job was there but not due yet: the backoff held it back (D49).
+    if (!job && m.db.jobs.some((j) => j.state === "queued" && j.notBefore !== null && j.notBefore > m.db.now)) hit("dequeue:held_back_by_not_before");
     m.db = next;
     if (job) m.held[this.w] = { jobId: job.id, token: job.token };
     await compare(m, r, this.toString());
@@ -269,15 +292,19 @@ class CompleteCmd implements Cmd {
   constructor(
     readonly w: W,
     readonly to: T4Target,
+    /** A requeue's backoff (D49), seconds; ignored for every other target. */
+    readonly backoff: number | null = null,
   ) {}
   check = (m: Readonly<Model>) => m.held[this.w] !== undefined;
   async run(m: Model, r: Real) {
     const h = m.held[this.w]!;
-    const { db: next, result } = modelComplete(m.db, { jobId: h.jobId, token: h.token, owner: this.w }, this.to, OUTCOMES[this.to].outcome);
+    const { db: next, result } = modelComplete(m.db, { jobId: h.jobId, token: h.token, owner: this.w }, this.to, OUTCOMES[this.to].outcome, null, {
+      notBeforeSeconds: this.backoff,
+    });
     const outcome: JobOutcome = { state: this.to, ...OUTCOMES[this.to], error: null, result: null, commitUncertain: false };
     let real: "recorded" | "fenced" | "illegal_transition" | "check_violation";
     try {
-      const res = await completeJob(r.pool, { jobId: h.jobId, fencingToken: h.token, workerId: this.w, outcome });
+      const res = await completeJob(r.pool, { jobId: h.jobId, fencingToken: h.token, workerId: this.w, outcome, requeueAfterSeconds: this.backoff });
       real = res.recorded ? "recorded" : res.reason === "illegal_transition" ? "illegal_transition" : "fenced";
     } catch (err) {
       if (sqlState(err) !== "23514") throw err;
@@ -287,7 +314,7 @@ class CompleteCmd implements Cmd {
     m.db = next;
     await compare(m, r, this.toString());
   }
-  toString = () => `complete(${this.w}, ${this.to})`;
+  toString = () => `complete(${this.w}, ${this.to}${this.to === "queued" && this.backoff !== null ? `, backoff ${this.backoff}` : ""})`;
 }
 
 /**
@@ -438,7 +465,11 @@ class TickCmd implements Cmd {
   check = () => true;
   async run(m: Model, r: Real) {
     // The database clock moving forward by dt == every stored time moving back by dt.
-    await r.pool.query("UPDATE jobs SET lease_expires_at = lease_expires_at - make_interval(secs => $1) WHERE lease_expires_at IS NOT NULL", [this.dt]);
+    await r.pool.query(
+      `UPDATE jobs SET lease_expires_at = lease_expires_at - make_interval(secs => $1), not_before = not_before - make_interval(secs => $1)
+       WHERE lease_expires_at IS NOT NULL OR not_before IS NOT NULL`,
+      [this.dt],
+    );
     await r.pool.query(
       "UPDATE job_verifications SET started_at = started_at - make_interval(secs => $1), ended_at = ended_at - make_interval(secs => $1)",
       [this.dt],
@@ -455,7 +486,9 @@ const commandArbs = [
   w.map((x) => new DequeueCmd(x)),
   w.map((x) => new HeartbeatCmd(x)),
   w.map((x) => new IntentCmd(x)),
-  fc.tuple(w, fc.constantFrom<T4Target>("succeeded", "needs_human", "failed", "queued", "business_outcome")).map(([x, to]) => new CompleteCmd(x, to)),
+  fc.tuple(w, fc.constantFrom<T4Target>("succeeded", "needs_human", "failed", "queued", "business_outcome"), fc.constantFrom<number | null>(null, 8, 10.5, 30, 36)).map(
+    ([x, to, backoff]) => new CompleteCmd(x, to, backoff),
+  ),
   w.map((x) => new RecoverCmd(x)),
   // The verify commands twice or three times over (fc.commands picks uniformly among these
   // arbitraries): T7/T8 need a job the same worker holds in verifying, which is rarer than a dequeue.
@@ -497,11 +530,17 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
     expect(commandsRun).toBeGreaterThan(RUNS * 5); // the sequences were not trivially short
   }, 300_000);
 
-  it(`${VERIFY_RUNS} more sequences that START with a job in verifying (a real dequeue + T5): the verify writes, re-claims and deferrals; then every Step 9 path was exercised`, async () => {
+  it(`${VERIFY_RUNS} more sequences that START with a job in committing (a real dequeue + T3) or in verifying (+ T5): the expired-commit claim, the verify writes, re-claims and deferrals; then every Step 9 path was exercised`, async () => {
     const pool = db.pool;
     await fc.assert(
       fc.asyncProperty(
-        fc.record({ maxAttempts: fc.constantFrom(1, 2, 3), jobs: fc.constantFrom(1, 2), prior: fc.constantFrom<keyof typeof PRIOR_RESULTS>("failure", "business_outcome") }),
+        fc.record({
+          maxAttempts: fc.constantFrom(1, 2, 3),
+          jobs: fc.constantFrom(1, 2),
+          prior: fc.constantFrom<keyof typeof PRIOR_RESULTS>("failure", "business_outcome"),
+          // committing: the T6.4 claim (an expired commit) is one tick + one recovery away; it no longer depends on luck.
+          start: fc.constantFrom<"committing" | "verifying">("committing", "verifying"),
+        }),
         fc.commands(commandArbs, { maxCommands: 15, size: "max" }),
         async (cfg, cmds) => {
           await resetQueueTables(pool);
@@ -513,8 +552,10 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
           }
           const model = { db: { now: 0, jobs, caps: { [TENANT]: 2 } }, held: {} } as Model;
           const real = { pool, tokens: new Map<string, number>(), lastSync: Date.now() } as Real;
-          // The prefix, through the same commands (so it is compared too): wA takes job 0 and verifies it.
-          for (const c of [new DequeueCmd("wA"), new CompleteIntoVerifyCmd("wA", cfg.prior)].map(synced)) await c.run(model, real);
+          // The prefix, through the same commands (so it is compared too): wA takes job 0 and writes its intent,
+          // or verifies it.
+          const second = cfg.start === "committing" ? new IntentCmd("wA") : new CompleteIntoVerifyCmd("wA", cfg.prior);
+          for (const c of [new DequeueCmd("wA"), second].map(synced)) await c.run(model, real);
           await fc.asyncModelRun(() => ({ model, real }), cmds);
         },
       ),
@@ -528,6 +569,7 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
       "T7:resubmitted:check_violation",
       "T8:recorded", "T8:fenced", "T8:illegal_transition",
       "recover:T6.1", "recover:T6.2", "recover:T6.4", "recover:T6.5", "recover:T6.7",
+      "dequeue:held_back_by_not_before",
       "reverify:moved", "reverify:refused",
     ]) {
       expect(hits.get(key) ?? 0, `never happened: ${key}; seen ${seen}`).toBeGreaterThan(0);

@@ -5,7 +5,8 @@
 //     if claim: verify it (T6.4/T6.5/T6.7 handed this worker a job to verify); that is the iteration
 //     job = dequeue(...)              # transient DB error -> log, back off (cap 5 s), never exit
 //     if none: sleep(poll backoff)    # 100 ms base, x2, cap 2 s, full jitter
-//     heartbeat (T2) while it runs; run it; record it (T4, fenced; retried while Postgres is down)
+//     heartbeat (T2) while it runs; run it; record it (T4, fenced; retried while Postgres is down);
+//     a requeue after a failure backs off (not_before, requeueBackoffSeconds; Step 10, D49)
 //     ... or, if it may have committed, move it into this worker's own verify phase (T5) and verify
 //     it at once (src/worker/verify.ts: lookups, settle, T7 / T8)
 //
@@ -27,7 +28,7 @@ import { writeCommitIntent } from "./intent.js";
 import { LeaseLostError } from "./leaseErrors.js";
 import { redactDeep, type Redactor } from "./credentials.js";
 import { isTransientDbError } from "../queue/index.js";
-import { jobOutcomeFor, type JobOutcome } from "../fleet/stateMachine.js";
+import { jobOutcomeFor, requeueBackoffSeconds, type JobOutcome } from "../fleet/stateMachine.js";
 import type { RunJobOptions, RunJobResult } from "./runJob.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
 import { NO_METRICS, type WorkerMetrics } from "./metrics.js";
@@ -99,6 +100,12 @@ export interface WorkerOptions {
   onVerifyDone?: (done: VerifyPhaseOutcome) => void;
   /** Counters (illegal_transitions_total, ...); Day 3 exports them. Default: not counted. */
   metrics?: WorkerMetrics;
+  /**
+   * Seconds a requeue after a failed attempt waits before the job may be dequeued again (T4's
+   * not_before; Step 10, D49). Default: requeueBackoffSeconds(attempt, random): 10 s, 30 s, 90 s, capped
+   * at 120 s, jittered x [0.8, 1.2).
+   */
+  requeueBackoff?: (attempt: number) => number;
 }
 
 export type TickResult = "ran" | "idle" | "db-unavailable";
@@ -280,9 +287,15 @@ export class Worker {
         await this.completeIntoVerifyAndVerify(job, outcome, log, started);
         return;
       }
+      // A requeue backs off (D49): the next attempt waits on the database clock, so an outage does not
+      // burn every attempt in seconds.
+      const requeueAfterSeconds =
+        outcome.state === "queued"
+          ? (this.options.requeueBackoff ?? ((attempt: number) => requeueBackoffSeconds(attempt, this.options.random ?? Math.random)))(job.attempt)
+          : null;
       const completion = await completeJobWithRetry(
         this.options.pool,
-        { jobId: job.id, fencingToken: job.fencing_token, workerId: this.options.workerId, outcome },
+        { jobId: job.id, fencingToken: job.fencing_token, workerId: this.options.workerId, outcome, requeueAfterSeconds },
         {
           signal: this.hard.signal,
           random: this.options.random,
@@ -293,8 +306,16 @@ export class Worker {
       if (completion?.recorded) fault.at("after-complete"); // the completion transaction committed
       const recorded = completion === null ? null : completion.recorded;
       const fencedOut = completion && !completion.recorded ? completion.reason : undefined;
-      const fields = { ...log, state: outcome.state, outcome: outcome.outcome, error: outcome.error, recorded, ms: Date.now() - started };
-      if (recorded === true) this.log.info(fields, "worker: job recorded");
+      const fields = {
+        ...log,
+        state: outcome.state,
+        outcome: outcome.outcome,
+        error: outcome.error,
+        recorded,
+        ...(requeueAfterSeconds === null ? {} : { retryInSeconds: requeueAfterSeconds }),
+        ms: Date.now() - started,
+      };
+      if (recorded === true) this.log.info(fields, requeueAfterSeconds === null ? "worker: job recorded" : `worker: requeued; retry in ${requeueAfterSeconds} s (backoff)`);
       else if (completion && !completion.recorded && completion.reason === "illegal_transition") {
         // A bug, not a lost lease (D41): the token is unchanged, so the state guard refused this
         // worker's own request. Nothing is written to the job; its lease expires and recovery takes it.
