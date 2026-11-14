@@ -12,5 +12,7 @@
     "outDir": "dist"
   },
   "include": ["src/**/*", "mock-app/**/*", "examples/**/*", "scripts/**/*"],
-  "exclude": ["**/*.test.ts", "node_modules", "dist"]
+  // scripts/test-timeline.ts reads the vitest project lists (vitest.browser-files.ts), which the image does
+  // not contain: a dev tool, typechecked by tsconfig.typecheck.json, never built (D48).
+  "exclude": ["**/*.test.ts", "node_modules", "dist", "scripts/test-timeline.ts"]
 }
