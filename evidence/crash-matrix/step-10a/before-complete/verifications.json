@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "job_id": "7ea843e4-7b9c-4b6d-bfad-8bf676bf68ed",
+    "fencing_token": 2,
+    "worker_id": "clean-before-complete",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-14T16:41:01.256Z",
+    "ended_at": "2026-11-14T16:41:02.285Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  }
+]

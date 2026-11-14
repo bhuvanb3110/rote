@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "job_id": "d050f988-02c3-493d-82e9-8e2b2e0f16fc",
+    "attempt": 1,
+    "worker_id": "fault-after-step-03",
+    "fencing_token": 1,
+    "started_at": "2026-11-14T16:38:44.260Z",
+    "ended_at": "2026-11-14T16:38:50.083Z",
+    "outcome": "crashed",
+    "commit_uncertain": false,
+    "trace_id": "549ab5d89bd5ab9369d2499d3ef3911a",
+    "error": "lease expired in running; recovered by clean-after-step-03 (T6.1 requeue)",
+    "commit_intent_at": null
+  },
+  {
+    "id": 2,
+    "job_id": "d050f988-02c3-493d-82e9-8e2b2e0f16fc",
+    "attempt": 2,
+    "worker_id": "clean-after-step-03",
+    "fencing_token": 3,
+    "started_at": "2026-11-14T16:38:50.100Z",
+    "ended_at": "2026-11-14T16:38:51.362Z",
+    "outcome": "success",
+    "commit_uncertain": false,
+    "trace_id": "549ab5d89bd5ab9369d2499d3ef3911a",
+    "error": null,
+    "commit_intent_at": "2026-11-14T16:38:51.124Z"
+  }
+]
