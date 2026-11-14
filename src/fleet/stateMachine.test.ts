@@ -17,6 +17,10 @@ import {
   minRequeueScheduleSeconds,
   readingsComplete,
   recoveryAction,
+  jobSettled,
+  reconcileDecision,
+  reconcileDueSeconds,
+  reconcileResultPatch,
   requeueBackoffBaseSeconds,
   requeueBackoffSeconds,
   verifyDecision,
@@ -289,5 +293,55 @@ describe("requeueBackoffSeconds (Step 10 section 1, reviewer decision 2: option 
     expect(minRequeueScheduleSeconds(3)).toBeCloseTo(32, 9);
     expect(minRequeueScheduleSeconds(2)).toBeCloseTo(8, 9);
     expect(minRequeueScheduleSeconds(1)).toBe(0);
+  });
+});
+
+describe("reconcileDecision (Step 10 section 2, R2's table; D50)", () => {
+  const defer = { budgetSeconds: 600, backoffBaseSeconds: 5, backoffCapSeconds: 60 };
+  const count = (n: number, ref: string | null = n > 0 ? "TXN-000001" : null): LookupReading => ({ kind: "count", n, firstMatchRef: ref, evidenceRef: "e" });
+  const decide = (reading: LookupReading, deferrals = 0, deferredForSeconds: number | null = null) => reconcileDecision({ reading, deferrals, deferredForSeconds, defer });
+
+  it("1 match -> reconciled: stays succeeded", () => {
+    expect(decide(count(1))).toEqual({ decision: "reconciled", to: "succeeded", outcome: null, matches: 1, firstMatchRef: "TXN-000001", error: null });
+  });
+
+  it("2+ matches -> duplicate_suspected: needs_human, with the count and the first match's reference", () => {
+    for (const n of [2, 3]) expect(decide(count(n))).toMatchObject({ decision: "duplicate_suspected", to: "needs_human", outcome: "duplicate_suspected", matches: n, firstMatchRef: "TXN-000001" });
+    expect(decide(count(2)).error).toMatch(/reconcile found 2 transfers with this memo_key after the job succeeded on a resubmit/);
+  });
+
+  it("0 matches, or a page it cannot read -> reconcile_unreadable: needs_human (a succeeded job the history cannot show is an alarm)", () => {
+    expect(decide(count(0))).toMatchObject({ decision: "reconcile_unreadable", to: "needs_human", outcome: "reconcile_unreadable", matches: 0 });
+    expect(decide({ kind: "unreadable", detail: "garbled", evidenceRef: null })).toMatchObject({ decision: "reconcile_unreadable", matches: null });
+  });
+
+  it("the bank unavailable -> reconcile_deferred with D44's backoff (5, 10, 20 ... capped at 60 s); past the budget -> reconcile_unreadable", () => {
+    const down: LookupReading = { kind: "unavailable", detail: "BANK_UNAVAILABLE", evidenceRef: null };
+    expect(decide(down)).toMatchObject({ decision: "reconcile_deferred", to: "succeeded", outcome: null, backoffSeconds: 5 });
+    expect(decide(down, 2, 30)).toMatchObject({ decision: "reconcile_deferred", backoffSeconds: 20 });
+    expect(decide(down, 9, 599)).toMatchObject({ decision: "reconcile_deferred", backoffSeconds: 60 });
+    expect(decide(down, 10, 600)).toMatchObject({ decision: "reconcile_unreadable", to: "needs_human" });
+    expect(decide({ kind: "transient", detail: "t", evidenceRef: null })).toMatchObject({ decision: "reconcile_deferred" });
+  });
+
+  it("result.reconcile carries the decision, the count, the first match's reference and the job's own confirmationRef", () => {
+    expect(reconcileResultPatch(decide(count(2)), "e", "TXN-000002")).toEqual({ decision: "duplicate_suspected", matches: 2, firstMatchRef: "TXN-000001", jobConfirmationRef: "TXN-000002", evidenceRef: "e" });
+    expect(reconcileResultPatch(decide({ kind: "unavailable", detail: "d", evidenceRef: null }), null, undefined)).toMatchObject({ matches: null, firstMatchRef: null, jobConfirmationRef: null });
+  });
+
+  it("reconcileDueSeconds = lease + settle (whole seconds, rounded up) + margin; production 30 + 5 + 25 = 60", () => {
+    expect(reconcileDueSeconds(30, 5000)).toBe(60);
+    expect(reconcileDueSeconds(5, 5000, 10)).toBe(20);
+    expect(reconcileDueSeconds(5, 1001, 1)).toBe(8);
+    expect(() => reconcileDueSeconds(-1, 0, 0)).toThrow(RangeError);
+  });
+
+  it("jobSettled: terminal and no reconcile due (none set, or the pass decided)", () => {
+    const at = new Date();
+    expect(jobSettled({ state: "succeeded", reconcile_after: null, reconciled_at: null })).toBe(true);
+    expect(jobSettled({ state: "succeeded", reconcile_after: at, reconciled_at: null })).toBe(false);
+    expect(jobSettled({ state: "succeeded", reconcile_after: at, reconciled_at: at })).toBe(true);
+    expect(jobSettled({ state: "needs_human", reconcile_after: at, reconciled_at: at })).toBe(true);
+    for (const state of ["queued", "running", "committing", "verifying"]) expect(jobSettled({ state, reconcile_after: null, reconciled_at: null }), state).toBe(false);
   });
 });

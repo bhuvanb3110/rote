@@ -32,6 +32,7 @@ import {
   type Pool,
 } from "../queue/index.js";
 import { isTransientDbError } from "../queue/index.js";
+import { jobSettled } from "../fleet/stateMachine.js";
 import { DEFAULT_ARTIFACTS_DIR, findCapability, listCapabilities } from "./registry.js";
 import { invokeCapability } from "./invoke.js";
 
@@ -89,6 +90,12 @@ export function jobView(job: JobRow) {
     traceId: job.trace_id,
     /** A queued job that failed an attempt is retried no earlier than this (the requeue backoff, D49). */
     notBefore: job.not_before?.toISOString() ?? null,
+    /**
+     * Terminal AND no reconcile due (D50, step-10 reviewer decision 3). A `succeeded` job that is not yet
+     * settled succeeded after a resubmit and will be re-read in the bank's history; until then it can still
+     * change to needs_human / duplicate_suspected.
+     */
+    settled: jobSettled(job),
     createdAt: job.created_at.toISOString(),
     updatedAt: job.updated_at.toISOString(),
   };

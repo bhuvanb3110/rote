@@ -24,7 +24,12 @@ export const BROWSER_TEST_FILES = [
   "src/worker/worker.db.test.ts",
 ];
 
-export const SLOW_TEST_FILES = ["src/worker/faults.db.test.ts", "src/worker/lease.db.test.ts", "src/worker/verify.db.test.ts"];
+export const SLOW_TEST_FILES = [
+  "src/worker/faults.db.test.ts",
+  "src/worker/lease.db.test.ts",
+  "src/worker/reconcileBank.db.test.ts",
+  "src/worker/verify.db.test.ts",
+];
 
 /**
  * Max concurrent browser test files, chosen by measurement (D31,

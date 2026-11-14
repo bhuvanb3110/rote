@@ -36,6 +36,7 @@ import {
   type VerifyCycle,
 } from "../fleet/stateMachine.js";
 import type { WorkerLogger } from "./loop.js";
+import { claimReconcile, type ReconcileClaim } from "./reconcile.js";
 import { INSERT_PHASE_SQL, readVerifyCycle } from "./verifySql.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
 
@@ -217,7 +218,8 @@ export async function recoverExpired(
 /**
  * The worker's beforeDequeue (seam 4): recover, log each recovery, and on a TRANSIENT database error
  * log and carry on to the dequeue (which has its own backoff). Any other error is a bug and propagates:
- * the worker exits loudly rather than loop on it. Resolves with the job claimed to verify, if any.
+ * the worker exits loudly rather than loop on it. Resolves with the job claimed to verify, if any; with
+ * `reconcile`, when nothing was claimed to verify, with at most ONE due reconcile (R1, Step 10, D50).
  */
 export function createRecoverySweep(options: {
   pool: Pool;
@@ -227,7 +229,9 @@ export function createRecoverySweep(options: {
   log?: WorkerLogger;
   fault?: FaultInjector;
   onRecovered?: (r: RecoveredJob) => void;
-}): () => Promise<VerifyClaim | null> {
+  /** Also claim one due reconcile (R1) when recovery claimed nothing to verify. The entrypoint sets it. */
+  reconcile?: boolean;
+}): () => Promise<VerifyClaim | ReconcileClaim | null> {
   return async () => {
     try {
       const { claim } = await recoverExpired(options.pool, {
@@ -254,7 +258,10 @@ export function createRecoverySweep(options: {
           options.onRecovered?.(r);
         },
       });
-      return claim;
+      if (claim || !options.reconcile) return claim;
+      const due = await claimReconcile(options.pool, { workerId: options.workerId, leaseSeconds: options.leaseSeconds });
+      if (due) options.log?.info({ workerId: options.workerId, jobId: due.job.id, fencingToken: due.fencingToken }, "worker: a job that succeeded after a resubmit is due; reconciling it (R1)");
+      return due;
     } catch (err) {
       if (!isTransientDbError(err)) throw err;
       options.log?.warn({ workerId: options.workerId, err: (err as Error).message }, "worker: Postgres unavailable during recovery; continuing to dequeue");

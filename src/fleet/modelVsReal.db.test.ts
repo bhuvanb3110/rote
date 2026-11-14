@@ -4,7 +4,7 @@
 // compares, after EVERY command, each job's state, fencing token, owner, attempt, outcome and lease, its
 // verify cycle as VERIFY_CYCLE_SQL derives it from job_verifications (phases, dead phases, deferrals,
 // deferred-for, prior status, the newest phase's decision), its requeue backoff (not_before, Step 10 D49),
-// plus each command's own answer (leased which
+// its reconcile marks (reconcile_after, reconciled_at; D50), plus each command's own answer (leased which
 // job, extended or not, recorded / fenced (lease_lost) / illegal_transition / CHECK violation, which jobs
 // recovered how, which one was claimed to verify). This is what catches drift between the model the
 // property tests trust and the SQL the workers run.
@@ -36,8 +36,9 @@ import { extendLease } from "../worker/heartbeat.js";
 import { writeCommitIntent } from "../worker/intent.js";
 import { FencingError } from "../worker/leaseErrors.js";
 import { recoverExpired } from "../worker/recover.js";
+import { claimReconcile, claimReconcileJob, writeReconcileResult } from "../worker/reconcile.js";
 import { completeIntoVerify, deferVerify, readVerifyCycle, reverifyJob, writeVerifyResult } from "../worker/verifySql.js";
-import { jobOutcomeFor, type JobOutcome, type VerifyDecision } from "./stateMachine.js";
+import { jobOutcomeFor, type JobOutcome, type ReconcileDecision, type VerifyDecision } from "./stateMachine.js";
 import {
   isActive,
   leaseRemaining,
@@ -46,6 +47,9 @@ import {
   modelDequeue,
   modelHeartbeat,
   modelIntent,
+  modelReconcileClaim,
+  modelReconcileClaimJob,
+  modelReconcileResult,
   modelRecover,
   modelReverify,
   modelTick,
@@ -54,6 +58,7 @@ import {
   modelVerifyResult,
   newJob,
   notBeforeRemaining,
+  reconcileAfterRemaining,
   type ModelDb,
   type ModelFencedResult,
   type ModelJob,
@@ -115,8 +120,9 @@ async function sync(r: Real): Promise<void> {
   // ended_at = now(), so started_at is never shifted forward (moving ended_at forward keeps
   // ended_at >= started_at).
   await r.pool.query(
-    `UPDATE jobs SET lease_expires_at = lease_expires_at + make_interval(secs => $1), not_before = not_before + make_interval(secs => $1)
-     WHERE lease_expires_at IS NOT NULL OR not_before IS NOT NULL`,
+    `UPDATE jobs SET lease_expires_at = lease_expires_at + make_interval(secs => $1), not_before = not_before + make_interval(secs => $1),
+                     reconcile_after = reconcile_after + make_interval(secs => $1)
+     WHERE lease_expires_at IS NOT NULL OR not_before IS NOT NULL OR reconcile_after IS NOT NULL`,
     [elapsed],
   );
   await r.pool.query("UPDATE job_verifications SET ended_at = ended_at + make_interval(secs => $1) WHERE ended_at IS NOT NULL", [elapsed]);
@@ -137,6 +143,9 @@ interface RealJob {
   remaining: number | null;
   /** Seconds until not_before (negative = due), or null. */
   not_before_in: number | null;
+  /** Seconds until reconcile_after (negative = due), or null. */
+  reconcile_in: number | null;
+  reconciled: boolean;
 }
 
 async function readReal(pool: Pool): Promise<RealJob[]> {
@@ -144,7 +153,9 @@ async function readReal(pool: Pool): Promise<RealJob[]> {
     await pool.query<RealJob>(
       `SELECT id, state, attempt, fencing_token, lease_owner, outcome,
               EXTRACT(EPOCH FROM (lease_expires_at - now()))::float8 AS remaining,
-              EXTRACT(EPOCH FROM (not_before - now()))::float8 AS not_before_in
+              EXTRACT(EPOCH FROM (not_before - now()))::float8 AS not_before_in,
+              EXTRACT(EPOCH FROM (reconcile_after - now()))::float8 AS reconcile_in,
+              reconciled_at IS NOT NULL AS reconciled
        FROM jobs ORDER BY created_at, id`,
     )
   ).rows;
@@ -181,6 +192,14 @@ async function compare(m: Model, r: Real, after: string): Promise<void> {
       expect(rj.not_before_in, `${where}: not_before`).not.toBeNull();
       expect(Math.abs(rj.not_before_in! - mNotBefore), `${where}: not_before in real ${rj.not_before_in} vs model ${mNotBefore} (slack ${slack.toFixed(3)} s)`).toBeLessThan(slack);
     }
+    // The reconcile marks (D50).
+    const mReconcile = reconcileAfterRemaining(mj, m.db.now);
+    if (mReconcile === null) expect(rj.reconcile_in, `${where}: reconcile_after`).toBeNull();
+    else {
+      expect(rj.reconcile_in, `${where}: reconcile_after`).not.toBeNull();
+      expect(Math.abs(rj.reconcile_in! - mReconcile), `${where}: reconcile_after in real ${rj.reconcile_in} vs model ${mReconcile} (slack ${slack.toFixed(3)} s)`).toBeLessThan(slack);
+    }
+    expect(rj.reconciled, `${where}: reconciled_at set`).toBe(mj.reconciledAt !== null);
     // The verify cycle (VERIFY_CYCLE_SQL vs the model's phases).
     const rc = cycles[i]!;
     const mc = modelVerifyCycle(mj, m.db.now);
@@ -460,14 +479,105 @@ class ReverifyCmd implements Cmd {
   toString = () => `reverify(job ${this.i})`;
 }
 
+/** A succeeded job's reconcile_after within 1 s of now: whether R1 takes it could differ by the few ms of real time. */
+function nearReconcileDue(m: Model): boolean {
+  return m.db.jobs.some((j) => j.state === "succeeded" && j.reconcileAfter !== null && Math.abs(j.reconcileAfter - m.db.now) < 1);
+}
+/** A succeeded job's reconcile lease within 1 s of expiry: whether a claim may take it could differ. */
+function nearReconcileLease(m: Model): boolean {
+  return m.db.jobs.some((j) => j.state === "succeeded" && j.leaseExpiresAt !== null && Math.abs(j.leaseExpiresAt - m.db.now) < 1);
+}
+
+/** R1: a worker's reconcile claim. */
+class ReconcileClaimCmd implements Cmd {
+  constructor(readonly w: W) {}
+  check = (m: Readonly<Model>) => !nearReconcileDue(m as Model) && !nearReconcileLease(m as Model) && !reconcileTie(m as Model);
+  async run(m: Model, r: Real) {
+    const { db: next, claimed } = modelReconcileClaim(m.db, this.w, LEASE);
+    const real = await claimReconcile(r.pool, { workerId: this.w, leaseSeconds: LEASE });
+    expect(real ? `${real.job.id}:${real.fencingToken}` : null, this.toString()).toEqual(claimed ? `${claimed.jobId}:${claimed.token}` : null);
+    hit(`R1:${claimed ? "claimed" : "none"}`);
+    m.db = next;
+    if (claimed) m.held[this.w] = { jobId: claimed.jobId, token: claimed.token };
+    await compare(m, r, this.toString());
+  }
+  toString = () => `reconcileClaim(${this.w})`;
+}
+
+/** Two due jobs sharing a reconcile_after: Postgres breaks the tie by id, the model by creation order. */
+function reconcileTie(m: Model): boolean {
+  const due = m.db.jobs.filter((j) => j.state === "succeeded" && j.reconciledAt === null && j.reconcileAfter !== null && j.reconcileAfter <= m.db.now);
+  return new Set(due.map((j) => j.reconcileAfter)).size < due.length;
+}
+
+/** The batch's claim of job i (rote reconcile --since): regardless of reconciled_at. */
+class ReconcileClaimJobCmd implements Cmd {
+  constructor(
+    readonly w: W,
+    readonly i: number,
+  ) {}
+  check = (m: Readonly<Model>) => this.i < m.db.jobs.length && !nearReconcileLease(m as Model);
+  async run(m: Model, r: Real) {
+    const id = m.db.jobs[this.i]!.id;
+    const { db: next, claimed } = modelReconcileClaimJob(m.db, id, this.w, LEASE);
+    const real = await claimReconcileJob(r.pool, { jobId: id, workerId: this.w, leaseSeconds: LEASE });
+    expect(real ? real.fencingToken : null, this.toString()).toBe(claimed ? claimed.token : null);
+    hit(`batchClaim:${claimed ? "claimed" : "refused"}`);
+    m.db = next;
+    if (claimed) m.held[this.w] = { jobId: claimed.jobId, token: claimed.token };
+    await compare(m, r, this.toString());
+  }
+  toString = () => `reconcileClaimJob(${this.w}, job ${this.i})`;
+}
+
+const RECONCILE_DECISIONS: Record<ReconcileDecision["decision"], ReconcileDecision> = {
+  reconciled: { decision: "reconciled", to: "succeeded", outcome: null, matches: 1, firstMatchRef: "TXN-000001", error: null },
+  duplicate_suspected: { decision: "duplicate_suspected", to: "needs_human", outcome: "duplicate_suspected", matches: 2, firstMatchRef: "TXN-000001", error: "2 matches" },
+  reconcile_unreadable: { decision: "reconcile_unreadable", to: "needs_human", outcome: "reconcile_unreadable", matches: 0, firstMatchRef: null, error: "0 matches" },
+  reconcile_deferred: { decision: "reconcile_deferred", to: "succeeded", outcome: null, backoffSeconds: 20, error: "bank unavailable" },
+};
+
+/** The worker that holds a succeeded job's reconcile lease right now (by the model), if any. */
+function reconcilerOf(m: Readonly<Model>): W | undefined {
+  return WORKERS.find((x) => {
+    const h = m.held[x];
+    const j = h && m.db.jobs.find((jj) => jj.id === h.jobId);
+    return j !== undefined && j.state === "succeeded" && j.token === h!.token && j.owner === x;
+  });
+}
+const resolveReconciler = (m: Readonly<Model>, who: Who): W | undefined => (who === "holder" ? reconcilerOf(m) : m.held[who] ? who : undefined);
+
+/** R2: the reconciler's decision. */
+class ReconcileResultCmd implements Cmd {
+  constructor(
+    readonly who: Who,
+    readonly decision: ReconcileDecision["decision"],
+  ) {}
+  check = (m: Readonly<Model>) => resolveReconciler(m, this.who) !== undefined;
+  async run(m: Model, r: Real) {
+    const w = resolveReconciler(m, this.who)!;
+    const h = m.held[w]!;
+    const d = RECONCILE_DECISIONS[this.decision];
+    const lookups = d.decision === "reconcile_deferred" ? [null] : [d.matches];
+    const { db: next, result } = modelReconcileResult(m.db, { jobId: h.jobId, token: h.token, owner: w }, d, lookups);
+    const real = await realFenced(() => writeReconcileResult(r.pool, { jobId: h.jobId, fencingToken: h.token, workerId: w, decision: d, lookups, evidenceRefs: ["e"], patch: { decision: d.decision } }));
+    expect(real, this.toString()).toBe(result);
+    hit(`R2:${this.decision}:${result}`);
+    m.db = next;
+    await compare(m, r, this.toString());
+  }
+  toString = () => `reconcileResult(${this.who}, ${this.decision})`;
+}
+
 class TickCmd implements Cmd {
   constructor(readonly dt: number) {}
   check = () => true;
   async run(m: Model, r: Real) {
     // The database clock moving forward by dt == every stored time moving back by dt.
     await r.pool.query(
-      `UPDATE jobs SET lease_expires_at = lease_expires_at - make_interval(secs => $1), not_before = not_before - make_interval(secs => $1)
-       WHERE lease_expires_at IS NOT NULL OR not_before IS NOT NULL`,
+      `UPDATE jobs SET lease_expires_at = lease_expires_at - make_interval(secs => $1), not_before = not_before - make_interval(secs => $1),
+                       reconcile_after = reconcile_after - make_interval(secs => $1), reconciled_at = reconciled_at - make_interval(secs => $1)
+       WHERE lease_expires_at IS NOT NULL OR not_before IS NOT NULL OR reconcile_after IS NOT NULL`,
       [this.dt],
     );
     await r.pool.query(
@@ -500,8 +610,20 @@ const commandArbs = [
   ...Array.from({ length: 2 }, () => fc.constantFrom(0, 1).map((i) => new ReverifyCmd(i))),
   fc.constantFrom(5, 12, 29, 31, 45).map((dt) => new TickCmd(dt)),
 ].map((arb) => arb.map((c) => synced(c)));
+/**
+ * The reconcile pass's commands (D50, D51): R1, the batch's claim, R2. Only the third family (which starts
+ * from a job that succeeded after a resubmit) adds them; the first two keep Step 9's exact mix, so their
+ * seeded sequences, and the rare paths they reach, are unchanged.
+ */
+const reconcileArbs = [
+  ...Array.from({ length: 2 }, () => w.map((x): Cmd => new ReconcileClaimCmd(x))),
+  fc.tuple(w, fc.constantFrom(0, 1)).map(([x, i]): Cmd => new ReconcileClaimJobCmd(x, i)),
+  ...Array.from({ length: 2 }, () =>
+    fc.tuple(who, fc.constantFrom<ReconcileDecision["decision"]>("reconciled", "duplicate_suspected", "reconcile_unreadable", "reconcile_deferred")).map(([x, d]): Cmd => new ReconcileResultCmd(x, d)),
+  ),
+].map((arb) => arb.map((c) => synced(c)));
 
-describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8 and reverify on a test Postgres schema", () => {
+describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema", () => {
   it(`${RUNS} seeded command sequences agree after every command`, async () => {
     const pool = db.pool;
     let commandsRun = 0;
@@ -530,7 +652,7 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
     expect(commandsRun).toBeGreaterThan(RUNS * 5); // the sequences were not trivially short
   }, 300_000);
 
-  it(`${VERIFY_RUNS} more sequences that START with a job in committing (a real dequeue + T3) or in verifying (+ T5): the expired-commit claim, the verify writes, re-claims and deferrals; then every Step 9 path was exercised`, async () => {
+  it(`${VERIFY_RUNS} more sequences that START with a job in committing (a real dequeue + T3) or in verifying (+ T5): the expired-commit claim, the verify writes, re-claims and deferrals`, async () => {
     const pool = db.pool;
     await fc.assert(
       fc.asyncProperty(
@@ -561,7 +683,41 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
       ),
       { numRuns: VERIFY_RUNS, seed: SEED + 1 },
     );
-    // Every Step 9 path was exercised, recorded AND fenced, not just generated (both tests together).
+  }, 300_000);
+
+  it(`${VERIFY_RUNS} more sequences that START with a job that succeeded after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4 succeeded): the reconcile pass; then every Step 9 and Step 10 path was exercised`, async () => {
+    const pool = db.pool;
+    await fc.assert(
+      fc.asyncProperty(
+        fc.record({ maxAttempts: fc.constantFrom(2, 3), jobs: fc.constantFrom(1, 2), early: fc.boolean() }),
+        fc.commands([...commandArbs, ...reconcileArbs], { maxCommands: 15, size: "max" }),
+        async (cfg, cmds) => {
+          await resetQueueTables(pool);
+          await pool.query("UPDATE tenants SET max_concurrent = 2 WHERE id = $1", [TENANT]);
+          const jobs: ModelJob[] = [];
+          for (let i = 0; i < cfg.jobs; i += 1) {
+            const { job } = await enqueue(pool, { capability: CAP, tenantId: TENANT, idempotencyKey: `mvr-r-${i}`, params: { memberId: "1" }, maxAttempts: cfg.maxAttempts });
+            jobs.push(newJob({ id: job.id, tenant: TENANT, seq: i + 1, maxAttempts: cfg.maxAttempts }));
+          }
+          const model = { db: { now: 0, jobs, caps: { [TENANT]: 2 } }, held: {} } as Model;
+          const real = { pool, tokens: new Map<string, number>(), lastSync: Date.now() } as Real;
+          // The prefix, through the same commands (compared too): job 0 is resubmitted and succeeds on attempt 2
+          // (marked: reconcile due in 60 s); `early` also moves the clock to it.
+          const prefix: Cmd[] = [
+            new DequeueCmd("wA"),
+            new CompleteIntoVerifyCmd("wA", "failure"),
+            new VerifyResultCmd("wA", "resubmitted"),
+            new DequeueCmd("wB"),
+            new CompleteCmd("wB", "succeeded"),
+            ...(cfg.early ? [new TickCmd(45), new TickCmd(29)] : []),
+          ];
+          for (const c of prefix.map(synced)) await c.run(model, real);
+          await fc.asyncModelRun(() => ({ model, real }), cmds);
+        },
+      ),
+      { numRuns: VERIFY_RUNS, seed: SEED + 2 },
+    );
+    // Every Step 9 and Step 10 path was exercised, recorded AND fenced, not just generated (all three tests together).
     const seen = JSON.stringify(Object.fromEntries(hits));
     for (const key of [
       "T5:recorded", "T5:fenced", "T5:illegal_transition",
@@ -570,6 +726,8 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
       "T8:recorded", "T8:fenced", "T8:illegal_transition",
       "recover:T6.1", "recover:T6.2", "recover:T6.4", "recover:T6.5", "recover:T6.7",
       "dequeue:held_back_by_not_before",
+      "R1:claimed", "R1:none", "batchClaim:claimed", "batchClaim:refused",
+      "R2:reconciled:recorded", "R2:duplicate_suspected:recorded", "R2:reconcile_unreadable:recorded", "R2:reconcile_deferred:recorded",
       "reverify:moved", "reverify:refused",
     ]) {
       expect(hits.get(key) ?? 0, `never happened: ${key}; seen ${seen}`).toBeGreaterThan(0);
@@ -577,5 +735,8 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
     const t7Any = (suffix: string) => [...hits.keys()].some((k) => k.startsWith("T7:") && k.endsWith(suffix));
     expect(t7Any(":fenced"), `a stale T7 never happened; seen ${seen}`).toBe(true);
     expect(t7Any(":illegal_transition"), `an illegal T7 never happened; seen ${seen}`).toBe(true);
+    const r2Any = (suffix: string) => [...hits.keys()].some((k) => k.startsWith("R2:") && k.endsWith(suffix));
+    expect(r2Any(":fenced"), `a stale R2 never happened; seen ${seen}`).toBe(true);
+    expect(r2Any(":illegal_transition"), `an illegal R2 never happened; seen ${seen}`).toBe(true);
   }, 300_000);
 });

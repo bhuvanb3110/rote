@@ -12,7 +12,12 @@
 //                abort it), lookup #2 the same way
 //   decide     = verifyDecision (pure) with the cycle's prior_status, attempt, and its deferrals so far
 //                (VERIFY_CYCLE_SQL, database clock)
-//   write      = T7 (the decision) or T8 (deferred: the bank was unavailable), fenced on this token
+//   write      = T7 (the decision) or T8 (deferred: the bank was unavailable), fenced on this token; a
+//                T7 `already_done` on a job that was resubmitted before marks it for the reconcile pass
+//                (D50)
+//
+// The lookup itself (createLookup: one lookup and its one retry) is shared with the reconcile pass
+// (src/worker/reconcile.ts, D50).
 //
 // Crash points (test-only, D34): verify-after-login (the lookup's step-03), verify-after-count (its
 // step-09), verify-before-result (decided, before T7/T8), verify-before-requeue (decided "resubmitted",
@@ -20,8 +25,8 @@
 //
 // RULE (step-09 reviewer decision 4): the settle period must exceed the bank's history visibility
 // delay. A row the bank shows later than the second lookup is invisible to both, and [0, 0] would
-// resubmit a transfer that happened. That is deployment configuration; the reconcile pass (Step 10)
-// is the backstop (evidence/settle-vs-history-lag/).
+// resubmit a transfer that happened. That is deployment configuration; the reconcile pass (D50) is the
+// backstop that makes such a duplicate loud (evidence/settle-vs-history-lag/).
 import type { Browser } from "playwright";
 import type { Step } from "../artifact/index.js";
 import { invokeCapability } from "../catalog/invoke.js";
@@ -34,6 +39,7 @@ import {
   DEFAULT_DEFER_CONFIG,
   lookupsColumn,
   readingsComplete,
+  reconcileDueSeconds,
   verifyDecision,
   type DeferConfig,
   type LookupEnd,
@@ -81,7 +87,96 @@ export interface VerifyContext {
    * Test seam: replaces the browser lookup (invokeCapability of transfer-history-lookup) with a function
    * returning what it would have. Never set by the entrypoint.
    */
-  invokeLookup?: (input: { claim: VerifyClaim; signal: AbortSignal; attempt: number }) => Promise<LookupEnd>;
+  invokeLookup?: (input: { claim: LookupClaim; signal: AbortSignal; attempt: number }) => Promise<LookupEnd>;
+  /**
+   * The reconcile delay T7 marks a job with when it succeeds after a resubmit (D50): lease + settle +
+   * margin (reconcileDueSeconds). Default: reconcileDueSeconds(leaseSeconds, settleMs).
+   */
+  reconcileDueSeconds?: number;
+}
+
+/** What a lookup needs from the job it reads for (a verify claim or a reconcile claim). */
+export interface LookupClaim {
+  job: Pick<VerifyClaim["job"], "id" | "tenant_id" | "params" | "memo_key">;
+  fencingToken: number;
+}
+
+/**
+ * One history lookup (transfer-history-lookup 1.2.0 for (memberId, memo_key), read-only, never
+ * approveRisky) and the one retry if it was transient (afterRetry: still transient -> "unavailable").
+ * Shared by the verify phase and the reconcile pass (D50). `faultPoints` maps lookup step ids to crash
+ * points (verify's only). An abort of `controller` rejects with its reason.
+ */
+export function createLookup(
+  ctx: VerifyContext,
+  claim: LookupClaim,
+  controller: AbortController,
+  faultPoints: Record<string, string> = {},
+): { once(): Promise<LookupReading>; withRetry(): Promise<LookupReading> } {
+  const fault = ctx.fault ?? NO_FAULT;
+  const redact = ctx.redact ?? ((s: string) => s);
+  const { job } = claim;
+  let lookupsRun = 0;
+  const once = async (): Promise<LookupReading> => {
+    lookupsRun += 1;
+    if (ctx.invokeLookup) {
+      let end: LookupEnd;
+      try {
+        end = await ctx.invokeLookup({ claim, signal: controller.signal, attempt: lookupsRun });
+      } catch (error) {
+        if (controller.signal.aborted) throw controller.signal.reason;
+        end = { kind: "thrown", error };
+      }
+      controller.signal.throwIfAborted();
+      return classifyLookup(end);
+    }
+    const capability = await findCapability(LOOKUP_CAPABILITY_ID, ctx.artifactsDir ?? DEFAULT_ARTIFACTS_DIR);
+    if (!capability) return { kind: "unreadable", detail: `no capability "${LOOKUP_CAPABILITY_ID}"`, evidenceRef: null };
+    let params: Record<string, unknown>;
+    try {
+      params = buildJobParams(capability, { tenant_id: job.tenant_id, params: { memberId: job.params.memberId, memo: job.memo_key }, memo_key: job.memo_key }, ctx.credentials);
+    } catch (err) {
+      return { kind: "unreadable", detail: redact(`cannot build the lookup's params: ${(err as Error).message}`), evidenceRef: null };
+    }
+    const onStep =
+      fault.point && Object.keys(faultPoints).length > 0
+        ? {
+            after: async (step: Step) => {
+              const point = faultPoints[step.id];
+              if (point) fault.at(point);
+            },
+          }
+        : undefined;
+    let reading: LookupReading;
+    try {
+      const result = await invokeCapability({
+        id: LOOKUP_CAPABILITY_ID,
+        tenant: job.tenant_id,
+        params,
+        browser: await ctx.getBrowser(),
+        signal: controller.signal,
+        evidenceBaseDir: ctx.evidenceBaseDir,
+        artifactsDir: ctx.artifactsDir,
+        overridesDir: ctx.overridesDir,
+        statusDir: ctx.statusDir,
+        onStep,
+        headless: true,
+      });
+      reading = classifyLookup({ kind: "result", result });
+    } catch (error) {
+      if (controller.signal.aborted) throw controller.signal.reason;
+      reading = classifyLookup({ kind: "thrown", error });
+    }
+    controller.signal.throwIfAborted();
+    return reading.kind === "count" ? reading : { ...reading, detail: redact(reading.detail) };
+  };
+  const withRetry = async (): Promise<LookupReading> => {
+    const first = await once();
+    if (first.kind !== "transient") return first;
+    ctx.log?.warn({ workerId: ctx.workerId, jobId: job.id, fencingToken: claim.fencingToken, detail: first.detail }, "lookup transient; one retry");
+    return afterRetry(await once());
+  };
+  return { once, withRetry };
 }
 
 export interface VerifyPhaseOutcome {
@@ -135,65 +230,7 @@ export async function runVerifyPhase(
     ...rest,
   });
 
-  let lookupsRun = 0;
-  const lookupOnce = async (): Promise<LookupReading> => {
-    lookupsRun += 1;
-    if (ctx.invokeLookup) {
-      let end: LookupEnd;
-      try {
-        end = await ctx.invokeLookup({ claim, signal: controller.signal, attempt: lookupsRun });
-      } catch (error) {
-        if (controller.signal.aborted) throw controller.signal.reason;
-        end = { kind: "thrown", error };
-      }
-      controller.signal.throwIfAborted();
-      return classifyLookup(end);
-    }
-    const capability = await findCapability(LOOKUP_CAPABILITY_ID, ctx.artifactsDir ?? DEFAULT_ARTIFACTS_DIR);
-    if (!capability) return { kind: "unreadable", detail: `no capability "${LOOKUP_CAPABILITY_ID}"`, evidenceRef: null };
-    let params: Record<string, unknown>;
-    try {
-      params = buildJobParams(capability, { tenant_id: job.tenant_id, params: { memberId: job.params.memberId, memo: job.memo_key }, memo_key: job.memo_key }, ctx.credentials);
-    } catch (err) {
-      return { kind: "unreadable", detail: redact(`cannot build the lookup's params: ${(err as Error).message}`), evidenceRef: null };
-    }
-    const onStep = fault.point
-      ? {
-          after: async (step: Step) => {
-            const point = LOOKUP_FAULT_POINTS[step.id];
-            if (point) fault.at(point);
-          },
-        }
-      : undefined;
-    let reading: LookupReading;
-    try {
-      const result = await invokeCapability({
-        id: LOOKUP_CAPABILITY_ID,
-        tenant: job.tenant_id,
-        params,
-        browser: await ctx.getBrowser(),
-        signal: controller.signal,
-        evidenceBaseDir: ctx.evidenceBaseDir,
-        artifactsDir: ctx.artifactsDir,
-        overridesDir: ctx.overridesDir,
-        statusDir: ctx.statusDir,
-        onStep,
-        headless: true,
-      });
-      reading = classifyLookup({ kind: "result", result });
-    } catch (error) {
-      if (controller.signal.aborted) throw controller.signal.reason;
-      reading = classifyLookup({ kind: "thrown", error });
-    }
-    controller.signal.throwIfAborted();
-    return reading.kind === "count" ? reading : { ...reading, detail: redact(reading.detail) };
-  };
-  const lookupWithRetry = async (): Promise<LookupReading> => {
-    const first = await lookupOnce();
-    if (first.kind !== "transient") return first;
-    ctx.log?.warn({ ...log, detail: first.detail }, "verify: lookup transient; one retry");
-    return afterRetry(await lookupOnce());
-  };
+  const lookupWithRetry = createLookup(ctx, claim, controller, LOOKUP_FAULT_POINTS).withRetry;
 
   try {
     readings.push(await lookupWithRetry());
@@ -233,7 +270,12 @@ export async function runVerifyPhase(
       () =>
         decision.decision === "deferred"
           ? deferVerify(ctx.pool, { ...write, decision })
-          : writeVerifyResult(ctx.pool, { ...write, decision, result: decision.decision === "already_done" ? alreadyDoneResult(decision) : null }),
+          : writeVerifyResult(ctx.pool, {
+              ...write,
+              decision,
+              result: decision.decision === "already_done" ? alreadyDoneResult(decision) : null,
+              reconcileDueSeconds: ctx.reconcileDueSeconds ?? reconcileDueSeconds(ctx.leaseSeconds, ctx.settleMs),
+            }),
       { signal: hardSignal },
     );
     if (written === null) {

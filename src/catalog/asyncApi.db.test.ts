@@ -202,9 +202,19 @@ describe("GET /jobs/:id?tenant=", () => {
     const res = await call(`${base}/jobs/${id}?tenant=tenant-b`, { method: "GET" });
     expect(res.status).toBe(200);
     expect(Object.keys(res.json).sort()).toEqual(
-      ["attempt", "capabilityId", "createdAt", "error", "id", "maxAttempts", "memoKey", "notBefore", "outcome", "result", "state", "tenant", "traceId", "updatedAt"].sort(),
+      ["attempt", "capabilityId", "createdAt", "error", "id", "maxAttempts", "memoKey", "notBefore", "outcome", "result", "settled", "state", "tenant", "traceId", "updatedAt"].sort(),
     );
-    expect(res.json).toMatchObject({ id, tenant: "tenant-b", state: "queued", attempt: 0, maxAttempts: 3, memoKey: `rote-${id}`, notBefore: null });
+    expect(res.json).toMatchObject({ id, tenant: "tenant-b", state: "queued", attempt: 0, maxAttempts: 3, memoKey: `rote-${id}`, notBefore: null, settled: false });
+
+    // settled (D50, step-10 reviewer decision 3): terminal and no reconcile due.
+    const settledAs = async (cols: string) => {
+      await pool.query(`UPDATE jobs SET ${cols} WHERE id = $1`, [id]);
+      return (await call(`${base}/jobs/${id}?tenant=tenant-b`, { method: "GET" })).json.settled;
+    };
+    expect(await settledAs("state = 'succeeded', reconcile_after = NULL")).toBe(true); // never resubmitted
+    expect(await settledAs("reconcile_after = now() + interval '60 seconds'")).toBe(false); // succeeded after a resubmit: may still change
+    expect(await settledAs("reconciled_at = now()")).toBe(true); // the reconcile pass decided
+    expect(await settledAs("state = 'needs_human', outcome = 'duplicate_suspected'")).toBe(true);
     expect(res.json.traceId).toMatch(/^[0-9a-f]{32}$/);
 
     const other = await call(`${base}/jobs/${id}?tenant=tenant-a`, { method: "GET" });

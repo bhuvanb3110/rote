@@ -17,6 +17,10 @@
 // now() + $8 seconds (requeueBackoffSeconds, computed by the worker; NULL = dequeueable at once), so a
 // bank outage does not burn every attempt in seconds. Any other target leaves not_before NULL.
 //
+// A success of a job that was RESUBMITTED before (a verify phase decided `resubmitted`) is marked for the
+// reconcile pass (Step 10, D50): reconcile_after = now() + $9 seconds (lease + settle + margin). Only such
+// a job can carry a zombie's late second transfer.
+//
 // 0 rows has two causes, told apart by re-reading the job's fencing token in the same transaction
 // (step-09 reviewer decision A1, D41):
 //   token CHANGED    the lease was lost (recovery moved the job on): `lease_lost`, as before.
@@ -30,12 +34,18 @@
 import { withTransaction, type Pool, type Queryable } from "../queue/index.js";
 import { createBackoff, sleep } from "./backoff.js";
 import { isTransientDbError } from "../queue/index.js";
-import type { JobOutcome } from "../fleet/stateMachine.js";
+import { reconcileDueSeconds, type JobOutcome } from "../fleet/stateMachine.js";
+
+/** The reconcile delay with the production defaults (lease 30 + settle 5 + margin 25 = 60 s). */
+export const DEFAULT_RECONCILE_DUE_SECONDS = reconcileDueSeconds(30, 5000);
 
 export const COMPLETE_JOB_SQL = `
 UPDATE jobs
 SET state = $4, outcome = $5, error = $6, result = $7::jsonb,
     not_before = CASE WHEN $4 = 'queued' THEN now() + make_interval(secs => $8) END,
+    reconcile_after = CASE WHEN $4 = 'succeeded' AND EXISTS (
+                        SELECT 1 FROM job_verifications v WHERE v.job_id = $1 AND v.decision = 'resubmitted')
+                      THEN now() + make_interval(secs => $9) ELSE reconcile_after END,
     lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
 WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3
   AND (state = 'running' OR (state = 'committing' AND $4 IN ('succeeded', 'needs_human')))
@@ -103,6 +113,8 @@ export interface CompleteInput {
    * null: at once.
    */
   requeueAfterSeconds?: number | null;
+  /** A success after a resubmit: seconds until the reconcile pass re-reads it (D50). Default: 60. */
+  reconcileDueSeconds?: number;
 }
 
 export type CompletionResult =
@@ -124,6 +136,7 @@ export async function completeJob(pool: Pool, input: CompleteInput): Promise<Com
       outcome.error,
       outcome.result === null ? null : JSON.stringify(outcome.result),
       outcome.state === "queued" ? (input.requeueAfterSeconds ?? null) : null,
+      input.reconcileDueSeconds ?? DEFAULT_RECONCILE_DUE_SECONDS,
     ]);
     if (updated.rowCount === 1) {
       await client.query(END_ATTEMPT_SQL, [input.jobId, input.fencingToken, outcome.attemptOutcome, outcome.commitUncertain, outcome.error]);

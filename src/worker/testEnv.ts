@@ -19,6 +19,7 @@ import { Worker, type WorkerOptions } from "./loop.js";
 import { runJob, type RunJobContext } from "./runJob.js";
 import { createRecoverySweep } from "./recover.js";
 import { runVerifyPhase, type VerifyContext } from "./verify.js";
+import { runReconcilePhase } from "./reconcile.js";
 import { listenOnSafePort } from "../testing/listen.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -136,6 +137,22 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
       const workerId = rest.workerId ?? `test-worker-${++seq}`;
       const leaseSeconds = rest.leaseSeconds ?? 300;
       const workerPool = rest.pool ?? pool;
+      const vctx = (): VerifyContext => ({
+        pool: workerPool,
+        workerId,
+        leaseSeconds,
+        heartbeatSeconds: rest.heartbeatSeconds,
+        settleMs: 300,
+        getBrowser: async () => browser,
+        credentials,
+        evidenceBaseDir,
+        artifactsDir,
+        overridesDir,
+        statusDir: runCtx.statusDir,
+        redact,
+        fault: runCtx.fault,
+        ...verifyCtx,
+      });
       return new Worker({
         pool,
         workerId,
@@ -145,31 +162,14 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
         redact,
         shutdownGraceMs: 30_000,
         // Like the entrypoint: verify a job that may have committed (Step 9), with a short settle by
-        // default so tests do not wait 5 s for every 0-match lookup.
-        verify: (claim, controller, hardSignal) =>
-          runVerifyPhase(
-            {
-              pool: workerPool,
-              workerId,
-              leaseSeconds,
-              heartbeatSeconds: rest.heartbeatSeconds,
-              settleMs: 300,
-              getBrowser: async () => browser,
-              credentials,
-              evidenceBaseDir,
-              artifactsDir,
-              overridesDir,
-              statusDir: runCtx.statusDir,
-              redact,
-              fault: runCtx.fault,
-              ...verifyCtx,
-            },
-            claim,
-            controller,
-            hardSignal,
-          ),
-        // Like the entrypoint: recover expired leases before every dequeue (T6).
-        beforeDequeue: createRecoverySweep({ pool: workerPool, workerId, leaseSeconds }),
+        // default so tests do not wait 5 s for every 0-match lookup; reconcile a job that succeeded after
+        // a resubmit once it is due (Step 10, D50; with the tests' 300 s lease that is minutes away unless
+        // a test moves reconcile_after).
+        verify: (claim, controller, hardSignal) => runVerifyPhase(vctx(), claim, controller, hardSignal),
+        reconcile: (claim, controller, hardSignal) => runReconcilePhase(vctx(), claim, controller, hardSignal),
+        // Like the entrypoint: recover expired leases before every dequeue (T6), then at most one due
+        // reconcile (R1).
+        beforeDequeue: createRecoverySweep({ pool: workerPool, workerId, leaseSeconds, reconcile: true }),
         ...rest,
       });
     },

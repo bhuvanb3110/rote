@@ -16,6 +16,11 @@ import { createPool, databaseUrlFromEnv, migrate, redactDatabaseUrl } from "../q
 import { collectAndCheck, DEFAULT_BANK_URL, oracleJson, readJobIdsFile } from "../oracle/index.js";
 import { reverifyJob } from "../worker/verifySql.js";
 import { REVERIFIABLE_OUTCOMES } from "../fleet/stateMachine.js";
+import { chromium, type Browser } from "playwright";
+import { loadCapabilities } from "../catalog/registry.js";
+import { createRedactor, loadTenantCredentials, redactInputNames } from "../worker/credentials.js";
+import { InMemoryCounters } from "../worker/metrics.js";
+import { parseDurationSeconds, reconcileWindow } from "../worker/reconcile.js";
 
 const logger = pino();
 const program = new Command();
@@ -469,6 +474,71 @@ jobsCommand
       logger.error({ err, database: redactDatabaseUrl(url) }, "jobs reverify: could not run");
       process.exitCode = 2;
     } finally {
+      await pool.end();
+    }
+  });
+
+program
+  .command("reconcile")
+  .description(
+    "End-of-day reconciliation (D51): re-read the bank's history for EVERY job in the window that succeeded after a " +
+      "resubmit, regardless of whether the workers' reconcile pass already ran, and flag 2+ matches exactly like it " +
+      "(needs_human / duplicate_suspected). Read-only toward the bank (the history lookup only). Needs the tenants' " +
+      "ROTE_CRED_* variables, like a worker. Exit 0: nothing flagged; 1: something flagged or left undecided; 2: could not run.",
+  )
+  .requiredOption("--since <duration>", "the window, e.g. 24h, 30m, 2d (jobs whose reconcile_after is within it)")
+  .option("--tenant <tenant>", "only this tenant's jobs")
+  .option("--by <name>", "who runs it (the reconcile lease owner and the verification rows' worker_id)", `reconcile:${os.hostname()}`)
+  .option("--database-url <url>", "Postgres URL (default: ROTE_DATABASE_URL or the Compose dev database)")
+  .option("--evidence-dir <dir>", "where the lookups write their evidence", path.join(os.tmpdir(), "rote-reconcile-evidence"))
+  .option("--lease-seconds <n>", "the reconcile lease per job", (v) => Number(v), 30)
+  .action(async (opts: { since: string; tenant?: string; by: string; databaseUrl?: string; evidenceDir: string; leaseSeconds: number }) => {
+    let sinceSeconds: number;
+    try {
+      sinceSeconds = parseDurationSeconds(opts.since);
+    } catch (err) {
+      logger.error({ since: opts.since }, `reconcile: ${(err as Error).message}`);
+      process.exitCode = 2;
+      return;
+    }
+    if (!(Number.isInteger(opts.leaseSeconds) && opts.leaseSeconds >= 1 && opts.leaseSeconds <= 3600)) {
+      logger.error({ leaseSeconds: opts.leaseSeconds }, "reconcile: --lease-seconds must be an integer in 1..3600");
+      process.exitCode = 2;
+      return;
+    }
+    const url = opts.databaseUrl ?? databaseUrlFromEnv();
+    const pool = createPool({ connectionString: url, max: 2 });
+    let browser: Browser | null = null;
+    try {
+      const tenants = (await pool.query<{ id: string }>("SELECT id FROM tenants ORDER BY id")).rows.map((r) => r.id);
+      const credentials = loadTenantCredentials(process.env, tenants, redactInputNames(await loadCapabilities()));
+      const metrics = new InMemoryCounters();
+      const report = await reconcileWindow(
+        {
+          pool,
+          workerId: opts.by,
+          leaseSeconds: opts.leaseSeconds,
+          settleMs: 0,
+          getBrowser: async () => (browser ??= await chromium.launch({ headless: true })),
+          credentials,
+          redact: createRedactor(credentials),
+          evidenceBaseDir: opts.evidenceDir,
+          metrics,
+          log: logger,
+        },
+        { sinceSeconds, tenant: opts.tenant },
+      );
+      for (const r of report.rows) logger.info({ jobId: r.jobId, tenant: r.tenant, result: r.result, matches: r.matches, detail: r.detail }, "reconcile: job");
+      logger.info(
+        { since: opts.since, jobs: report.rows.length, flagged: report.flagged, undecided: report.undecided, duplicates_detected_total: metrics.get("duplicates_detected_total") },
+        report.flagged > 0 ? "reconcile: FLAGGED jobs for a human (needs_human)" : report.undecided > 0 ? "reconcile: some jobs could not be decided; run it again" : "reconcile: every job in the window reconciled",
+      );
+      if (report.flagged > 0 || report.undecided > 0) process.exitCode = 1;
+    } catch (err) {
+      logger.error({ err, database: redactDatabaseUrl(url) }, "reconcile: could not run");
+      process.exitCode = 2;
+    } finally {
+      await (browser as Browser | null)?.close().catch(() => undefined);
       await pool.end();
     }
   });

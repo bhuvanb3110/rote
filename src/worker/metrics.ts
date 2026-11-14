@@ -7,12 +7,18 @@
 //                               lost lease (docs/DECISIONS.md D41)
 //   verify_decisions_total      one per finished verify phase, by decision (already_done, resubmitted,
 //                               deferred, ...); Step 9
+//   reconcile_decisions_total   one per recorded reconcile run, by decision (reconciled,
+//                               duplicate_suspected, reconcile_unreadable, reconcile_deferred); Step 10 (D50)
+//   duplicates_detected_total   a reconcile found 2+ transfers for one job (duplicate_suspected): the zombie
+//                               window, made loud. Its error-level log line carries the process's total
 //
 // Labels are a small fixed set per counter (the decision name), never a job id.
-export type WorkerCounter = "illegal_transitions_total" | "verify_decisions_total";
+export type WorkerCounter = "illegal_transitions_total" | "verify_decisions_total" | "reconcile_decisions_total" | "duplicates_detected_total";
 
 export interface WorkerMetrics {
   inc(name: WorkerCounter, labels?: Record<string, string>): void;
+  /** The current value, where the implementation keeps one (InMemoryCounters); for log lines. */
+  value?(name: WorkerCounter, labels?: Record<string, string>): number;
 }
 
 export const NO_METRICS: WorkerMetrics = { inc() {} };
@@ -36,6 +42,10 @@ export class InMemoryCounters implements WorkerMetrics {
 
   get(name: WorkerCounter, labels?: Record<string, string>): number {
     return this.values.get(keyOf(name, labels)) ?? 0;
+  }
+
+  value(name: WorkerCounter, labels?: Record<string, string>): number {
+    return this.get(name, labels);
   }
 
   snapshot(): Record<string, number> {

@@ -3,9 +3,9 @@
 //
 // Order: Playwright version check -> bank forwarder (ROTE_BANK_FORWARD) -> wait for Postgres ->
 // migrate (advisory lock, D17) -> credentials check (refuse to start if any is missing) -> launch
-// Chromium -> poll loop (recovery of expired leases before every dequeue, T6; a heartbeat on every job,
-// T2; the fenced commit intent before every Submit, T3) -> on SIGTERM/SIGINT a graceful stop (a second
-// signal aborts) -> exit 0.
+// Chromium -> poll loop (recovery of expired leases before every dequeue, T6, then at most one due
+// reconcile, R1/R2; a heartbeat on every job, T2; the fenced commit intent before every Submit, T3) -> on
+// SIGTERM/SIGINT a graceful stop (a second signal aborts) -> exit 0.
 // A fatal error exits 1, loudly.
 //
 // Environment (defaults in brackets):
@@ -18,6 +18,10 @@
 //   ROTE_VERIFY_DEFER_BUDGET_SECONDS  [600]  verify: give up deferring (bank unavailable) this long
 //                                    after the first deferral -> needs_human / verify_unavailable (D44)
 //   ROTE_VERIFY_DEFER_BACKOFF_SECONDS [5]    verify: first backoff after a deferral; doubles, capped at 60 s
+//                                    (the reconcile pass defers with the same backoff and budget)
+//   ROTE_RECONCILE_MARGIN_SECONDS     [25]   a job that succeeded after a resubmit is re-read in the bank's
+//                                    history lease + settle + this after it succeeded (30 + 5 + 25 = 60 s;
+//                                    the reconcile pass, D50)
 //   ROTE_SHUTDOWN_GRACE_MS   [30000]
 //   ROTE_EVIDENCE_DIR        [<tmpdir>/rote-worker-evidence]  never the repo's evidence/
 //   ROTE_BANK_FORWARD        [unset]  e.g. bank:4100 -> forward 127.0.0.1:4100 there
@@ -44,8 +48,9 @@ import { createFaultInjector, parseFaultConfig } from "./fault.js";
 import { DEFAULT_HEARTBEAT_SECONDS, DEFAULT_LEASE_SECONDS, validateLeaseTiming } from "./heartbeat.js";
 import { runJob } from "./runJob.js";
 import { InMemoryCounters } from "./metrics.js";
-import { DEFAULT_VERIFY_SETTLE_MS, runVerifyPhase } from "./verify.js";
-import { DEFAULT_DEFER_CONFIG, type DeferConfig } from "../fleet/stateMachine.js";
+import { DEFAULT_VERIFY_SETTLE_MS, runVerifyPhase, type VerifyContext } from "./verify.js";
+import { runReconcilePhase } from "./reconcile.js";
+import { DEFAULT_DEFER_CONFIG, DEFAULT_RECONCILE_MARGIN_SECONDS, reconcileDueSeconds, type DeferConfig } from "../fleet/stateMachine.js";
 
 const log = pino({ base: { service: "worker" } });
 
@@ -89,6 +94,8 @@ async function main(): Promise<void> {
     backoffBaseSeconds: Math.max(1, backoffBase),
     backoffCapSeconds: Math.max(backoffBase, DEFAULT_DEFER_CONFIG.backoffCapSeconds),
   };
+  const reconcileMarginSeconds = intEnv("ROTE_RECONCILE_MARGIN_SECONDS", DEFAULT_RECONCILE_MARGIN_SECONDS);
+  const reconcileDue = reconcileDueSeconds(leaseSeconds, settleMs, reconcileMarginSeconds);
   const evidenceBaseDir = process.env.ROTE_EVIDENCE_DIR || path.join(os.tmpdir(), "rote-worker-evidence");
   const healthFile = process.env.ROTE_HEALTH_FILE;
   const dbUrl = databaseUrlFromEnv();
@@ -145,12 +152,29 @@ async function main(): Promise<void> {
 
   if (faultPoint) log.warn({ workerId, faultPoint }, "worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)");
   log.info(
-    { workerId, playwrightVersion, leaseSeconds, heartbeatSeconds, shutdownGraceMs, settleMs, defer, evidenceBaseDir, db: redactDatabaseUrl(dbUrl), tenants },
+    { workerId, playwrightVersion, leaseSeconds, heartbeatSeconds, shutdownGraceMs, settleMs, defer, reconcileDueSeconds: reconcileDue, evidenceBaseDir, db: redactDatabaseUrl(dbUrl), tenants },
     "worker: ready",
   );
 
-  // In-process counters (illegal_transitions_total, verify_decisions_total); Day 3 exports them (D41).
+  // In-process counters (illegal_transitions_total, verify_decisions_total, reconcile_decisions_total,
+  // duplicates_detected_total); Day 3 exports them (D41, D50).
   const metrics = new InMemoryCounters();
+  const verifyCtx: VerifyContext = {
+    pool,
+    workerId,
+    leaseSeconds,
+    heartbeatSeconds,
+    settleMs,
+    defer,
+    reconcileDueSeconds: reconcileDue,
+    getBrowser,
+    credentials,
+    evidenceBaseDir,
+    fault,
+    log,
+    metrics,
+    redact,
+  };
   worker = new Worker({
     pool,
     workerId,
@@ -162,18 +186,16 @@ async function main(): Promise<void> {
     log,
     fault,
     metrics,
+    reconcileDueSeconds: reconcileDue,
     runJob: (job, options) => runJob({ credentials, evidenceBaseDir, fault }, job, options),
     // Step 9: a job that may have committed is verified in the bank's history (T5/T6.4-T6.7 -> T7/T8).
-    verify: (claim, controller, hardSignal) =>
-      runVerifyPhase(
-        { pool, workerId, leaseSeconds, heartbeatSeconds, settleMs, defer, getBrowser, credentials, evidenceBaseDir, fault, log, metrics, redact },
-        claim,
-        controller,
-        hardSignal,
-      ),
+    verify: (claim, controller, hardSignal) => runVerifyPhase(verifyCtx, claim, controller, hardSignal),
+    // Step 10: a job that succeeded after a resubmit is re-read once it is due (R1 -> lookup -> R2, D50).
+    reconcile: (claim, controller, hardSignal) => runReconcilePhase(verifyCtx, claim, controller, hardSignal),
     // Seam 4: every loop iteration recovers up to 10 expired leases before it dequeues (T6, D38); a
-    // claim to verify (T6.4/T6.5/T6.7) is the iteration's work.
-    beforeDequeue: createRecoverySweep({ pool, workerId, leaseSeconds, log, fault }),
+    // claim to verify (T6.4/T6.5/T6.7) is the iteration's work; otherwise at most one due reconcile is
+    // (R1, D50).
+    beforeDequeue: createRecoverySweep({ pool, workerId, leaseSeconds, log, fault, reconcile: true }),
     onTick: healthFile
       ? () => {
           writeFile(healthFile, new Date().toISOString()).catch(() => undefined);

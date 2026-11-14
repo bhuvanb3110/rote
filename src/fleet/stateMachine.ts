@@ -14,6 +14,8 @@
 //   classifyLookup    what one history lookup said: a count, the bank unavailable, transient, unreadable
 //   verifyDecision    what a verify phase concludes from its lookups (Step 9, docs/plans/step-08.md
 //                     section 5, plus step-09 reviewer decisions 4-5: deferral)
+//   reconcileDecision what the reconcile pass concludes from its one lookup (Step 10, D50), and
+//                     jobSettled: terminal with no reconcile due (GET /jobs/:id `settled`)
 //
 // jobOutcomeFor (docs/plans/step-06.md section 2, reviewer decisions 2-3), tested row by row. The
 // load-bearing rules:
@@ -25,7 +27,7 @@
 //   - a failure before anything irreversible is retried while attempts are left (D10), else failed;
 //   - a job that can never run (unknown capability, bad params, missing override) fails at once.
 import type { ReplayResult } from "../artifact/index.js";
-import type { JobState } from "../queue/types.js";
+import { TERMINAL_STATES, type JobState } from "../queue/types.js";
 import type { Redactor } from "../worker/credentials.js";
 
 export type RunEnd =
@@ -297,6 +299,8 @@ export type RecoverableState = "running" | "committing" | "verifying";
 
 /** Why a verify phase started (job_verifications.reason). The first two start a new verify cycle. */
 export type VerifyReason = "commit_uncertain" | "lease_expired_in_committing" | "lease_expired_in_verifying" | "resumed";
+/** A job_verifications row's reason: a verify phase's, or a reconcile run's (Step 10, D50; never part of a verify cycle). */
+export type PhaseReason = VerifyReason | "reconcile";
 export const CYCLE_STARTING_REASONS: readonly VerifyReason[] = ["commit_uncertain", "lease_expired_in_committing"];
 
 /** How a verify phase ended (job_verifications.decision); null = still open. */
@@ -310,7 +314,12 @@ export type PhaseDecision =
   | "handed_off"
   | "lease_lost"
   | "crashed"
-  | "illegal_transition";
+  | "illegal_transition"
+  // A reconcile run's decisions (Step 10, D50).
+  | "reconciled"
+  | "duplicate_suspected"
+  | "reconcile_unreadable"
+  | "reconcile_deferred";
 /** Phases that ended without a decision: they count toward the 3-phase cap (T6.6). */
 export const DEAD_PHASE_DECISIONS: readonly PhaseDecision[] = ["crashed", "lease_lost", "illegal_transition"];
 
@@ -637,3 +646,125 @@ export function alreadyDoneResult(d: Extract<VerifyDecision, { decision: "alread
 
 /** `rote jobs reverify` accepts needs_human jobs with these outcomes: the "could not tell" ones. Never `ambiguous`. */
 export const REVERIFIABLE_OUTCOMES = ["commit_uncertain", "unreadable", "verify_unavailable", "verify_exhausted"] as const;
+
+// ---------------------------------------------------------------------------------------------------
+// The reconcile pass (Step 10: docs/plans/step-10.md section 2; reviewer decisions 3 and 5; D50).
+//
+// Verify + resubmit reopens the zombie window (docs/plans/step-08.md section 6): a worker frozen after its
+// intent can click after another worker verified [0, 0] and resubmitted, and the bank has no lease to
+// check. The window is not closed; it is made LOUD. Only a job that SUCCEEDED AFTER A RESUBMIT can carry
+// such a late second transfer, so T4 (succeeded) and T7 (already_done) mark it: reconcile_after = now() +
+// reconcileDueSeconds (lease + settle + margin: by then a zombie frozen across its lease has had a full
+// settle period, and the margin, to click). R1 claims a due job under a reconcile lease, one history
+// lookup (the same lookup as verify, one retry if transient) reads it, and R2 writes reconcileDecision:
+//
+//   lookup                      decision               job
+//   1 match                     reconciled             stays succeeded (reconciled_at = now)
+//   2+ matches                  duplicate_suspected    needs_human; duplicates_detected_total + 1; an error log line
+//   0 matches / unreadable      reconcile_unreadable   needs_human (a succeeded job the history cannot show is an alarm)
+//   unavailable, within budget  reconcile_deferred     stays succeeded, reconcile_after = now + backoff (D44's)
+//   unavailable, budget spent   reconcile_unreadable   needs_human
+//
+// The one exception to "terminal states are final": succeeded -> needs_human (reviewer decision 3). A job
+// is SETTLED (GET /jobs/:id `settled`) once it is terminal and no reconcile is due: it never had a
+// reconcile_after, or the reconcile decided (reconciled_at). Until then a succeeded job can still become
+// needs_human.
+//
+// The honest limit (reviewer decision 5): a zombie frozen longer than the delay that also beats its own
+// overdue heartbeat on waking clicks AFTER the reconcile read, and that duplicate is silent again. The
+// end-of-day batch `rote reconcile --since <duration>` re-reads every such job in a window, regardless of
+// reconciled_at, and flags 2+ matches exactly like R2.
+
+/** The reconcile margin's default (ROTE_RECONCILE_MARGIN_SECONDS): production delay 30 + 5 + 25 = 60 s. */
+export const DEFAULT_RECONCILE_MARGIN_SECONDS = 25;
+
+/** lease + settle (rounded up to whole seconds) + margin. */
+export function reconcileDueSeconds(leaseSeconds: number, settleMs: number, marginSeconds: number = DEFAULT_RECONCILE_MARGIN_SECONDS): number {
+  if (!(leaseSeconds >= 0 && settleMs >= 0 && marginSeconds >= 0)) throw new RangeError("reconcileDueSeconds: every part must be >= 0");
+  return leaseSeconds + Math.ceil(settleMs / 1000) + marginSeconds;
+}
+
+export type ReconcileDecisionName = "reconciled" | "duplicate_suspected" | "reconcile_unreadable" | "reconcile_deferred";
+
+export type ReconcileDecision =
+  | { decision: "reconciled"; to: "succeeded"; outcome: null; matches: 1; firstMatchRef: string | null; error: null }
+  | { decision: "duplicate_suspected"; to: "needs_human"; outcome: "duplicate_suspected"; matches: number; firstMatchRef: string | null; error: string }
+  | { decision: "reconcile_unreadable"; to: "needs_human"; outcome: "reconcile_unreadable"; matches: number | null; firstMatchRef: null; error: string }
+  | { decision: "reconcile_deferred"; to: "succeeded"; outcome: null; backoffSeconds: number; error: string };
+
+export interface ReconcileInput {
+  /** The one lookup, after its one retry (afterRetry). */
+  reading: LookupReading;
+  /** The job's reconcile deferrals so far and seconds since the first one ended (database clock). */
+  deferrals: number;
+  deferredForSeconds: number | null;
+  defer: DeferConfig;
+}
+
+export function reconcileDecision(input: ReconcileInput): ReconcileDecision {
+  const { reading } = input;
+  switch (reading.kind) {
+    case "count":
+      if (reading.n === 1) return { decision: "reconciled", to: "succeeded", outcome: null, matches: 1, firstMatchRef: reading.firstMatchRef, error: null };
+      if (reading.n >= 2) {
+        return {
+          decision: "duplicate_suspected",
+          to: "needs_human",
+          outcome: "duplicate_suspected",
+          matches: reading.n,
+          firstMatchRef: reading.firstMatchRef,
+          error:
+            `reconcile found ${reading.n} transfers with this memo_key after the job succeeded on a resubmit ` +
+            `(first ${reading.firstMatchRef ?? "?"}): a duplicate is suspected (a zombie's late click?). A human must check`,
+        };
+      }
+      return {
+        decision: "reconcile_unreadable",
+        to: "needs_human",
+        outcome: "reconcile_unreadable",
+        matches: 0,
+        firstMatchRef: null,
+        error: "reconcile found NO transfer with this memo_key, although the job succeeded: the history cannot show it. A human must check",
+      };
+    case "unreadable":
+      return { decision: "reconcile_unreadable", to: "needs_human", outcome: "reconcile_unreadable", matches: null, firstMatchRef: null, error: `reconcile could not read the history: ${reading.detail}` };
+    case "unavailable":
+    case "transient": {
+      if (input.deferredForSeconds !== null && input.deferredForSeconds >= input.defer.budgetSeconds) {
+        return {
+          decision: "reconcile_unreadable",
+          to: "needs_human",
+          outcome: "reconcile_unreadable",
+          matches: null,
+          firstMatchRef: null,
+          error:
+            `reconcile gave up: the bank has been unavailable for ${Math.round(input.deferredForSeconds)} s since the first deferral ` +
+            `(budget ${input.defer.budgetSeconds} s, ${input.deferrals} deferrals): ${reading.detail}`,
+        };
+      }
+      const backoffSeconds = deferBackoffSeconds(input.deferrals, input.defer);
+      return { decision: "reconcile_deferred", to: "succeeded", outcome: null, backoffSeconds, error: `reconcile deferred ${backoffSeconds} s (deferral ${input.deferrals + 1}; the bank is unavailable): ${reading.detail}` };
+    }
+  }
+}
+
+/** What R2 adds to jobs.result under `reconcile` for a needs_human decision (the job's own result is kept). */
+export function reconcileResultPatch(d: ReconcileDecision, evidenceRef: string | null, confirmationRef: unknown): Record<string, unknown> {
+  return {
+    decision: d.decision,
+    matches: "matches" in d ? d.matches : null,
+    firstMatchRef: "firstMatchRef" in d ? d.firstMatchRef : null,
+    jobConfirmationRef: typeof confirmationRef === "string" ? confirmationRef : null,
+    evidenceRef,
+  };
+}
+
+/**
+ * Settled (GET /jobs/:id): terminal, and no reconcile is due -- the job never had one (reconcile_after
+ * NULL) or the reconcile pass decided (reconciled_at set). Until then a succeeded job can still change to
+ * needs_human (reviewer decision 3).
+ */
+export function jobSettled(job: { state: string; reconcile_after: Date | null | undefined; reconciled_at: Date | null | undefined }): boolean {
+  if (!(TERMINAL_STATES as readonly string[]).includes(job.state)) return false;
+  return job.reconcile_after == null || job.reconciled_at != null;
+}

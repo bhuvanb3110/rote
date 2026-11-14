@@ -8,12 +8,15 @@
 //                                 its attempt row closed, a job_verifications row (starts a verify cycle)
 //   T7  VERIFY_RESULT_SQL         the verifier writes its decision and releases the job (a resubmit
 //                                 clears commit_intent_at, and is dequeueable at once: not_before NULL,
-//                                 D49); its phase row gets the decision and lookups
+//                                 D49); already_done on a job resubmitted before marks it for the
+//                                 reconcile pass (reconcile_after, D50); its phase row gets the decision
+//                                 and lookups
 //   T8  VERIFY_DEFER_SQL          the bank is unavailable: the job STAYS verifying, token + 1 (the
 //                                 deferring verifier is fenced out of its own job), the lease set to
 //                                 now + the backoff, lease_owner kept (jobs_active_has_owner); recovery
 //                                 resumes it (T6.7) once the backoff has passed. Not a dead phase.
-//   VERIFY_CYCLE_SQL              the job's current verify cycle, derived from job_verifications
+//   VERIFY_CYCLE_SQL              the job's current verify cycle, derived from job_verifications (verify
+//                                 phases only: a reconcile run's row is never part of a cycle, D50)
 //   REVERIFY_SQL                  rote jobs reverify: a needs_human job that "could not tell" is handed
 //                                 to recovery (verifying, lease already expired, a `handed_off` row)
 //
@@ -22,6 +25,7 @@
 // and leases are durations the SQL adds to now(); the cycle's "deferred for" is computed by the SQL.
 import { withTransaction, type Pool, type Queryable } from "../queue/index.js";
 import {
+  reconcileDueSeconds,
   REVERIFIABLE_OUTCOMES,
   type JobOutcome,
   type PhaseDecision,
@@ -43,7 +47,7 @@ WITH start AS (
   SELECT COALESCE(max(id), 0) AS id FROM job_verifications
   WHERE job_id = $1 AND reason IN ('commit_uncertain', 'lease_expired_in_committing')
 ), cycle AS (
-  SELECT v.id, v.decision, v.ended_at FROM job_verifications v, start WHERE v.job_id = $1 AND v.id >= start.id
+  SELECT v.id, v.decision, v.ended_at FROM job_verifications v, start WHERE v.job_id = $1 AND v.id >= start.id AND v.reason <> 'reconcile'
 )
 SELECT
   (SELECT count(*) FROM cycle)::int AS phases,
@@ -146,6 +150,9 @@ SET state = $4, outcome = $5, error = $6,
                   ELSE COALESCE(result, '{}'::jsonb) || jsonb_build_object('verify', $8::jsonb) END,
     commit_intent_at = CASE WHEN $4 = 'queued' THEN NULL ELSE commit_intent_at END,
     not_before = NULL,
+    reconcile_after = CASE WHEN $4 = 'succeeded' AND EXISTS (
+                        SELECT 1 FROM job_verifications v WHERE v.job_id = $1 AND v.decision = 'resubmitted')
+                      THEN now() + make_interval(secs => $9) ELSE reconcile_after END,
     lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
 WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3 AND state = 'verifying'
   AND $4 IN ('succeeded', 'queued', 'failed', 'business_outcome', 'needs_human')
@@ -164,7 +171,7 @@ export interface VerifyWriteInput {
   evidenceRefs: Array<string | null>;
 }
 
-async function fencedOutPhase(
+export async function fencedOutPhase(
   client: Queryable,
   input: VerifyWriteInput,
   what: string,
@@ -178,10 +185,14 @@ async function fencedOutPhase(
   return { recorded: false, reason: fence.reason, detail };
 }
 
-/** T7. The decision must not be `deferred` (that is T8). */
+/**
+ * T7. The decision must not be `deferred` (that is T8). `reconcileDueSeconds`: a success of a job that was
+ * resubmitted before is re-read by the reconcile pass that long after (D50; default lease 30 + settle 5 +
+ * margin 25).
+ */
 export async function writeVerifyResult(
   pool: Pool,
-  input: VerifyWriteInput & { decision: Exclude<VerifyDecision, { decision: "deferred" }>; result: unknown },
+  input: VerifyWriteInput & { decision: Exclude<VerifyDecision, { decision: "deferred" }>; result: unknown; reconcileDueSeconds?: number },
 ): Promise<FencedWrite<object>> {
   const d = input.decision;
   return withTransaction(pool, async (client) => {
@@ -194,6 +205,7 @@ export async function writeVerifyResult(
       d.error,
       d.to === "succeeded" ? JSON.stringify(input.result) : null,
       JSON.stringify({ decision: d.decision, lookups: input.lookups, evidenceRefs: input.evidenceRefs, phaseToken: input.fencingToken }),
+      input.reconcileDueSeconds ?? reconcileDueSeconds(30, 5000),
     ]);
     if (updated.rowCount === 1) {
       await client.query(END_PHASE_SQL, [input.jobId, input.fencingToken, input.lookups, d.decision, d.error]);

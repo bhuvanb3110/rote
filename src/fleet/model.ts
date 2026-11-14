@@ -11,7 +11,11 @@
 //   modelVerifyDefer        src/worker/verifySql.ts  T8  VERIFY_DEFER_SQL + the phase's decision (step-09 decision 5)
 //   modelRecover            src/worker/recover.ts    T6  CLAIM_EXPIRED_SQL + VERIFY_CYCLE_SQL + the action per recoveryAction
 //   modelReverify           src/worker/verifySql.ts  REVERIFY_SQL (rote jobs reverify)
-//   modelVerifyCycle        src/worker/verifySql.ts  VERIFY_CYCLE_SQL (derived from the job's phases)
+//   modelVerifyCycle        src/worker/verifySql.ts  VERIFY_CYCLE_SQL (derived from the job's verify phases)
+//   modelReconcileClaim     src/worker/reconcile.ts  R1  RECONCILE_CLAIM_SQL + its dead-row close + its phase row (D50)
+//   modelReconcileClaimJob  src/worker/reconcile.ts  RECONCILE_CLAIM_JOB_SQL (rote reconcile --since, D51)
+//   modelReconcileResult    src/worker/reconcile.ts  R2  RECONCILE_RESULT_SQL + the run's decision
+//   modelReconcileCycle     src/worker/reconcile.ts  RECONCILE_CYCLE_SQL (deferrals)
 //   modelTick               the database clock moving forward
 //
 // The decisions come from src/fleet/stateMachine.ts (completionAllowed, recoveryAction), the same
@@ -35,7 +39,9 @@ import {
   REVERIFIABLE_OUTCOMES,
   type CompletionTarget,
   type PhaseDecision,
+  type PhaseReason,
   type PriorStatus,
+  type ReconcileDecision,
   type RecoverableState,
   type RecoveryAction,
   type VerifyCycle,
@@ -60,6 +66,10 @@ export interface ModelJob {
   readonly leaseExpiresAt: number | null;
   /** A queued job is not dequeued before this (T4's requeue backoff, D49); null = at once. */
   readonly notBefore: number | null;
+  /** Set when the job succeeds after a resubmit (T4 / T7): the reconcile pass re-reads it from then (D50). */
+  readonly reconcileAfter: number | null;
+  /** When the reconcile pass decided (every decision but a deferral). */
+  readonly reconciledAt: number | null;
   readonly commitIntentAt: number | null;
   readonly outcome: string | null;
   /** What T4 wrote (the ReplayResult); the oracle reads result.outputs.confirmationRef. */
@@ -72,7 +82,7 @@ export interface ModelJob {
 export interface ModelPhase {
   readonly token: number;
   readonly owner: string;
-  readonly reason: VerifyReason;
+  readonly reason: PhaseReason;
   readonly priorStatus: PriorStatus;
   /** null = open. */
   readonly decision: PhaseDecision | null;
@@ -108,6 +118,8 @@ export function newJob(fields: { id: string; tenant: string; seq: number; maxAtt
     owner: null,
     leaseExpiresAt: null,
     notBefore: null,
+    reconcileAfter: null,
+    reconciledAt: null,
     commitIntentAt: null,
     outcome: null,
     result: null,
@@ -190,7 +202,19 @@ const fencedOut = (job: ModelJob, ref: LeaseRef): "fenced" | "illegal_transition
 export interface ModelCompleteOptions {
   /** A requeue's backoff (T4's $8, D49): not_before = now + this; null / omitted = dequeueable at once. */
   notBeforeSeconds?: number | null;
+  /** T4's / T7's $9 (D50): a success after a resubmit sets reconcile_after = now + this. Default 60. */
+  reconcileDueSeconds?: number;
 }
+
+/** The default reconcile delay (lease 30 + settle 5 + margin 25), as complete.ts's. */
+export const MODEL_DEFAULT_RECONCILE_DUE = 60;
+
+/** Has the job ever been resubmitted (a verify phase decided `resubmitted`)? T4's / T7's EXISTS. */
+export const wasResubmitted = (job: ModelJob): boolean => job.phases.some((p) => p.decision === "resubmitted");
+
+/** reconcile_after after a write to `to`: set by a success after a resubmit, else unchanged. */
+const markReconcile = (job: ModelJob, to: string, now: number, due: number | undefined): number | null =>
+  to === "succeeded" && wasResubmitted(job) ? now + (due ?? MODEL_DEFAULT_RECONCILE_DUE) : job.reconcileAfter;
 
 /**
  * T4: the holder (token + owner) records its outcome and releases the lease. Not lease-checked: a
@@ -210,8 +234,9 @@ export function modelComplete(
   if (!(holds(job, ref) && completionAllowed(job.state, to))) return { db, result: fencedOut(job, ref) };
   if (to === "queued" && !(job.attempt < job.maxAttempts)) return { db, result: "check_violation" };
   const notBefore = to === "queued" && options.notBeforeSeconds != null ? db.now + options.notBeforeSeconds : null;
+  const reconcileAfter = markReconcile(job, to, db.now, options.reconcileDueSeconds);
   return {
-    db: replace(db, { ...job, state: to, outcome, result, notBefore, owner: null, leaseExpiresAt: null }),
+    db: replace(db, { ...job, state: to, outcome, result, notBefore, reconcileAfter, owner: null, leaseExpiresAt: null }),
     result: "recorded",
   };
 }
@@ -223,18 +248,20 @@ export function modelComplete(
  * commit_uncertain; T6.4: lease_expired_in_committing), or all of them when none did.
  */
 export function modelVerifyCycle(job: ModelJob, now: number): VerifyCycle {
+  // Verify phases only: a reconcile run's row is never part of a verify cycle (D50).
+  const phases = job.phases.filter((p) => p.reason !== "reconcile");
   let starter = -1;
-  job.phases.forEach((p, i) => {
-    if (CYCLE_STARTING_REASONS.includes(p.reason)) starter = i;
+  phases.forEach((p, i) => {
+    if (CYCLE_STARTING_REASONS.includes(p.reason as VerifyReason)) starter = i;
   });
-  const cycle = job.phases.slice(Math.max(starter, 0));
+  const cycle = phases.slice(Math.max(starter, 0));
   const deferredEnds = cycle.filter((p) => p.decision === "deferred").map((p) => p.endedAt!);
   return {
     phases: cycle.length,
     deadPhases: cycle.filter((p) => p.decision === null || DEAD_PHASE_DECISIONS.includes(p.decision)).length,
     deferrals: deferredEnds.length,
     deferredForSeconds: deferredEnds.length === 0 ? null : now - Math.min(...deferredEnds),
-    priorStatus: starter === -1 ? null : job.phases[starter]!.priorStatus,
+    priorStatus: starter === -1 ? null : phases[starter]!.priorStatus,
     lastDecision: cycle.length === 0 ? null : cycle[cycle.length - 1]!.decision,
   };
 }
@@ -297,6 +324,7 @@ export function modelVerifyResult(
   decision: Exclude<VerifyDecision, { decision: "deferred" }>,
   lookups: ReadonlyArray<number | null>,
   result?: unknown,
+  options: { reconcileDueSeconds?: number } = {},
 ): { db: ModelDb; result: ModelFencedResult } {
   const job = find(db, ref.jobId);
   if (!(holds(job, ref) && job.state === "verifying")) {
@@ -312,6 +340,7 @@ export function modelVerifyResult(
       result: result === undefined ? job.result : result,
       commitIntentAt: decision.to === "queued" ? null : job.commitIntentAt,
       notBefore: null, // a verified resubmit is dequeueable at once (D49)
+      reconcileAfter: markReconcile(job, decision.to, db.now, options.reconcileDueSeconds), // already_done after a resubmit (D50)
       owner: null,
       leaseExpiresAt: null,
     },
@@ -436,6 +465,95 @@ export function modelRecover(
   return { db: current, recovered, claimed: null };
 }
 
+// ----------------------------------------------------------------------------------------- reconcile
+
+/** RECONCILE_CYCLE_SQL: the job's reconcile deferrals and seconds since the first one ended. */
+export function modelReconcileCycle(job: ModelJob, now: number): { deferrals: number; deferredForSeconds: number | null } {
+  const ends = job.phases.filter((p) => p.reason === "reconcile" && p.decision === "reconcile_deferred").map((p) => p.endedAt!);
+  return { deferrals: ends.length, deferredForSeconds: ends.length === 0 ? null : now - Math.min(...ends) };
+}
+
+/** The reconcile lease is free: none, or expired (`lease_expires_at IS NULL OR lease_expires_at < now()`). */
+const reconcileLeaseFree = (job: ModelJob, now: number) => job.leaseExpiresAt === null || job.leaseExpiresAt < now;
+
+function claimForReconcile(db: ModelDb, job: ModelJob, owner: string, leaseSeconds: number): { db: ModelDb; claimed: { jobId: string; token: number } } {
+  const token = job.token + 1;
+  const next: ModelJob = {
+    ...job,
+    // A dead reconciler's open phase (its lease expired) is closed `crashed`.
+    phases: [
+      ...job.phases.map((p) => (p.token === job.token && p.decision === null ? { ...p, decision: "crashed" as const, endedAt: db.now } : p)),
+      { token, owner, reason: "reconcile" as const, priorStatus: null, decision: null, endedAt: null, lookups: null },
+    ],
+    token,
+    owner,
+    leaseExpiresAt: db.now + leaseSeconds,
+  };
+  return { db: replace(db, next), claimed: { jobId: job.id, token } };
+}
+
+/**
+ * R1 (RECONCILE_CLAIM_SQL): the succeeded job with the earliest due reconcile_after, not yet reconciled,
+ * whose reconcile lease is free (Postgres breaks ties by id; the model by creation order). The job stays
+ * succeeded; token + 1; owner and lease; a new reconcile phase.
+ */
+export function modelReconcileClaim(db: ModelDb, owner: string, leaseSeconds: number): { db: ModelDb; claimed: { jobId: string; token: number } | null } {
+  const job = db.jobs
+    .filter((j) => j.state === "succeeded" && j.reconciledAt === null && j.reconcileAfter !== null && j.reconcileAfter <= db.now && reconcileLeaseFree(j, db.now))
+    .sort((a, b) => a.reconcileAfter! - b.reconcileAfter! || a.seq - b.seq)[0];
+  return job ? claimForReconcile(db, job, owner, leaseSeconds) : { db, claimed: null };
+}
+
+/**
+ * The batch's claim of one job (RECONCILE_CLAIM_JOB_SQL, rote reconcile --since): succeeded after a
+ * resubmit, reconcile lease free, REGARDLESS of reconciled_at.
+ */
+export function modelReconcileClaimJob(db: ModelDb, jobId: string, owner: string, leaseSeconds: number): { db: ModelDb; claimed: { jobId: string; token: number } | null } {
+  const job = find(db, jobId);
+  if (!(job.state === "succeeded" && job.reconcileAfter !== null && reconcileLeaseFree(job, db.now))) return { db, claimed: null };
+  return claimForReconcile(db, job, owner, leaseSeconds);
+}
+
+/**
+ * R2 (RECONCILE_RESULT_SQL): the reconciler (token + owner, state succeeded; not lease-checked, like T4)
+ * writes its decision and releases the lease. needs_human decisions keep the job's result and add
+ * `reconcile`; reconciled_at is set by every decision but a deferral, which moves reconcile_after instead.
+ */
+export function modelReconcileResult(
+  db: ModelDb,
+  ref: LeaseRef,
+  decision: ReconcileDecision,
+  lookups: ReadonlyArray<number | null>,
+): { db: ModelDb; result: ModelFencedResult } {
+  const job = find(db, ref.jobId);
+  if (!(holds(job, ref) && job.state === "succeeded")) {
+    const how = fencedOut(job, ref);
+    return { db: replace(db, markPhaseFencedOut(job, ref.token, how, db.now)), result: how };
+  }
+  const deferred = decision.decision === "reconcile_deferred";
+  const toHuman = decision.to === "needs_human";
+  const next = closePhase(
+    {
+      ...job,
+      state: decision.to,
+      outcome: toHuman ? decision.outcome : job.outcome,
+      result: toHuman ? { ...((job.result as Record<string, unknown> | null) ?? {}), reconcile: { decision: decision.decision } } : job.result,
+      reconciledAt: deferred ? job.reconciledAt : db.now,
+      reconcileAfter: deferred ? db.now + decision.backoffSeconds : job.reconcileAfter,
+      owner: null,
+      leaseExpiresAt: null,
+    },
+    ref.token,
+    decision.decision,
+    db.now,
+    lookups,
+  );
+  return { db: replace(db, next), result: "recorded" };
+}
+
+/** Settled (jobSettled): terminal, and no reconcile due -- none was ever set, or the pass decided. */
+export const modelSettled = (job: ModelJob): boolean => isTerminal(job.state) && (job.reconcileAfter === null || job.reconciledAt !== null);
+
 export function modelTick(db: ModelDb, seconds: number): ModelDb {
   if (!(seconds >= 0)) throw new RangeError(`model: time only moves forward (got ${seconds})`);
   return { ...db, now: db.now + seconds };
@@ -444,6 +562,11 @@ export function modelTick(db: ModelDb, seconds: number): ModelDb {
 /** Seconds left on a job's lease (negative = expired), or null when it has none. */
 export function leaseRemaining(job: ModelJob, now: number): number | null {
   return job.leaseExpiresAt === null ? null : job.leaseExpiresAt - now;
+}
+
+/** Seconds until a succeeded job's reconcile is due (negative = due), or null when none was set (D50). */
+export function reconcileAfterRemaining(job: ModelJob, now: number): number | null {
+  return job.reconcileAfter === null ? null : job.reconcileAfter - now;
 }
 
 /** Seconds until a queued job's backoff has passed (negative = due), or null when it has none (D49). */

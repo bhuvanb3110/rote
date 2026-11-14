@@ -27,7 +27,13 @@
 //   property 5  every requeue after an intent passed through a verify whose two lookups counted 0.
 //
 // Step 10 adds the requeue backoff (D49): T4's requeue after a failure sets not_before, and a separate
-// simulation (below) proves that an outage shorter than the backoff schedule fails no job.
+// simulation (below) proves that an outage shorter than the backoff schedule fails no job. And the
+// reconcile pass (D50): a job that succeeded after a resubmit is re-read once due (R1 in an idle worker's
+// loop, one `lookup`, `decide` = R2); the drain runs past the reconcile delay, so:
+//   property 4  terminal states are final, with ONE exception: reconcile's succeeded -> needs_human
+//   property 8  a duplicate never stays silently `succeeded`, unless a row became visible in the history
+//               only after the reconcile's read (the zombie that clicks after the pass: the honest limit)
+//   property 9  with the end-of-day batch (rote reconcile --since, D51) after the drain: never
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import type { ReplayResult } from "../artifact/index.js";
@@ -39,7 +45,12 @@ import {
   modelDequeue,
   modelHeartbeat,
   modelIntent,
+  modelReconcileClaim,
+  modelReconcileClaimJob,
+  modelReconcileCycle,
+  modelReconcileResult,
   modelRecover,
+  modelSettled,
   modelTick,
   modelVerifyCycle,
   modelVerifyDefer,
@@ -55,6 +66,8 @@ import {
   lookupsColumn,
   minRequeueScheduleSeconds,
   readingsComplete,
+  reconcileDecision,
+  reconcileDueSeconds,
   requeueBackoffSeconds,
   verifyDecision,
   type CompletionTarget,
@@ -67,6 +80,8 @@ const LEASE = 30;
 const BEAT = 10;
 const SETTLE = 5;
 const RECOVER_PER_LOOP = 10;
+/** lease + settle + margin, as in production (30 + 5 + 25 = 60 s). */
+const RECONCILE_DUE = reconcileDueSeconds(LEASE, SETTLE * 1000, 25);
 /** Smaller than production (600 / 5 / 60) so outages can exhaust it within a sequence. */
 const DEFER: DeferConfig = { budgetSeconds: 120, backoffBaseSeconds: 5, backoffCapSeconds: 20 };
 const RUNS = 10_000;
@@ -188,6 +203,34 @@ const outageArb: fc.Arbitrary<Ev[]> = fc.tuple(fc.boolean(), fc.integer({ min: 3
     ]).flat(),
   ]),
 );
+/**
+ * The reconcile pass's honest limit (D50): the zombie of zombieArb, but it stays frozen past the reconcile
+ * delay and clicks only after a worker's reconcile READ the history (R1, lookup), before or after its R2.
+ */
+const lateZombieArb: fc.Arbitrary<Ev[]> = fc.boolean().chain((clickBeforeDecide) =>
+  withNoise([
+    { k: "dequeue", w: 0 },
+    { k: "intent", w: 0 },
+    { k: "pause", w: 0 },
+    { k: "tick", dt: 31 },
+    { k: "dequeue", w: 1 },
+    { k: "lookup", w: 1 },
+    { k: "tick", dt: 5 },
+    { k: "lookup", w: 1 },
+    { k: "decide", w: 1 },
+    { k: "dequeue", w: 2 },
+    { k: "intent", w: 2 },
+    { k: "click", w: 2, commits: true },
+    { k: "finish", w: 2, how: "ok" },
+    { k: "tick", dt: 45 },
+    { k: "tick", dt: 20 }, // past the reconcile delay (60 s)
+    { k: "dequeue", w: 1 }, // R1
+    { k: "lookup", w: 1 }, // the reconcile reads: 1 row
+    ...(clickBeforeDecide
+      ? ([{ k: "resume", w: 0, beatFirst: false }, { k: "click", w: 0, commits: true }, { k: "decide", w: 1 }] as Ev[])
+      : ([{ k: "decide", w: 1 }, { k: "resume", w: 0, beatFirst: false }, { k: "click", w: 0, commits: true }] as Ev[])),
+  ]),
+);
 const lagArb = fc.oneof(fc.constant(0), fc.integer({ min: 0, max: 12 }));
 const scenarioArb = fc.record({
   maxAttempts: fc.integer({ min: 1, max: 3 }),
@@ -199,13 +242,14 @@ const scenarioArb = fc.record({
     { weight: 1, arbitrary: zombieArb },
     { weight: 1, arbitrary: deadVerifiersArb },
     { weight: 1, arbitrary: outageArb },
+    { weight: 1, arbitrary: lateZombieArb },
   ),
 });
 type Scenario = { maxAttempts: number; lag: number; events: Ev[] };
 
 // ------------------------------------------------------------------------------------------- world
 
-type Phase = "idle" | "steps" | "intent" | "clicked" | "verify";
+type Phase = "idle" | "steps" | "intent" | "clicked" | "verify" | "reconcile";
 interface SimWorker {
   name: string;
   incarnation: number;
@@ -220,6 +264,8 @@ interface SimWorker {
   clickedRow: LedgerRow | null;
   /** Its verify phase: the lookups so far and when the first one was read. */
   verify: { readings: LookupReading[]; firstAt: number | null } | null;
+  /** Its reconcile run: the one lookup, when it was read, and the ledger rows the history showed then. */
+  rec: { reading: LookupReading | null; at: number | null; seen: string[] } | null;
 }
 
 interface SimRow extends LedgerRow {
@@ -246,6 +292,10 @@ interface World {
   maxClickStaleness: number;
   /** Decisions reached (for the "interesting states" check). */
   decisions: string[];
+  /** When the history was read for the latest reconcile that decided `reconciled` (property 8). */
+  lastReconciledRead: number | null;
+  /** The ledger rows that read saw (a row not among them came after it: a late zombie). */
+  lastReconciledSeen: string[] | null;
 }
 
 interface Transition {
@@ -266,7 +316,7 @@ const idOf = (w: SimWorker) => `${w.name}#${w.incarnation}`;
 const job = (world: World): ModelJob => world.db.jobs[0]!;
 const refOf = (w: SimWorker): LeaseRef => ({ jobId: JOB_ID, token: w.held!.token, owner: idOf(w) });
 const canAct = (w: SimWorker) => w.alive && !w.paused;
-const IDLE = (): Pick<SimWorker, "phase" | "held" | "clickedRow" | "verify"> => ({ phase: "idle", held: null, clickedRow: null, verify: null });
+const IDLE = (): Pick<SimWorker, "phase" | "held" | "clickedRow" | "verify" | "rec"> => ({ phase: "idle", held: null, clickedRow: null, verify: null, rec: null });
 
 function newWorld(maxAttempts: number, lag: number): World {
   return {
@@ -282,6 +332,8 @@ function newWorld(maxAttempts: number, lag: number): World {
     zombieClick: false,
     maxClickStaleness: 0,
     decisions: [],
+    lastReconciledRead: null,
+    lastReconciledSeen: null,
   };
 }
 
@@ -329,14 +381,15 @@ function finishRun(world: World, w: SimWorker, end: RunEnd, irreversibleStarted:
   }
   // A requeue backs off as the worker's does (D49), with the jitter at its middle (x 1.0): 10 s, 30 s.
   const notBeforeSeconds = outcome.state === "queued" ? requeueBackoffSeconds(attempt, () => 0.5) : null;
-  const { db, result } = modelComplete(world.db, refOf(w), outcome.state, outcome.outcome, outcome.result, { notBeforeSeconds });
+  const { db, result } = modelComplete(world.db, refOf(w), outcome.state, outcome.outcome, outcome.result, { notBeforeSeconds, reconcileDueSeconds: RECONCILE_DUE });
   if (result === "check_violation") world.violations.push(`T4 would violate jobs_queued_has_attempts_left (${outcome.state} at attempt ${attempt})`);
   commit(world, db);
   Object.assign(w, IDLE());
 }
 
 function beat(world: World, w: SimWorker): void {
-  if (!w.held || w.phase === "idle") return;
+  // A reconcile run has no heartbeat (D50: one lookup against a full lease; a re-run is harmless).
+  if (!w.held || w.phase === "idle" || w.phase === "reconcile") return;
   const { db, extended } = modelHeartbeat(world.db, refOf(w), LEASE);
   commit(world, db);
   // The heartbeat found the lease gone: the run (or verify) rejects with LeaseLostError; nothing on jobs.
@@ -344,14 +397,75 @@ function beat(world: World, w: SimWorker): void {
   else Object.assign(w, IDLE());
 }
 
-/** T6 by `w` (idle): may hand it a job to verify. */
+/** T6 by `w` (idle): may hand it a job to verify; if not, R1 may hand it a due reconcile (the sweep). */
 function recover(world: World, w: SimWorker): boolean {
   const { db, claimed } = modelRecover(world.db, RECOVER_PER_LOOP, { owner: idOf(w), leaseSeconds: LEASE });
   commit(world, db);
-  if (!claimed) return false;
+  if (!claimed) return reconcileClaim(world, w);
   startVerify(world, w, claimed.token, job(world).attempt);
   return true;
 }
+
+function startReconcile(world: World, w: SimWorker, token: number): void {
+  Object.assign(w, { phase: "reconcile", held: { token, attempt: job(world).attempt }, clickedRow: null, verify: null, rec: { reading: null, at: null, seen: [] }, lastExtendedAt: world.db.now });
+  world.lastHolder = idOf(w);
+}
+
+/** R1 by an idle worker after its recovery sweep claimed nothing: may hand it a due reconcile. */
+function reconcileClaim(world: World, w: SimWorker): boolean {
+  const { db, claimed } = modelReconcileClaim(world.db, idOf(w), LEASE);
+  commit(world, db);
+  if (!claimed) return false;
+  startReconcile(world, w, claimed.token);
+  return true;
+}
+
+/** The reconcile's one lookup (no settle: one look, after the delay). */
+function reconcileLookup(world: World, w: SimWorker): void {
+  const rec = w.rec!;
+  if (rec.reading) return;
+  rec.reading = lookupNow(world);
+  rec.at = world.db.now;
+  rec.seen = world.bankUp ? world.ledger.filter((r) => r.memo === MEMO && r.visibleAt <= world.db.now).map((r) => r.id) : [];
+}
+
+function reconcileDecide(world: World, w: SimWorker): void {
+  const rec = w.rec!;
+  if (!rec.reading) return;
+  const j = job(world);
+  const cycle = modelReconcileCycle(j, world.db.now);
+  const d = reconcileDecision({ reading: rec.reading, deferrals: cycle.deferrals, deferredForSeconds: cycle.deferredForSeconds, defer: DEFER });
+  const { db, result } = modelReconcileResult(world.db, refOf(w), d, lookupsColumn([rec.reading]));
+  commit(world, db);
+  if (result === "recorded") {
+    world.decisions.push(`${d.decision}:${JSON.stringify(lookupsColumn([rec.reading]))}`);
+    if (d.decision === "reconciled") {
+      world.lastReconciledRead = rec.at;
+      world.lastReconciledSeen = rec.seen;
+    }
+  }
+  Object.assign(w, IDLE());
+}
+
+/**
+ * The end-of-day batch (rote reconcile --since, D51) after the drain: if the job succeeded after a
+ * resubmit and the workers' pass is due (or ran), re-read it regardless of reconciled_at, once every row
+ * is visible (the drain's last tick plus the largest lag).
+ */
+function endOfDayBatch(world: World): void {
+  const j = job(world);
+  if (!(j.state === "succeeded" && j.reconcileAfter !== null)) return;
+  if (j.reconciledAt === null && j.reconcileAfter > world.db.now) return; // not due: the workers' pass's
+  commit(world, modelTick(world.db, 13)); // past the largest history lag (12 s)
+  const batch: SimWorker = { name: "batch", incarnation: 0, alive: true, paused: false, ...IDLE(), lastExtendedAt: 0 };
+  const { db, claimed } = modelReconcileClaimJob(world.db, JOB_ID, idOf(batch), LEASE);
+  commit(world, db);
+  if (!claimed) return;
+  startReconcile(world, batch, claimed.token);
+  reconcileLookup(world, batch);
+  reconcileDecide(world, batch);
+}
+
 
 function dequeue(world: World, w: SimWorker): void {
   if (recover(world, w)) return; // the claim is this iteration's work
@@ -436,7 +550,7 @@ function decide(world: World, w: SimWorker): void {
     commit(world, db);
     if (result === "recorded") world.decisions.push("deferred");
   } else {
-    const { db, result } = modelVerifyResult(world.db, refOf(w), d, lookups, d.decision === "already_done" ? alreadyDoneResult(d) : undefined);
+    const { db, result } = modelVerifyResult(world.db, refOf(w), d, lookups, d.decision === "already_done" ? alreadyDoneResult(d) : undefined, { reconcileDueSeconds: RECONCILE_DUE });
     if (result === "check_violation") world.violations.push(`T7 would violate jobs_queued_has_attempts_left (${d.decision})`);
     commit(world, db);
     if (result === "recorded") world.decisions.push(`${d.decision}${d.decision === "escalated" ? `:${d.outcome}` : ""}:${JSON.stringify(lookups)}`);
@@ -478,9 +592,11 @@ function apply(world: World, ev: Ev): void {
       return;
     case "lookup":
       if (canAct(w) && w.phase === "verify") lookup(world, w);
+      else if (canAct(w) && w.phase === "reconcile") reconcileLookup(world, w);
       return;
     case "decide":
       if (canAct(w) && w.phase === "verify") decide(world, w);
+      else if (canAct(w) && w.phase === "reconcile") reconcileDecide(world, w);
       return;
     case "crash":
       if (w.alive) Object.assign(w, { alive: false, paused: false, ...IDLE() });
@@ -548,7 +664,13 @@ function runEvents(s: Scenario): Trace {
 function checkTransitions(transitions: Transition[], at: string, found: Found): void {
   for (const { from, to } of transitions) {
     const what = `${at}: ${from.state}/${from.token} -> ${to.state}/${to.token}`;
-    if (isTerminal(from.state) && !(from.state === "needs_human" && to.state === "verifying")) found.terminalMoved.push(what);
+    // Terminal states are final, except: reverify (needs_human -> verifying; not modelled here), and the
+    // reconcile pass on a succeeded job: its claim / deferral bump the token (succeeded -> succeeded), and
+    // its flag moves it to needs_human (duplicate_suspected / reconcile_unreadable) -- the ONE exception.
+    const reverify = from.state === "needs_human" && to.state === "verifying";
+    const reconcileTouch = from.state === "succeeded" && to.state === "succeeded";
+    const reconcileFlag = from.state === "succeeded" && to.state === "needs_human" && (to.outcome === "duplicate_suspected" || to.outcome === "reconcile_unreadable");
+    if (isTerminal(from.state) && !reverify && !reconcileTouch && !reconcileFlag) found.terminalMoved.push(what);
     if (to.state === "queued" && !(to.attempt < to.maxAttempts)) found.queuedExhausted.push(`${what} at attempt ${to.attempt}/${to.maxAttempts}`);
     if (to.state === "queued" && from.state !== "running") {
       // Property 5: after an intent, the only way back to queued is a verify that looked twice and saw 0.
@@ -583,6 +705,10 @@ function finishWork(world: World, w: SimWorker): void {
   if (phaseOf(w) === "intent") (i >= 0 ? apply(world, { k: "click", w: i, commits: true }) : click(world, w, true));
   if (phaseOf(w) === "clicked") finishRun(world, w, runEndFor(w, "ok"), true);
   if (phaseOf(w) === "verify") runVerifyToEnd(world, w);
+  if (phaseOf(w) === "reconcile") {
+    reconcileLookup(world, w);
+    reconcileDecide(world, w);
+  }
 }
 
 /**
@@ -595,7 +721,8 @@ function quiesce(world: World): void {
   for (const w of world.workers) if (w.alive && w.paused) apply(world, { k: "resume", w: world.workers.indexOf(w), beatFirst: true });
   for (const w of world.workers) if (canAct(w) && w.phase !== "idle") finishWork(world, w);
   commit(world, modelTick(world.db, LEASE + 1));
-  for (let round = 0; round < 4 * job(world).maxAttempts + 10 && !isTerminal(job(world).state); round += 1) {
+  // Until the job is terminal AND settled: past the reconcile delay, its pass has run (D50).
+  for (let round = 0; round < 4 * job(world).maxAttempts + 14 && !modelSettled(job(world)); round += 1) {
     const clean: SimWorker = { name: `clean${round}`, incarnation: 0, alive: true, paused: false, ...IDLE(), lastExtendedAt: 0 };
     dequeue(world, clean);
     finishWork(world, clean);
@@ -611,6 +738,11 @@ function oracleFor(world: World) {
     drainTimedOut: true,
   });
 }
+
+/** A row the reconcile's history read did not see: it was written, or became visible, only after the read (a late zombie). */
+const lateRow = (world: World) => world.lastReconciledSeen !== null && world.ledger.some((r) => !world.lastReconciledSeen!.includes(r.id));
+/** Property 8: a succeeded job with 2+ rows, and no row that became visible only after the reconcile's read. */
+const silentDuplicate = (world: World) => job(world).state === "succeeded" && world.ledger.length >= 2 && !lateRow(world);
 
 /** Property 1's precondition: no zombie click, and the settle period covers the history lag. */
 const p1Holds = (world: World) => !world.zombieClick && world.lag <= SETTLE;
@@ -663,17 +795,18 @@ describe("fleet state machine, pure model (Step 9: verify, settle, history lag, 
     );
   }, PROPERTY_TIMEOUT_MS);
 
-  it("property 3: no lost job -- after the bank is back, everyone wakes and the leases pass, recovery + verify + clean workers reach a terminal state", () => {
+  it("property 3: no lost job -- after the bank is back, everyone wakes and the leases pass, recovery + verify + clean workers reach a terminal state, and it is SETTLED (its reconcile, if one was due, ran)", () => {
     fc.assert(
       fc.property(scenarioArb, (s) => {
         const { world } = simulate(s);
         expect(isTerminal(job(world).state), `job ended ${job(world).state}`).toBe(true);
+        expect(modelSettled(job(world)), "settled").toBe(true);
       }),
       params,
     );
   }, PROPERTY_TIMEOUT_MS);
 
-  it("property 4: terminal states are final (only rote jobs reverify reopens one, never modelled here), and queued always has an attempt left (D21)", () => {
+  it("property 4: terminal states are final -- except the reconcile pass's succeeded -> needs_human (duplicate_suspected / reconcile_unreadable; reviewer decision 3); rote jobs reverify is not modelled -- and queued always has an attempt left (D21)", () => {
     fc.assert(
       fc.property(scenarioArb, (s) => {
         const { found } = simulate(s);
@@ -707,6 +840,42 @@ describe("fleet state machine, pure model (Step 9: verify, settle, history lag, 
       }),
       params,
     );
+  }, PROPERTY_TIMEOUT_MS);
+
+  it("property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50)", () => {
+    fc.assert(
+      fc.property(scenarioArb, (s) => {
+        const { world } = simulate(s);
+        expect(silentDuplicate(world), `${world.ledger.length} rows, job ${job(world).state}/${job(world).outcome}, last reconciled read at ${world.lastReconciledRead} saw ${JSON.stringify(world.lastReconciledSeen)}, rows ${JSON.stringify(world.ledger.map((r) => [r.id, r.visibleAt]))}`).toBe(false);
+      }),
+      params,
+    );
+  }, PROPERTY_TIMEOUT_MS);
+
+  it("property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded -- the honest limit of property 8 is closed", () => {
+    fc.assert(
+      fc.property(scenarioArb, (s) => {
+        const { world } = simulate(s);
+        endOfDayBatch(world);
+        expect(job(world).state === "succeeded" && world.ledger.length >= 2, `${world.ledger.length} rows, job ${job(world).state}/${job(world).outcome}`).toBe(false);
+      }),
+      params,
+    );
+  }, PROPERTY_TIMEOUT_MS);
+
+  it("property 8's exemption is real (fast-check finds a duplicate that the workers' pass read too early), and the reconcile is what flags duplicates (without it, one stays succeeded)", () => {
+    const late = fc.check(
+      fc.property(scenarioArb, (s) => {
+        const { world } = simulate(s);
+        return !(job(world).state === "succeeded" && world.ledger.length >= 2);
+      }),
+      params,
+    );
+    expect(late.failed, "fast-check found no duplicate that stayed succeeded past the workers' pass (the late zombie)").toBe(true);
+    const [shrunk] = late.counterexample!;
+    const { world } = simulate(shrunk);
+    expect(world.zombieClick).toBe(true);
+    expect(lateRow(world)).toBe(true);
   }, PROPERTY_TIMEOUT_MS);
 
   it("R2a: at most one worker holds a valid lease (owner + token match, lease_expires_at > now), and it is the one that took the job last", () => {
@@ -762,6 +931,11 @@ describe("the simulation reaches the interesting states (so the properties are n
       "decision:deferred",
       "decision:escalated:ambiguous",
       "decision:escalated:verify_unavailable",
+      "decision:reconciled",
+      "decision:duplicate_suspected",
+      "succeeded->succeeded", // R1's token bump on a succeeded job
+      "succeeded->needs_human", // the one exception (reconcile)
+      "final:needs_human/duplicate_suspected",
       "lookups:[0,1]",
       "phase:crashed",
       "final:succeeded/success",
@@ -833,8 +1007,9 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
       { k: "click", w: 2, commits: true },
       { k: "finish", w: 2, how: "ok" },
     ]);
-    expect(world.decisions).toEqual(["resubmitted:[0,0]"]);
+    expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:[1]"]); // the drain's reconcile pass: 1 row
     expect(job(world)).toMatchObject({ state: "succeeded", outcome: "success", attempt: 2 });
+    expect(job(world).reconciledAt).not.toBeNull();
     expect(rows(world)).toBe(1);
     expect(Object.values(found).flat()).toEqual([]);
   });
@@ -851,8 +1026,8 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
       { k: "lookup", w: 1 }, // too early: ignored
       { k: "decide", w: 1 }, // incomplete: ignored
     ]);
-    // Only the drain decided, after the settle period.
-    expect(world.decisions).toEqual(["resubmitted:[0,0]"]);
+    // Only the drain decided, after the settle period (then its reconcile).
+    expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:[1]"]);
   });
 
   it("history lag 3 s < settle 5 s, the bank's answer lost after it committed (T5 verifies at once): [0, 1] -> already_done, 1 row", () => {
@@ -875,7 +1050,7 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
     expect(oracleFor(world).pass).toBe(true);
   });
 
-  it("history lag 8 s > settle 5 s, the same crash: [0, 0] -> resubmitted -> a second transfer: DUPLICATE (the settle must exceed the lag)", () => {
+  it("history lag 8 s > settle 5 s, the same crash: [0, 0] -> resubmitted -> a second transfer: DUPLICATE (the settle must exceed the lag) -- and the reconcile pass flags it (D47's backstop)", () => {
     const { world } = run(
       [
         { k: "dequeue", w: 0 },
@@ -893,13 +1068,14 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
       ],
       { lag: 8 },
     );
-    expect(world.decisions).toEqual(["resubmitted:[0,0]"]);
+    expect(world.decisions).toEqual(["resubmitted:[0,0]", "duplicate_suspected:[2]"]);
     expect(rows(world)).toBe(2);
     expect(world.zombieClick).toBe(false);
+    expect(job(world)).toMatchObject({ state: "needs_human", outcome: "duplicate_suspected" });
     expect(oracleFor(world).findings[0]!.verdict).toBe("DUPLICATE");
   });
 
-  it("frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE (Step 10's reconcile pass detects it)", () => {
+  it("frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE -- and the reconcile pass flags it: needs_human / duplicate_suspected", () => {
     const { world } = run([
       { k: "dequeue", w: 0 },
       { k: "intent", w: 0 },
@@ -920,8 +1096,43 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
     expect(world.zombieClick).toBe(true);
     expect(world.maxClickStaleness).toBeGreaterThanOrEqual(LEASE + SETTLE);
     expect(rows(world)).toBe(2);
-    expect(job(world)).toMatchObject({ state: "succeeded", attempt: 2 });
+    expect(world.decisions).toEqual(["resubmitted:[0,0]", "duplicate_suspected:[2]"]);
+    expect(job(world)).toMatchObject({ state: "needs_human", outcome: "duplicate_suspected", attempt: 2 });
     expect(oracleFor(world).findings[0]!.verdict).toBe("DUPLICATE");
+  });
+
+  it("the reconcile pass's limit: a zombie still frozen when the reconcile READ the history clicks after it -- the duplicate stays succeeded (property 8's exemption); the end-of-day batch then flags it", () => {
+    const { world, found } = run([
+      { k: "dequeue", w: 0 },
+      { k: "intent", w: 0 },
+      { k: "pause", w: 0 },
+      { k: "tick", dt: 31 },
+      { k: "dequeue", w: 1 },
+      { k: "lookup", w: 1 },
+      { k: "tick", dt: 5 },
+      { k: "lookup", w: 1 },
+      { k: "decide", w: 1 }, // [0, 0]: resubmitted
+      { k: "dequeue", w: 2 },
+      { k: "intent", w: 2 },
+      { k: "click", w: 2, commits: true },
+      { k: "finish", w: 2, how: "ok" }, // succeeded after a resubmit: reconcile due in 60 s
+      { k: "tick", dt: 45 },
+      { k: "tick", dt: 20 },
+      { k: "dequeue", w: 1 }, // R1
+      { k: "lookup", w: 1 }, // reads 1 row
+      { k: "decide", w: 1 }, // reconciled
+      { k: "resume", w: 0, beatFirst: false },
+      { k: "click", w: 0, commits: true }, // after the read: the history the pass saw had 1 row
+    ]);
+    expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:[1]"]);
+    expect(rows(world)).toBe(2);
+    expect(job(world)).toMatchObject({ state: "succeeded", attempt: 2 });
+    expect(lateRow(world)).toBe(true);
+    expect(silentDuplicate(world)).toBe(false); // exempt: the row came after the read
+    expect(found.terminalMoved).toEqual([]);
+    endOfDayBatch(world);
+    expect(world.decisions.at(-1)).toBe("duplicate_suspected:[2]");
+    expect(job(world)).toMatchObject({ state: "needs_human", outcome: "duplicate_suspected" });
   });
 
   it("frozen after the intent, and its heartbeat fires first on waking: the run is aborted, no click; verify resubmits; 1 row", () => {
@@ -936,7 +1147,7 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
     ]);
     expect(rows(world)).toBe(1); // only the resubmitted attempt's
     expect(job(world)).toMatchObject({ state: "succeeded", attempt: 2 });
-    expect(world.decisions).toEqual(["resubmitted:[0,0]"]);
+    expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:[1]"]);
   });
 
   it("a crash after the click on the LAST attempt is verified, not failed: already_done with 1 row, never UNRECORDED_COMMIT", () => {

@@ -1564,3 +1564,128 @@ smallest change that meets it: one column, one CHECK, one clause in each dequeue
 while a job waits.
 
 **Date.** 2026-11-14
+
+## D50: The reconcile pass: a job that succeeded after a resubmit is re-read once, after lease + settle + margin; 2+ matches move it to `needs_human` / `duplicate_suspected`; `GET /jobs/:id` says when a job is `settled`
+
+(Step 10, plan section 2 (step-08 section 9a, R3); reviewer decision 3 and its addition.)
+
+**Decision.** Verify + resubmit reopens the zombie window (step-08 section 6): a worker frozen after its
+intent can click after another worker verified `[0, 0]` and resubmitted, and the bank has no lease to
+check. The window is not closed; it is made **loud**. Only a job that **succeeded after a resubmit** can
+carry such a late second transfer, so only those are reconciled.
+- **Marking.** T4 (to `succeeded`) and T7 (`already_done`) set `reconcile_after = now() + $due` when the job
+  has a `resubmitted` verify phase (an `EXISTS` on `job_verifications`). `$due` = lease + settle + margin
+  (`reconcileDueSeconds`; `ROTE_RECONCILE_MARGIN_SECONDS`, default 25, so 30 + 5 + 25 = 60 s in production):
+  by then a zombie frozen across its lease has had a full settle period and the margin to click.
+- **R1, the claim** (`RECONCILE_CLAIM_SQL`, in `beforeDequeue` after the recovery sweep, at most one per
+  loop iteration, and only when the sweep claimed nothing to verify). The job **stays `succeeded`**; the
+  reconcile lease is `lease_owner` / `lease_expires_at` on the succeeded row (`jobs_lease_pair` holds;
+  `jobs_active_has_owner` does not apply); token + 1; a `job_verifications` row with reason `reconcile`. A
+  dead reconciler's open row is closed `crashed` and its expired lease is claimable again (T6 only looks at
+  active states). No heartbeat: one lookup takes about a second against the lease, and a reconciler whose
+  lease expired is fenced by the next claim's token bump (it is read-only).
+- **One lookup** (the verify lookup, 1.2.0, one retry if transient), then the pure `reconcileDecision`:
+  1 match → `reconciled` (stays succeeded); 2+ → `duplicate_suspected` (`needs_human`,
+  `duplicates_detected_total` + 1, one error-level log line); 0 or unreadable → `reconcile_unreadable`
+  (`needs_human`: a succeeded job whose transfer the history cannot show is itself an alarm); unavailable →
+  `reconcile_deferred` (`reconcile_after` moves by D44's backoff; past D44's budget → `reconcile_unreadable`).
+- **R2, the result** (`RECONCILE_RESULT_SQL`), fenced on (id, token, owner, state `succeeded`); 0 rows →
+  `readFence` (D41). A `needs_human` decision keeps the job's result and adds `result.reconcile`
+  (`decision`, `matches`, `firstMatchRef`, `jobConfirmationRef`, `lookups`, `evidenceRefs`).
+  **`reconciled_at` is set by every decision except a deferral** (the plan set it only for `reconciled`),
+  so "the pass decided" is one column.
+- **`settled`** (reviewer decision 3's addition). `GET /jobs/:id` returns `settled: true` when the job is
+  terminal and no reconcile is due: `reconcile_after IS NULL OR reconciled_at IS NOT NULL` (`jobSettled`).
+  Until then a succeeded job can still change to `needs_human`; the README says so.
+- **The one exception to terminal finality**: `succeeded` → `needs_human` (`duplicate_suspected` /
+  `reconcile_unreadable`), approved by the reviewer. `rote jobs reverify` never accepts either outcome.
+- `job_verifications` gains reason `reconcile` and four decisions, with a CHECK that ties them to that
+  reason; `VERIFY_CYCLE_SQL` (and the model) ignore reconcile rows, so a verify cycle is only verify phases.
+- Counters `duplicates_detected_total` and `reconcile_decisions_total{decision}` (in process until Day 3).
+
+**The honest limits.**
+- A zombie frozen longer than the delay that also beats its overdue heartbeat on waking clicks **after**
+  the reconcile read, and that duplicate is silent again (reviewer decision 5). The end-of-day batch
+  (D51) re-reads every such job in a window, regardless of `reconciled_at`.
+- Lookup 1.2.0 reads only the FIRST match's Reference. With 2 matches the reconcile records the count, the
+  first match's reference and the job's own `confirmationRef`; when the history lists the job's own row
+  first (the mock bank lists oldest first), the second row's reference is in the evidence screenshot, not
+  in a field. Reading every match is a lookup 1.3.0 (re-approval), not done here.
+- Only `succeeded` jobs are reconciled. A job that ends `failed` or `business_outcome` after a resubmit can
+  also meet a zombie's late click (1 row against a job that says it did not move money; the oracle's
+  UNRECORDED_COMMIT). Not covered; an open question for the reviewer.
+
+**Tests.** Unit: every row of `reconcileDecision`, `reconcileDueSeconds`, `jobSettled`. Property: terminal
+finality with the one exception; **property 8**: after a drain past the reconcile delay, a job never stays
+`succeeded` with 2+ rows unless a row became visible only after the reconcile's read (the zombie after the
+pass); **property 9**: with the end-of-day batch after the drain, never at all. Model vs real: R1, the batch
+claim and R2 per decision, `reconcile_after` / `reconciled_at` after every command, a sequence family that
+starts from a job that succeeded after a resubmit. DB: T4/T7 marking (and not without a resubmit); R1's due
+selection, `SKIP LOCKED`, a re-claim after an expired reconcile lease (the dead row closed `crashed`); R2 per
+decision; a stale R2 writes nothing; the 0004 CHECKs. Integration (real lookup, real bank): two ledger rows
+for one memo → `duplicate_suspected` with the count and both refs on the job; 1 row → `reconciled`.
+
+**Alternatives considered.**
+- Keep `succeeded` with outcome `duplicate_suspected` plus the alert (gentler for API clients, but the
+  brief's `needs_human` list would not show it): the reviewer chose `needs_human`.
+- Reconcile every succeeded job: a history read per job for a window only resubmitted jobs have.
+- A second, later reconcile (e.g. +15 min): the reviewer chose the batch command instead (D51).
+- A heartbeat during the reconcile: a lookup is a second against a 30 s lease, and a re-run is harmless.
+
+**Why.** The window cannot be closed from outside the bank (it has no lease to check), so the system must
+look again after the window and say so loudly. Limiting the look to resubmitted jobs keeps the cost at one
+read per job that could possibly be affected.
+
+**Date.** 2026-11-14
+
+## D51: `rote reconcile --since <duration>`: end-of-day reconciliation re-reads every job that succeeded after a resubmit, regardless of `reconciled_at`
+
+(Step 10, reviewer decision 5.)
+
+**Decision.** The reconcile pass (D50) looks once, at lease + settle + margin. A zombie frozen longer than
+that, which also beats its own overdue heartbeat on waking, clicks after the look, and its duplicate is
+silent again: that is stated as the pass's honest limit. Banks close the gap the way they always have, with
+an end-of-day reconciliation, so the reviewer asked for one:
+
+```
+npm run reconcile -- --since 24h [--tenant tenant-a] [--by <name>] [--database-url <url>] [--evidence-dir <dir>]
+```
+
+- **The window** (`RECONCILE_WINDOW_SQL`): every job still `succeeded` with `reconcile_after` set (it
+  succeeded after a resubmit) whose `reconcile_after` is inside `--since`. `reconcile_after` is the success
+  moment plus the reconcile delay (moved later by a deferral), so the window reaches back `since` plus one
+  delay: a few more jobs than strictly "succeeded in the window", never fewer, and it is read-only.
+- **Each job, one at a time**: the batch's claim (`RECONCILE_CLAIM_JOB_SQL`: by id, `succeeded`, reconcile
+  lease free, **regardless of `reconciled_at`**), then exactly the workers' reconcile phase: one lookup, the
+  pure `reconcileDecision`, R2. So 2+ matches are flagged exactly like R2 (`needs_human` /
+  `duplicate_suspected`, `duplicates_detected_total`, the error log line), and the run's rows carry the
+  batch's `--by` name.
+- A job whose workers' pass is **not due yet** is left to it (reported `not_due`): reconciling it early
+  would set `reconciled_at` before the window the workers' pass exists for. A job another reconciler holds
+  is reported `busy`.
+- **Read-only toward the bank**: only the history lookup runs, never `approveRisky`; the integration test
+  checks the ledger is unchanged.
+- **Exit code**: 0 when every job in the window reconciled (or was not due); 1 when it flagged a job or
+  left one undecided (deferred, busy, fenced out): a human reads the summary; 2 when it could not run (bad
+  arguments, no database, a missing credential). Credentials come from the same `ROTE_CRED_*` variables as a
+  worker's.
+
+**Tests.** DB (scripted lookups, `reconcile.db.test.ts`): a job the workers' pass reconciled with 1 match
+is re-read and flagged when the history now shows 2; a not-yet-due job is left alone; a job never
+resubmitted is never read; the window excludes older jobs; a held job is `busy`; the duration parser.
+Integration (real lookup, real bank): a succeeded-after-resubmit job, a second ledger row with its memo
+added after the workers' pass reconciled it, the batch flags it and the ledger is unchanged. The property
+test models the batch after the drain (property 9: then no job stays `succeeded` with 2+ rows).
+
+**Alternatives considered.**
+- A second, late reconcile in the workers (e.g. +15 min): another timer per job, still a fixed window; the
+  reviewer chose the batch.
+- Reconcile not-yet-due jobs too: steals the workers' pass's window (see above).
+- Reconcile every succeeded job in the window: a history read per job for a hazard only resubmitted jobs
+  carry.
+
+**Why.** A fixed-delay check always leaves a later window; a periodic sweep over a window, run by an
+operator, closes it the way back offices already do, with the same decision table, so a flag means the same
+thing whoever raised it.
+
+**Date.** 2026-11-14

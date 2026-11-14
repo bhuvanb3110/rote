@@ -1,8 +1,9 @@
 // The worker's poll loop (docs/plans/step-06.md sections 1 and 6; Day 2: docs/plans/step-08.md):
 //
 //   while not stopping:
-//     claim = beforeDequeue()         # seam 4: expired-lease recovery (T6) runs HERE
-//     if claim: verify it (T6.4/T6.5/T6.7 handed this worker a job to verify); that is the iteration
+//     claim = beforeDequeue()         # seam 4: expired-lease recovery (T6) runs HERE, then R1 (a due reconcile)
+//     if claim: verify it (T6.4/T6.5/T6.7 handed this worker a job to verify), or reconcile it (R1 ->
+//               lookup -> R2, Step 10 D50); that is the iteration
 //     job = dequeue(...)              # transient DB error -> log, back off (cap 5 s), never exit
 //     if none: sleep(poll backoff)    # 100 ms base, x2, cap 2 s, full jitter
 //     heartbeat (T2) while it runs; run it; record it (T4, fenced; retried while Postgres is down);
@@ -34,6 +35,7 @@ import { NO_FAULT, type FaultInjector } from "./fault.js";
 import { NO_METRICS, type WorkerMetrics } from "./metrics.js";
 import type { FencedOutReason } from "./complete.js";
 import type { VerifyClaim } from "./recover.js";
+import type { ReconcileClaim, ReconcilePhaseOutcome } from "./reconcile.js";
 import type { VerifyPhaseOutcome } from "./verify.js";
 import { completeIntoVerify } from "./verifySql.js";
 
@@ -90,7 +92,7 @@ export interface WorkerOptions {
    * Seam 4: expired-lease recovery (createRecoverySweep, T6). The entrypoint always sets it. Resolves
    * with a job it claimed to verify (T6.4/T6.5/T6.7), which is then this iteration's work.
    */
-  beforeDequeue?: () => Promise<VerifyClaim | null | void>;
+  beforeDequeue?: () => Promise<VerifyClaim | ReconcileClaim | null | void>;
   /**
    * Runs one verify phase (src/worker/verify.ts runVerifyPhase) on a job this worker holds in
    * `verifying` (after T5, or a recovery claim). The entrypoint always sets it. Without it, a
@@ -98,6 +100,18 @@ export interface WorkerOptions {
    */
   verify?: (claim: VerifyClaim, controller: AbortController, hardSignal: AbortSignal) => Promise<VerifyPhaseOutcome>;
   onVerifyDone?: (done: VerifyPhaseOutcome) => void;
+  /**
+   * Runs one reconcile (src/worker/reconcile.ts runReconcilePhase) on a job recovery's sweep claimed with
+   * R1 (Step 10, D50). The entrypoint always sets it. Without it, the claim's lease simply expires and
+   * another worker reconciles the job.
+   */
+  reconcile?: (claim: ReconcileClaim, controller: AbortController, hardSignal: AbortSignal) => Promise<ReconcilePhaseOutcome>;
+  onReconcileDone?: (done: ReconcilePhaseOutcome) => void;
+  /**
+   * T4 marks a success after a resubmit for the reconcile pass this many seconds later (lease + settle +
+   * margin, D50). Default: 60 (the production defaults).
+   */
+  reconcileDueSeconds?: number;
   /** Counters (illegal_transitions_total, ...); Day 3 exports them. Default: not counted. */
   metrics?: WorkerMetrics;
   /**
@@ -159,7 +173,8 @@ export class Worker {
   async tick(): Promise<TickResult> {
     const claim = await this.options.beforeDequeue?.();
     if (claim) {
-      await this.verifyPhase(claim);
+      if (claim.label === "R1") await this.reconcilePhase(claim);
+      else await this.verifyPhase(claim);
       return "ran";
     }
     let job: JobRow | null;
@@ -295,7 +310,7 @@ export class Worker {
           : null;
       const completion = await completeJobWithRetry(
         this.options.pool,
-        { jobId: job.id, fencingToken: job.fencing_token, workerId: this.options.workerId, outcome, requeueAfterSeconds },
+        { jobId: job.id, fencingToken: job.fencing_token, workerId: this.options.workerId, outcome, requeueAfterSeconds, reconcileDueSeconds: this.options.reconcileDueSeconds },
         {
           signal: this.hard.signal,
           random: this.options.random,
@@ -375,6 +390,25 @@ export class Worker {
       label: "T5",
       priorStatus: outcome.priorStatus ?? null,
     });
+  }
+
+  /** One reconcile run on a job this worker claimed with R1, abortable by stop() like a job. */
+  private async reconcilePhase(claim: ReconcileClaim): Promise<void> {
+    if (!this.options.reconcile) {
+      this.log.error({ workerId: this.options.workerId, jobId: claim.job.id }, "worker: holds a job to reconcile but has no reconciler; its lease expires and another worker reconciles it");
+      return;
+    }
+    const controller = new AbortController();
+    const current: { controller: AbortController; graceTimer?: NodeJS.Timeout } = { controller };
+    this.current = current;
+    if (this.stopping) current.graceTimer = setTimeout(() => controller.abort(new ShutdownAbortError()), this.options.shutdownGraceMs ?? 30_000);
+    try {
+      const done = await this.options.reconcile(claim, controller, this.hard.signal);
+      this.options.onReconcileDone?.(done);
+    } finally {
+      if (current.graceTimer) clearTimeout(current.graceTimer);
+      if (this.current === current) this.current = null;
+    }
   }
 
   /** One verify phase on a job this worker holds in `verifying`, abortable by stop() like a job. */
