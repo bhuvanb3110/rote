@@ -252,6 +252,13 @@ export class Worker {
               leaseSeconds: this.options.leaseSeconds,
             });
             this.log.info(log, "worker: commit intent written; clicking Submit");
+            // TEST-ONLY stall fault (stall-after-intent, D52): a frozen process runs no timers, so the
+            // heartbeat stops; after the stall the click goes out at once (the zombie window's worst case).
+            if (fault.stallMs("stall-after-intent") > 0) {
+              heartbeat?.stop();
+              this.log.warn({ ...log, stallMs: fault.stallMs("stall-after-intent") }, "worker: FAULT stall-after-intent: heartbeat suspended; frozen after the intent");
+              await fault.stall("stall-after-intent");
+            }
           },
         });
       } catch (error) {

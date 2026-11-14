@@ -29,6 +29,7 @@
 //   ROTE_CRED_<TENANT>_<INPUT>        per-tenant credentials (credentials.ts)
 //   PLAYWRIGHT_VERSION       [unset]  baked into the image; must equal the installed playwright
 //   ROTE_FAULT / ROTE_FAULT_ENABLE   [unset]  TEST-ONLY crash point (fault.ts, D34); refused unless both
+//   ROTE_FAULT_STALL_MS      [unset]  TEST-ONLY: the stall of ROTE_FAULT=stall-after-intent (D52); needs it, refused otherwise
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -44,7 +45,7 @@ import { isTransientDbError } from "../queue/index.js";
 import { Worker } from "./loop.js";
 import { createRecoverySweep } from "./recover.js";
 import { checkPlaywrightVersion } from "./playwrightVersion.js";
-import { createFaultInjector, parseFaultConfig } from "./fault.js";
+import { createFaultInjector, parseFaultConfig, parseStallMs } from "./fault.js";
 import { DEFAULT_HEARTBEAT_SECONDS, DEFAULT_LEASE_SECONDS, validateLeaseTiming } from "./heartbeat.js";
 import { runJob } from "./runJob.js";
 import { InMemoryCounters } from "./metrics.js";
@@ -80,7 +81,7 @@ async function waitForPostgres(pool: Pool, url: string, stop: AbortSignal): Prom
 async function main(): Promise<void> {
   // First: a bad fault flag refuses the start before anything is touched (D34).
   const faultPoint = parseFaultConfig(process.env);
-  const fault = createFaultInjector(faultPoint);
+  const fault = createFaultInjector(faultPoint, { stallMs: parseStallMs(process.env, faultPoint) });
   const playwrightVersion = checkPlaywrightVersion(process.env.PLAYWRIGHT_VERSION);
   const workerId = process.env.ROTE_WORKER_ID || `${os.hostname()}-${process.pid}-${randomBytes(2).toString("hex")}`;
   const leaseSeconds = intEnv("ROTE_LEASE_SECONDS", DEFAULT_LEASE_SECONDS);
@@ -150,7 +151,15 @@ async function main(): Promise<void> {
   };
   await getBrowser();
 
-  if (faultPoint) log.warn({ workerId, faultPoint }, "worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)");
+  if (faultPoint) {
+    const stallMs = fault.stallMs(faultPoint);
+    log.warn(
+      { workerId, faultPoint, ...(stallMs > 0 ? { stallMs } : {}) },
+      stallMs > 0
+        ? "worker: FAULT INJECTION ENABLED: this worker freezes after its commit intent (heartbeat suspended), then clicks (test-only)"
+        : "worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)",
+    );
+  }
   log.info(
     { workerId, playwrightVersion, leaseSeconds, heartbeatSeconds, shutdownGraceMs, settleMs, defer, reconcileDueSeconds: reconcileDue, evidenceBaseDir, db: redactDatabaseUrl(dbUrl), tenants },
     "worker: ready",

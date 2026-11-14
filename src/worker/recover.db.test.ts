@@ -330,7 +330,14 @@ describe("createRecoverySweep (the worker's beforeDequeue)", () => {
     await expire(job.id);
     const before = await row(job.id);
     class Killed extends Error {}
-    const fault = { point: "recover-in-transaction", at: (name: string) => { if (name === "recover-in-transaction") throw new Killed("simulated kill"); } };
+    const fault = {
+      point: "recover-in-transaction",
+      at: (name: string) => {
+        if (name === "recover-in-transaction") throw new Killed("simulated kill");
+      },
+      stallMs: () => 0,
+      stall: async () => {},
+    };
     await expect(recoverOne(pool, { workerId: "doomed", leaseSeconds: LEASE, fault })).rejects.toBeInstanceOf(Killed);
     expect(await row(job.id)).toEqual(before);
     expect(await phases(job.id)).toEqual([]);

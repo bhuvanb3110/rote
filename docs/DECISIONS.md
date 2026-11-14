@@ -1689,3 +1689,44 @@ operator, closes it the way back offices already do, with the same decision tabl
 thing whoever raised it.
 
 **Date.** 2026-11-14
+
+## D52: The zombie window, measured and made loud: the `stall-after-intent` fault (heartbeat suspended) and `evidence/zombie-window-limit/`
+
+(Step 10, plan section 3; reviewer decisions 4 and 5; step-08 section 6.)
+
+**Decision.**
+- **A stall fault point**, `stall-after-intent`, doubly gated like every fault (`ROTE_FAULT` +
+  `ROTE_FAULT_ENABLE=1`) and needing `ROTE_FAULT_STALL_MS` (1..600 000; refused with any other point, and
+  this point is refused without it). Right after T3 commits, the worker **stops its heartbeat** (a frozen
+  process runs no timers), writes `ROTE_FAULT stalling at stall-after-intent for <ms> ms` to stderr, sleeps
+  the stall without any abort signal, writes `ROTE_FAULT stall over: clicking Submit now`, and returns, so
+  the click goes out the moment it "wakes". That is the window's worst case by construction (the zombie acts
+  before its heartbeat could notice the lost lease), and the reviewer approved it as the evidence; no
+  `SIGSTOP` variant (its timing between T3 and the click cannot be aimed from outside).
+- **`npm run verify-scenarios -- --family zombie`** → `evidence/zombie-window-limit/`. One job; lease 5 s /
+  heartbeat 2 s; settle 5 s; a 30 s stall; the reconcile margin 10 s (delay 5 + 5 + 10 = 20 s). The zombie
+  starts first; the clean worker starts once the job is `committing`. The judge checks, from the database,
+  the ledger and the workers' logs:
+  1. T6.4 by the clean worker → verify `[0, 0]` → resubmitted;
+  2. attempt 2 (clean) succeeded, and the job's `confirmationRef` is the first ledger row;
+  3. the zombie woke and clicked: **2 ledger rows, oracle DUPLICATE** (the honest limit), and its late
+     result was fenced (`lease lost; outcome NOT recorded`);
+  4. the reconcile read 2 matches: `needs_human` / `duplicate_suspected`, `result.reconcile.matches = 2`,
+     and `duplicates_detected_total = 1` over the workers' error lines;
+  5. the order of events, from the timestamps: the verify decided `resubmitted` < attempt 2's row < the
+     zombie's row < the reconcile started. A run whose timing differs fails loudly instead of passing by
+     luck.
+
+  RESULT: PASS means the duplicate happened AND it was detected. The README there states plainly that the
+  window is not closed; it is made loud.
+- **In chaos** (10b) the 45 s pause in every seed keeps exercising the realistic case, where the heartbeat
+  usually wins on waking.
+
+**Alternatives considered.** A real `SIGSTOP` / `docker pause` (cannot be aimed between T3 and the click);
+stalling with the heartbeat running (the heartbeat would abort the run on waking: the benign case, not the
+window); stalling in the browser (replay has no hook there, and the click is what matters).
+
+**Why.** A limit nobody has seen is a limit nobody believes. The evidence shows the duplicate the design
+cannot prevent, and the pass that makes it a page for a human instead of a silent second transfer.
+
+**Date.** 2026-11-14
