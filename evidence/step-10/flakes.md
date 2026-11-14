@@ -22,3 +22,15 @@
   were last compensated, measured at the comparison. That bound is sound: real time can move a real
   remaining-time by at most the real time that passed. Every command's ANSWER (leased, extended, recorded,
   fenced, CHECK violation) is still compared exactly.
+
+## 2. `recover.db.test.ts`: "8 concurrent recoverers over 50 expired jobs" timed out at vitest's default 5 s (2026-11-14)
+
+- **Where:** the model-vs-real fix's first gate run, `evidence/step-10/npm-test-commit-mvr-slack-run1-FLAKE.txt`
+  (exit 1, 206.6 s; 571 passed, 1 failed: `Test timed out in 5000ms`). Also round 3 of the slow-project A/B
+  with the slow files in group 0, where the next test ("8 concurrent verifiers ...") then failed with "no
+  job" because the timed-out test's work was still running.
+- **Cause:** the same loaded machine as flake 1. The test enqueues and dequeues 50 jobs one by one, opens 8
+  pools and recovers concurrently: a correctness test with vitest's default 5 s timeout, no explicit one.
+- **Fixed** (with flake 1's fix): both concurrency tests get an explicit 60 s timeout. The timeout bounds a
+  hang; it was never a claim about speed, and every assertion is unchanged.
+- **Rerun:** `evidence/step-10/npm-test-commit-mvr-slack.txt` (with both fixes): 58 files, 572/572, 196.3 s.

@@ -266,7 +266,7 @@ describe("T6 under concurrency", () => {
     } finally {
       await Promise.all(pools.map((p) => p.end()));
     }
-  });
+  }, 60_000); // correctness under concurrency; 50 jobs x 8 pools can take > 5 s on a loaded machine (evidence/step-10/flakes.md 2)
 
   it("8 concurrent verifiers re-claiming 16 expired verifying jobs (looping until none is left): each claimed exactly once, one open phase each", async () => {
     for (let i = 0; i < 16; i += 1) await committing();
@@ -298,7 +298,7 @@ describe("T6 under concurrency", () => {
     } finally {
       await Promise.all(pools.map((p) => p.end()));
     }
-  });
+  }, 60_000); // correctness under concurrency; 50 jobs x 8 pools can take > 5 s on a loaded machine (evidence/step-10/flakes.md 2)
 });
 
 describe("createRecoverySweep (the worker's beforeDequeue)", () => {

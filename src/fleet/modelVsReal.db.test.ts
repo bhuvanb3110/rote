@@ -12,9 +12,13 @@
 // (`lease_expires_at`, and job_verifications' started_at / ended_at), which is exactly equivalent to the
 // database clock moving forward by dt, because every rule compares those with now(). The model advances
 // its `now` by the same dt. Real time also passes while a sequence runs (a few ms per command), so the
-// lease and deferred-for comparisons allow 1 s of slack, and a command whose answer depends on a lease
-// boundary is not generated while a lease sits within 1 s of it (fast-check `check`); with whole-second
-// leases and ticks that only excludes "exactly at expiry", where `>` and `<` are both false. A recovery
+// lease and deferred-for comparisons allow a slack of 1 s PLUS the real time since the stored times were
+// last compensated (see sync): under load one command (a dequeue transaction and the compare's reads) can
+// itself take more than a second, and that time moves every real remaining-time by at most that much
+// (Step 10: a loaded 8 GB laptop drifted 1.27 s; the bound is sound, the answers are still compared
+// exactly). A command whose answer depends on a lease boundary is not generated while a lease sits within
+// 1 s of it (fast-check `check`); with whole-second leases and ticks that only excludes "exactly at
+// expiry", where `>` and `<` are both false. A recovery
 // is also not generated while two expired jobs share an expiry and one of them would be claimed to
 // verify: the sweep stops at its claim, and Postgres breaks such a tie by the real (millisecond) order of
 // the writes, which the model's whole seconds do not record.
@@ -140,6 +144,9 @@ async function readReal(pool: Pool): Promise<RealJob[]> {
 /** After every command: the model and the database agree, and R2a/R2b hold in the database. */
 async function compare(m: Model, r: Real, after: string): Promise<void> {
   const real = await readReal(r.pool);
+  // Real time not yet compensated by sync() when the rows above were read: the most any real
+  // remaining-time can have drifted from the model's (1 s base, as before, for the whole-second model).
+  const slack = 1 + Math.max(0, (Date.now() - r.lastSync) / 1000);
   expect(real.map((j) => j.id), after).toEqual(m.db.jobs.map((j) => j.id));
   const cycles = await Promise.all(real.map((j) => readVerifyCycle(r.pool, j.id)));
   for (const [i, mj] of m.db.jobs.entries()) {
@@ -156,14 +163,14 @@ async function compare(m: Model, r: Real, after: string): Promise<void> {
     if (mRemaining === null) expect(rj.remaining, `${where}: lease`).toBeNull();
     else {
       expect(rj.remaining, `${where}: lease`).not.toBeNull();
-      expect(Math.abs(rj.remaining! - mRemaining), `${where}: lease remaining real ${rj.remaining} vs model ${mRemaining}`).toBeLessThan(1);
+      expect(Math.abs(rj.remaining! - mRemaining), `${where}: lease remaining real ${rj.remaining} vs model ${mRemaining} (slack ${slack.toFixed(3)} s)`).toBeLessThan(slack);
     }
     // The verify cycle (VERIFY_CYCLE_SQL vs the model's phases).
     const rc = cycles[i]!;
     const mc = modelVerifyCycle(mj, m.db.now);
     expect({ ...rc, deferredForSeconds: rc.deferredForSeconds === null }, `${where}: verify cycle`).toEqual({ ...mc, deferredForSeconds: mc.deferredForSeconds === null });
     if (mc.deferredForSeconds !== null) {
-      expect(Math.abs(rc.deferredForSeconds! - mc.deferredForSeconds), `${where}: deferred for real ${rc.deferredForSeconds} vs model ${mc.deferredForSeconds}`).toBeLessThan(1);
+      expect(Math.abs(rc.deferredForSeconds! - mc.deferredForSeconds), `${where}: deferred for real ${rc.deferredForSeconds} vs model ${mc.deferredForSeconds} (slack ${slack.toFixed(3)} s)`).toBeLessThan(slack);
     }
     // R2b: the token never decreases.
     const prev = r.tokens.get(rj.id) ?? 0;
