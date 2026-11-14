@@ -1,19 +1,40 @@
-// In-process harness pieces shared by scripts/crash-matrix.ts and scripts/verify-scenarios.ts: the mock
-// bank on :4100 in this process (so its knobs and ledger are the harness's), a fresh Postgres test
-// schema per scenario, and real worker CHILD PROCESSES (`node --import tsx src/worker/main.ts`) pointed
-// at that schema -- a fault worker SIGKILLs itself for real (D34), and every worker runs the same code
-// path as in Docker.
+// Real worker CHILD PROCESSES for tests and harnesses (moved from scripts/lib/harness.ts in Step 10,
+// docs/plans/step-10.md section 6; D53): `node --import tsx src/worker/main.ts`, pointed at a Postgres
+// test schema, with the mock bank on :4100 in THIS process (so its knobs and ledger are the caller's). A
+// fault worker (ROTE_FAULT=<point>, ROTE_FAULT_ENABLE=1) SIGKILLs itself for real at its point (D34): a
+// real signal on Linux (CI), TerminateProcess on Windows (exit code 1). Every worker runs the same code
+// path as in Docker. Used by src/worker/crashSubmit.db.test.ts (npm test), scripts/crash-matrix.ts and
+// scripts/verify-scenarios.ts.
+//
+// The bank binds :4100 because the committed transfer artifacts and tenant overrides point there; stop
+// the Compose bank first (docker compose stop bank), and never run two of these at once.
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import app from "../../mock-app/app.js";
-import { testDatabaseUrl, type TestSchema } from "../../src/queue/testDb.js";
-import { FAKE_CREDS } from "./compose.js";
+import { testDatabaseUrl, type TestSchema } from "../queue/testDb.js";
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 export const BANK_PORT = 4100;
 export const BANK = `http://127.0.0.1:${BANK_PORT}`;
 export const TERMINAL = new Set(["succeeded", "business_outcome", "failed", "needs_human"]);
+
+/**
+ * Fake mock-bank credentials (the same defaults as .env.example). Harnesses grep their evidence for
+ * exactly these values. (scripts/lib/compose.ts re-exports them for the Compose harnesses.)
+ */
+export const FAKE_CREDS: Record<string, string> = {
+  ROTE_CRED_TENANT_A_USERNAME: process.env.ROTE_CRED_TENANT_A_USERNAME || "fleet-op-a",
+  ROTE_CRED_TENANT_A_PASSWORD: process.env.ROTE_CRED_TENANT_A_PASSWORD || "fake-pass-a",
+  ROTE_CRED_TENANT_B_USERNAME: process.env.ROTE_CRED_TENANT_B_USERNAME || "fleet-op-b",
+  ROTE_CRED_TENANT_B_PASSWORD: process.env.ROTE_CRED_TENANT_B_PASSWORD || "fake-pass-b",
+  ROTE_CRED_TENANT_C_USERNAME: process.env.ROTE_CRED_TENANT_C_USERNAME || "fleet-op-c",
+  ROTE_CRED_TENANT_C_PASSWORD: process.env.ROTE_CRED_TENANT_C_PASSWORD || "fake-pass-c",
+};
 
 export interface Child {
   exited: Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
@@ -22,10 +43,11 @@ export interface Child {
   kill(): void;
 }
 
-/** A worker child process; stdout + stderr go to `logFile`. */
+/** A worker child process; stdout + stderr go to `logFile`. Runs from the repo root. */
 export function startWorker(env: Record<string, string>, logFile: string): Child {
   const out = createWriteStream(logFile);
-  const child = spawn(process.execPath, ["--import", "tsx", "src/worker/main.ts"], {
+  const child = spawn(process.execPath, ["--import", "tsx", path.join("src", "worker", "main.ts")], {
+    cwd: REPO,
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -45,6 +67,12 @@ export function startWorker(env: Record<string, string>, logFile: string): Child
 
 export function within<T>(p: Promise<T>, ms: number): Promise<T | "timeout"> {
   return Promise.race([p, new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), ms))]);
+}
+
+/** Stops a worker gracefully (SIGTERM), and kills it if it is still alive after `graceMs`. */
+export async function stopWorker(child: Child, graceMs = 30_000): Promise<void> {
+  child.stop();
+  if ((await within(child.exited, graceMs)) === "timeout") child.kill();
 }
 
 /** The mock bank (this process's module state: its knobs and ledger) on :4100. */
@@ -69,7 +97,7 @@ export async function control(route: string): Promise<void> {
   if (res.status !== 200) throw new Error(`/control/${route} -> HTTP ${res.status}`);
 }
 
-/** The environment of a worker child on this schema (fake credentials, the given lease timing). */
+/** The environment of a worker child on this schema (fake credentials, plus `extra`: lease timing...). */
 export function workerEnv(db: TestSchema, extra: Record<string, string>): Record<string, string> {
   const url = new URL(testDatabaseUrl());
   url.searchParams.set("options", `-c search_path=${db.schema}`);

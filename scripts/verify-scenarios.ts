@@ -53,8 +53,8 @@ import { checkLedger, fetchLedger, readJobs, type LedgerRow } from "../src/oracl
 import { enqueue } from "../src/queue/index.js";
 import { createTestSchema, type TestSchema } from "../src/queue/testDb.js";
 import { jobSettled } from "../src/fleet/stateMachine.js";
-import { argValue, FAKE_CREDS, parseDuration } from "./lib/compose.js";
-import { BANK, closeBank, control, listenBank, runFaultWorker, startWorker, within, workerEnv, type Child } from "./lib/harness.js";
+import { argValue, parseDuration } from "./lib/compose.js";
+import { BANK, closeBank, control, FAKE_CREDS, listenBank, runFaultWorker, startWorker, within, workerEnv, type Child } from "../src/testing/workerProcess.js";
 
 const FAMILY = argValue("family");
 if (FAMILY !== "lag" && FAMILY !== "outage" && FAMILY !== "zombie") throw new Error("--family must be lag, outage or zombie");

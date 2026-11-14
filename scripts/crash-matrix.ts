@@ -39,7 +39,7 @@ import { enqueue } from "../src/queue/index.js";
 import { createTestSchema } from "../src/queue/testDb.js";
 import { EXPECTATION_PHASES, scenariosFor, judgePoint, type CrashScenario, type ExpectationPhase } from "../src/chaos/crashExpected.js";
 import { argValue, parseDuration } from "./lib/compose.js";
-import { BANK, closeBank, listenBank, runFaultWorker, startWorker, TERMINAL, within, workerEnv } from "./lib/harness.js";
+import { BANK, closeBank, listenBank, runFaultWorker, startWorker, TERMINAL, within, workerEnv } from "../src/testing/workerProcess.js";
 
 const DRAIN_TIMEOUT_MS = argValue("drain-timeout") ? parseDuration(argValue("drain-timeout")!) : 90_000;
 const LEASE_SECONDS = Number(argValue("lease-seconds") ?? 30);

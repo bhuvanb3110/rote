@@ -1730,3 +1730,35 @@ window); stalling in the browser (replay has no hook there, and the click is wha
 cannot prevent, and the pass that makes it a page for a human instead of a silent second transfer.
 
 **Date.** 2026-11-14
+## D53: Crash right before and right after Submit run in `npm test` with real worker processes; the worker spawner moves to `src/testing/`
+
+(Step 10, plan section 6; the brief's deliverable "integration tests for crash-before and crash-after Submit".)
+
+**Decision.** `src/worker/crashSubmit.db.test.ts` (the `slow` project, D48) runs, for each case, a real worker
+CHILD PROCESS with `ROTE_FAULT=before-submit` / `after-submit` that SIGKILLs itself at the point (a real
+signal on Linux CI; Windows' `TerminateProcess` locally, exit code 1), then a clean child worker that
+recovers the job when its lease expires, verifies it and drains until the job is **settled**, then the
+ledger oracle. Lease 5 s / heartbeat 2 s as in the matrix, settle 1 s, reconcile margin 1 s, so each case
+takes seconds. Expected, both cases: exactly 1 ledger row, `succeeded`, oracle PASS.
+- **before-submit**: T6.4 verify `[0, 0]` → resubmitted → attempt 2 succeeds (the dead attempt `crashed`)
+  → the reconcile pass reads 1 match (`reconciled`).
+- **after-submit**: T6.4 verify `[1]` → `succeeded` / `already_done` on attempt 1, `confirmationRef` = the
+  row, no reconcile due.
+
+The spawner (`startWorker`, `runFaultWorker`, `listenBank`, `workerEnv`, `FAKE_CREDS`, ...) moves from
+`scripts/lib/harness.ts` to **`src/testing/workerProcess.ts`**; `crash-matrix.ts` and `verify-scenarios.ts`
+import it from there and `scripts/lib/harness.ts` is deleted (`scripts/lib/compose.ts` re-exports
+`FAKE_CREDS`). The test binds the mock bank on :4100 (the committed artifacts point there), like the matrix:
+the Compose bank must be stopped, which the working agreement already requires for `npm test`. The guard test
+counts a file that imports the spawner and starts workers as a Chromium launcher.
+
+**Alternatives considered.** In-process fault flags only (the plan of Day 1; the matrix already proves the
+real-signal path, and the brief asks for the tests in `npm test`); relaxed copies of the artifacts on an
+ephemeral port (needs the worker entrypoint to take test-only directories; the matrix's path is the one to
+test); keeping the spawner under `scripts/` (a test importing from `scripts/` inverts the layering).
+
+**Why.** The brief's two worst cases should fail `npm test` and CI the moment they regress, through the same
+entrypoint, signals and recovery that production runs.
+
+**Date.** 2026-11-14
+

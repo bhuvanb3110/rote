@@ -5,19 +5,14 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 
+import { FAKE_CREDS } from "../../src/testing/workerProcess.js";
+
 /**
  * Fake mock-bank credentials (the same defaults as .env.example), passed to `docker compose` through
  * the environment so .env is never read or edited here. Harnesses grep their evidence for exactly
- * these values.
+ * these values. Defined with the worker spawner (src/testing/workerProcess.ts, D53).
  */
-export const FAKE_CREDS: Record<string, string> = {
-  ROTE_CRED_TENANT_A_USERNAME: process.env.ROTE_CRED_TENANT_A_USERNAME || "fleet-op-a",
-  ROTE_CRED_TENANT_A_PASSWORD: process.env.ROTE_CRED_TENANT_A_PASSWORD || "fake-pass-a",
-  ROTE_CRED_TENANT_B_USERNAME: process.env.ROTE_CRED_TENANT_B_USERNAME || "fleet-op-b",
-  ROTE_CRED_TENANT_B_PASSWORD: process.env.ROTE_CRED_TENANT_B_PASSWORD || "fake-pass-b",
-  ROTE_CRED_TENANT_C_USERNAME: process.env.ROTE_CRED_TENANT_C_USERNAME || "fleet-op-c",
-  ROTE_CRED_TENANT_C_PASSWORD: process.env.ROTE_CRED_TENANT_C_PASSWORD || "fake-pass-c",
-};
+export { FAKE_CREDS };
 
 export function dockerEnv(workers: number): NodeJS.ProcessEnv {
   return { ...process.env, ...FAKE_CREDS, ROTE_WORKERS: String(workers) };

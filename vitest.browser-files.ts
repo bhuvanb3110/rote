@@ -25,6 +25,7 @@ export const BROWSER_TEST_FILES = [
 ];
 
 export const SLOW_TEST_FILES = [
+  "src/worker/crashSubmit.db.test.ts",
   "src/worker/faults.db.test.ts",
   "src/worker/lease.db.test.ts",
   "src/worker/reconcileBank.db.test.ts",
