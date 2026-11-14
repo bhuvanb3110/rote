@@ -42,6 +42,11 @@ several runs — can't be told from a single `run.jsonl`.
 | [`verify-bank-outage-30s/`](verify-bank-outage-30s/) | Step 9, reviewer addition 5: the bank down for 30 s while four jobs killed after Submit / after the intent are verified. | `summary.md`: `RESULT: PASS`. Every job deferred 3 times (4 phases, past the dead-phase cap, which deferrals don't count) and was decided 13–21 s after the bank came back; none escalated; oracle `ok=4`. |
 | [`chaos/step-09-seed-14449393/`](chaos/step-09-seed-14449393/) | Step 9: the chaos harness, seed 14449393, 14 kills and a 45 s pause, against verify. | `check.txt`: **ok=100, 0 LOST, 0 duplicates, 0 `needs_human`, `RESULT: PASS`**; `T6.1 requeue x9`, `T6.4 verify x3` (all `already_done [1]`); the paused worker's heartbeat aborted it 0.18 s after waking. No kill landed between intent and click, so no resubmit this seed (README). |
 | [`step-09/`](step-09/) | Fleet Step 9: every full `npm test` log (raw, exit code and wall time) and the property tests' mutation check. | `mutation-check-property-tests.txt`: four planted bugs, each caught by the property tests, each reverted. |
+| [`step-10/`](step-10/) | Fleet Step 10a: every full `npm test` log (raw, exit code and wall time), the slow-project A/B and timelines (`slow-project/`), and `flakes.md`. | `slow-project/README.md`: overlapping the slow files with unit-db was no faster (mean 185.2 s both ways) and failed 6 tests under load, so they share the browser pool in one longest-first queue (D48). `flakes.md`: two load flakes, each rerun and fixed at its cause. |
+| [`zombie-window-limit/`](zombie-window-limit/) | Step 10a (D52): a worker frozen after its intent (the `stall-after-intent` fault, heartbeat suspended) wakes after another worker verified `[0, 0]`, resubmitted and succeeded. | `summary.md`: **RESULT: PASS (the duplicate happened, and it was detected)**. From the zombie's intent: verify `[0, 0]` → resubmitted +14.3 s, attempt 2's row +16.0 s, the zombie's row +30.1 s (2 rows, DUPLICATE), the reconcile at +36.5 s reads 2 → `needs_human` / `duplicate_suspected`, `duplicates_detected_total = 1`. README: the window is not closed, it is made loud; the limit that remains. |
+| [`mutation-check/`](mutation-check/) | Step 10a (D54): `npm run mutation-check`, eight planted bugs (Steps 8–10) as patches in `scripts/mutations/`. | `report.md`: **8/8 caught**, `RESULT: PASS`, every revert clean; the failing tests are named per mutant in `check.txt`. `ci-linux/`: the same 8/8 in CI. |
+| [`crash-matrix/step-10a/`](crash-matrix/step-10a/) | Step 10a: the crash-point matrix at 5 s / 2 s against `--expect step-10` (Step 9's outcomes, drained until settled, the resubmit paths reconciled). | `matrix.md`: **23/23**, `RESULT: PASS`, 1 row everywhere; `before-submit` and the three `before-submit>verify-*` scenarios: resubmitted `[0, 0]` → attempt 2 → `reconcile:reconciled[1]`; no other reconcile due. `../ci-linux-step-10a/`: the same 23/23 in CI with a real `signal SIGKILL` at every fault. |
+| [`step-10/verify-scenarios/`](step-10/verify-scenarios/) | Step 10a: `verify-scenarios --family lag` and `--family outage` re-run on the 10a code (drained until settled). | `lag/summary.md` and `outage/summary.md`: both **RESULT: PASS**. Lag: the same verify outcomes as Step 9, and the three `[0, 0]` duplicates now end `needs_human` / `duplicate_suspected` (the reconcile pass, D47's backstop). Outage: every verify deferred 3 times and decided after the outage; the two resubmitted jobs reconciled `[1]`; oracle ok=4. |
 
 ## Day 2, Step 8: before / after
 
@@ -79,6 +84,24 @@ Step 9 adds two judges with no "before":
 **Still open after Step 9 (Step 10):** chaos at 20+ seeds; the matrix at the production 30/10; the
 zombie stall-after-intent duplicate, made loud by the reconcile pass (the only window verify cannot
 close); the crash tests required in CI.
+
+## Day 2, Step 10a: before / after
+
+Step 10a adds the requeue backoff (D49), the reconcile pass (D50, D51), the zombie stall (D52), the crash tests
+in `npm test` (D53) and the mutation check (D54). The matrix gained `--expect step-10` (drained until settled,
+the resubmit paths reconciled); the verify scenarios drain until settled.
+
+| Judge | After Step 9 | After Step 10a |
+| --- | --- | --- |
+| Crash-point matrix (5 s / 2 s) | 23/23 (`step-09`) | **23/23** against `step-10` (`crash-matrix/step-10a/`; CI Linux `crash-matrix/ci-linux-step-10a/`, now a failing job when red) |
+| History lag vs settle | PASS; the `[0, 0]` runs were silent DUPLICATEs | **PASS** (`step-10/verify-scenarios/lag/`): the same DUPLICATEs, now **flagged** `needs_human` / `duplicate_suspected` |
+| A 30 s outage during verifies | PASS | **PASS** (`step-10/verify-scenarios/outage/`); the resubmitted jobs reconciled `[1]` |
+| The zombie window | the honest limit, a silent DUPLICATE (the property tests' deterministic scenario) | **PASS** (`zombie-window-limit/`): the duplicate happens and is detected |
+| Planted bugs | 4, checked once by hand (`step-09/mutation-check-property-tests.txt`) | **8/8** caught by `npm run mutation-check` (`mutation-check/`), in CI on every push |
+| A 30 s bank outage before Submit | a job burned its 3 attempts and failed | the attempts back off; the attempt after the outage succeeds (`faults.db.test.ts`, in `npm test`) |
+
+**Still open after 10a (Step 10b):** chaos at 500 jobs × 20 seeds (the builder runs the batch), the bank-fault
+chaos runs, the matrix at the production 30 / 10, the README case study.
 
 ## Provenance
 

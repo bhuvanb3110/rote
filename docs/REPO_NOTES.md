@@ -99,6 +99,44 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
+## Fleet Step 10a: backoff, reconcile, the zombie window, crash tests in CI (2026-11-14)
+
+- **Migration `0004_day2_exit.sql`** (forward-only; ALL of Step 10's schema): `jobs.not_before` (+ CHECK
+  `jobs_not_before_only_queued`), `jobs.reconcile_after` / `reconciled_at` (+ the partial index
+  `jobs_reconcile_due`), and on `job_verifications` the reason `reconcile` with four decisions
+  (`reconciled`, `duplicate_suspected`, `reconcile_unreadable`, `reconcile_deferred`) tied to it by a CHECK.
+  Four migrations now; tests that list them name all four. `JobRowSchema` has the three new columns.
+- **The requeue backoff** (D49): T4's requeue sets `not_before`; `CLAIM_TENANT_SQL` / `PICK_JOB_SQL` skip a
+  job that is not due (fairness by due work only); `LEASE_SQL` clears it; T6.1 and T7 never set it. A test
+  that requeues and dequeues again at once must move `not_before` (see `faults.db.test.ts`).
+- **The reconcile pass** (D50): `src/worker/reconcile.ts` (R1 claim, R2 result, the batch).
+  `createRecoverySweep({ reconcile: true })` claims at most one due reconcile when recovery claimed nothing;
+  `Worker` runs it through the `reconcile` option; `jobSettled` (`src/fleet/stateMachine.ts`) is the
+  `settled` of `GET /jobs/:id`. The verify lookup is `createLookup` in `verify.ts`, shared by both.
+  `VERIFY_CYCLE_SQL` ignores reconcile rows. New counters `reconcile_decisions_total`,
+  `duplicates_detected_total`. New setting `ROTE_RECONCILE_MARGIN_SECONDS` (25).
+- **`npm run reconcile -- --since <duration>`** (D51): the end-of-day batch (needs `ROTE_CRED_*`).
+- **`stall-after-intent`** (D52; `ROTE_FAULT_STALL_MS`): the one fault point that stalls instead of killing.
+  `npm run verify-scenarios -- --family zombie` → `evidence/zombie-window-limit/`. Every verify-scenarios
+  family now drains until settled.
+- **Tests:** three vitest projects (D48): `unit-db`; `browser` and `slow` share group 1 and one pool of 3,
+  in one longest-first queue (`vitest.sequencer.ts`: vitest's own order runs projects one after another).
+  `npm run test:fast` leaves the slow files out (never a commit gate). `src/worker/crashSubmit.db.test.ts`
+  binds the mock bank on :4100 like the matrix: stop the Compose bank before `npm test` (as before, never run
+  the suite with the fleet up). The worker spawner is `src/testing/workerProcess.ts` (D53;
+  `scripts/lib/harness.ts` is gone).
+- **Two load flakes fixed at their cause** (`evidence/step-10/flakes.md`): model vs real's slack now covers
+  a command's own real time; `recover.db.test.ts`'s concurrency tests have a 60 s timeout. Both showed up
+  when the 8 GB laptop had 0.65 GB free and every run took 200–255 s instead of 165 s.
+- **`npm run mutation-check`** (D54): `scripts/mutations/*.patch`, eight mutants; the CI job
+  `mutation-check`; the CI `crash-matrix` job is no longer report-only and runs `--expect step-10`
+  (`src/chaos/crashExpected.ts`: the resubmit paths reconciled; drained until settled;
+  `--reconcile-margin-seconds 5`).
+- **The suite:** 61 files, 627 tests. On this laptop the day's runs took 196–285 s (165 s in the morning before
+  memory pressure set in); the final three took 223.9, 214.5 and 229.0 s, all 627/627
+  (`evidence/step-10/README.md`). Group 1 (browser + slow, 3 at a time) is the long pole; D31's cap of 3 is the
+  lever, and it is D31's decision.
+
 ## Fleet Step 9: verify (2026-11-13/14)
 
 - **Migration `0003_verify.sql`** (forward-only): `job_verifications` gains the reason `resumed`, the

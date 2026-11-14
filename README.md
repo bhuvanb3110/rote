@@ -45,9 +45,13 @@ The tests use a separate `rote_test` database (created on demand) with one schem
 they never touch the dev `rote` database. `docker compose down -v` deletes the data volume.
 
 `npm run typecheck` checks every file, tests and `scripts/` included (the build config excludes tests).
-The 11 test files that launch Chromium run in their own vitest project, at most 3 at a time
-(`vitest.browser-files.ts`, D31; a guard test keeps the list complete); everything else runs fully
-parallel. Never run the suite while the 4-worker fleet is up on an 8 GB machine.
+Three vitest projects (D31, D48): `unit-db` (everything that does not launch Chromium, fully parallel),
+then `browser` and `slow` together, at most 3 files at a time, in one longest-first queue
+(`vitest.browser-files.ts`, `vitest.sequencer.ts`; a guard test keeps the lists complete). `slow` holds
+the integration files that mostly wait (leases, a slow bank, a 30 s outage, worker child processes);
+`npm run test:fast` leaves it out for a quick local loop, never before a commit. Never run the suite
+while the 4-worker fleet is up on an 8 GB machine; `crashSubmit.db.test.ts` binds the mock bank on :4100,
+so the Compose bank must be stopped.
 
 ### CI
 
@@ -55,9 +59,10 @@ GitHub Actions (`.github/workflows/ci.yml`, D35) on every push and pull request 
 `fleet/**`: **test** (Node 22, a `postgres:17` service, Playwright Chromium from the lockfile,
 `npm run typecheck`, the full `npm test`, the full log uploaded as the `npm-test-log` artifact on every
 run), **unit-node25** (the pure unit tests on Node 25), **docker** (builds the fleet image, never
-pushed, with the Actions cache) and **crash-matrix** (the crash-point matrix on Linux with real
-signals, **report-only** until Step 10: `continue-on-error`, the report uploaded as the
-`crash-matrix-report` artifact and shown in the job summary). Every action is pinned by commit SHA.
+pushed, with the Actions cache), **crash-matrix** (the crash-point matrix on Linux with real signals,
+`--expect step-10`; since Step 10a no longer report-only: a red matrix fails the workflow; the report is
+uploaded as the `crash-matrix-report` artifact and shown in the job summary) and **mutation-check**
+(eight planted bugs must each turn their tests red, D54). Every action is pinned by commit SHA.
 Not in CI: the Day-1 exit and chaos; they need the Compose stack and minutes of wall time and run as
 scripts with committed evidence (next section).
 
@@ -342,8 +347,9 @@ Reference, D42).
 **Deployment requirement: `ROTE_VERIFY_SETTLE_MS` (default 5000) must exceed the bank's history
 visibility delay** (D47). If the bank shows a transfer in its history later than verify's second look,
 `[0, 0]` resubmits a transfer that happened. `evidence/settle-vs-history-lag/` shows it: an 8 s lag with
-a 5 s settle produced a duplicate when the verify started at once. The reconcile pass (Step 10) is the
-backstop. The other settings are `ROTE_VERIFY_DEFER_BACKOFF_SECONDS` (5) and
+a 5 s settle produced a duplicate when the verify started at once. The reconcile pass (Step 10a, D50) is
+the backstop: it flags such a duplicate `needs_human` / `duplicate_suspected` (re-run on the 10a code in
+`evidence/step-10/verify-scenarios/lag/`). The other settings are `ROTE_VERIFY_DEFER_BACKOFF_SECONDS` (5) and
 `ROTE_VERIFY_DEFER_BUDGET_SECONDS` (600).
 
 | Judge | Step 8 | Step 9 |
@@ -353,6 +359,46 @@ backstop. The other settings are `ROTE_VERIFY_DEFER_BACKOFF_SECONDS` (5) and
 | History lag vs settle | – | **PASS** (`evidence/settle-vs-history-lag/`): `[0, 1]` rescued by the settle; a lag past lookup #2 → DUPLICATE, as the rule says |
 | A 30 s bank outage during verifies | – | **PASS** (`evidence/verify-bank-outage-30s/`): every verify deferred and completed afterwards; none escalated; 1 row per job |
 
+
+### Day 2, Step 10a: retries back off, the reconcile pass, the zombie window made loud
+
+- **Retries back off** (D49). A failure before the commit intent is requeued with `not_before` = now +
+  10 s × 3^(attempt − 1), jittered × [0.8, 1.2], capped at 120 s (database clock); no worker takes the job
+  before then. With 3 attempts the third cannot run sooner than 32 s after the first failure, so the
+  brief's 30 s bank outage fails no job. A crash requeue and a verified resubmit are not delayed.
+  `GET /jobs/:id` shows `notBefore`. Longer outages are Day 4's circuit breaker.
+- **The reconcile pass** (D50). A job that succeeded **after a resubmit** is the only kind that can carry
+  a frozen worker's late second transfer, so it is re-read in the bank's history once, lease + settle +
+  margin after it succeeded (`ROTE_RECONCILE_MARGIN_SECONDS`, default 25: 60 s in production). 1 match:
+  `reconciled`. **2+ matches: the job moves to `needs_human` / `duplicate_suspected`**, with the count
+  and references in `result.reconcile`, `duplicates_detected_total` + 1 and an error-level log line. 0
+  matches or an unreadable page: `needs_human` / `reconcile_unreadable`. The bank down: deferred with
+  verify's backoff and budget.
+- **`settled`.** `GET /jobs/:id` returns `settled: true` once the job is terminal and no reconcile is due.
+  **A `succeeded` job that is not yet settled can still change to `needs_human`** (it succeeded after a
+  resubmit and its reconcile has not run). Treat `succeeded` as final only when `settled` is true.
+- **End-of-day reconciliation** (D51): `npm run reconcile -- --since 24h` re-reads every job in the window
+  that succeeded after a resubmit, whether or not the workers' pass already reconciled it, and flags 2+
+  matches the same way. Read-only toward the bank. Exit 0: nothing flagged; 1: something flagged or left
+  undecided; 2: it could not run. It needs the same `ROTE_CRED_*` variables as a worker.
+- **The zombie window is not closed; it is made loud** (D52). A worker frozen after its intent, past its
+  lease, can wake and click after another worker verified `[0, 0]` and resubmitted; the bank has no lease
+  to check. `npm run verify-scenarios -- --family zombie` stages exactly that (`stall-after-intent`, a test-
+  only fault that freezes the worker with its heartbeat suspended): `evidence/zombie-window-limit/` shows the
+  duplicate AND its detection. The limit that remains: a zombie frozen longer than the reconcile delay that
+  also beats its own heartbeat on waking clicks after the pass read the history; the end-of-day batch is
+  what finds that one.
+- **Crash right before / after Submit run in `npm test`** (`src/worker/crashSubmit.db.test.ts`, D53): real
+  worker processes, a real SIGKILL on Linux CI, exactly 1 ledger row each.
+- **`npm run mutation-check`** (D54): eight planted bugs (Steps 8–10), each a patch in `scripts/mutations/`,
+  must each turn their tests red; a CI job runs it, and the crash matrix is no longer report-only.
+
+| Judge | Step 10a |
+| --- | --- |
+| Crash-point matrix (lease 5 s, heartbeat 2 s, `--expect step-10`) | **23/23** (`evidence/crash-matrix/step-10a/`, and in CI on Linux with real signals): the resubmit paths reconciled `[1]`, 1 row everywhere |
+| The zombie window | **PASS** (`evidence/zombie-window-limit/`): the duplicate happens (2 rows) and is flagged `duplicate_suspected` |
+| History lag vs settle, a 30 s outage during verifies (re-run on 10a) | **PASS** (`evidence/step-10/verify-scenarios/`): the lag duplicates are now flagged by the reconcile pass |
+| Mutation check | **8/8** caught (`evidence/mutation-check/`) |
 
 ## Saved demonstration runs
 

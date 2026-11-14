@@ -386,3 +386,98 @@ Step 10 is built in two halves, each in its own session.
 - `npm test` before every commit; never commit or push on red. The full suite 3 times at the end of each
   half, logs unfiltered. Push, then check CI with `gh` and report it; if it is red, fix it in that half.
 - Each half ends with the usual handoff report (10a adds "What 10b must do").
+
+## Built: Step 10a (2026-11-14)
+
+Built in the order of the reviewer decisions: the decisions section, the slow project first, then section
+12's commits 1–5 (with decisions 3 and 5 inside commit 2), then the judges on the 10a code.
+
+| Commit | What |
+| --- | --- |
+| `b6d8263` | the reviewer decisions (2026-11-14), recorded on this file |
+| `8eb764b` | the `slow` vitest project, `vitest.sequencer.ts`, `test:fast`; the A/B (D48) |
+| `1c2ae4a` | two load flakes fixed at their cause (model vs real's slack; recover's timeouts) |
+| `063359e` | 1: 0004 + the requeue backoff (D49) |
+| `8569dcf` | 2: the reconcile pass R1/R2, `settled`, `rote reconcile --since` (D50, D51) |
+| `2748eed` | 3: `stall-after-intent`, `verify-scenarios --family zombie`; every family drains until settled (D52) |
+| `953cfd6` | 3: evidence: `zombie-window-limit/`, RESULT: PASS |
+| `05027a7` | 4: `crashSubmit.db.test.ts` in `npm test`; the spawner in `src/testing/` (D53) |
+| `3ff342a` | 5: `scripts/mutation-check` + the CI job; the matrix required, `--expect step-10` (D54) |
+| `59c00b4` | evidence: the matrix at 5 / 2 against `step-10`, 23/23 |
+| `fa267a5` | fix: the image build excludes `scripts/test-timeline.ts` (CI's docker job was red on `3ff342a`) |
+| `3f0776f` | evidence: CI on Linux (run 43616704578): the matrix 23/23 with real SIGKILLs, the mutation check 8/8 |
+| `452df18`, `1d747bd` | evidence: `verify-scenarios` lag and outage on the 10a code, both PASS |
+| (docs) | REPO_NOTES, README, the evidence index, this section; the full suite x3 |
+
+Decisions **D48–D54**. Evidence: `evidence/step-10/` (every `npm test` log, the slow-project A/B and
+timelines, `flakes.md`), `evidence/zombie-window-limit/`, `evidence/mutation-check/` (and `ci-linux/`),
+`evidence/crash-matrix/step-10a/` and `ci-linux-step-10a/`, `evidence/step-10/verify-scenarios/` (lag and
+outage on the 10a code).
+
+Where the build went beyond, or differed from, the text above:
+
+- **The slow project is in the browser files' pool, not beside unit-db** (D48). Overlapping it with the
+  unit/DB files was measured first (an interleaved A/B, 3 rounds): no gain, and it failed six tests under
+  load. In the same group as `browser`, vitest's own sequencer ran the slow files after every browser file
+  (it orders projects by name); `vitest.sequencer.ts` restores one longest-first queue. `npm run test:fast`
+  leaves the slow files out of a quick local loop.
+- **Two pre-existing load flakes** showed up on this 8 GB machine (0.65 GB free, runs at 200–255 s) and
+  were fixed at their cause in their own commit (`evidence/step-10/flakes.md`).
+- **0004 also ties the reconcile decisions to the `reconcile` reason** (a CHECK), and **`not_before` only on
+  a queued job** (a CHECK; the lease clears it).
+- **`reconciled_at` is set by every reconcile decision except a deferral** (the plan set it only for
+  `reconciled`), so `settled` = terminal and (no `reconcile_after` or a `reconciled_at`).
+- **`rote reconcile --since` leaves a not-yet-due job to the workers' pass** (reconciling it early would
+  set `reconciled_at` before the window the pass exists for), and reports `busy` / `not_due` / each
+  decision; exit 0 / 1 / 2.
+- **"Both references" (section 3, item 4):** lookup 1.2.0 reads only the first match's Reference. The job
+  keeps the count, the first match's reference and its own `confirmationRef`; the mock bank lists oldest
+  first, so with a zombie's late row the first match IS the job's own row and the other reference is in the
+  reconcile lookup's screenshot and the ledger, not in a field. Reading every match is lookup 1.3.0 (an
+  open question).
+- **The property tests** gained property 7 (the backoff, a separate simulation), property 8 (no duplicate
+  stays silently `succeeded` unless a row came after the reconcile's read) and property 9 (with the
+  end-of-day batch: never), a late-zombie template, and deterministic tests of the limit and the batch.
+  Property 4 allows exactly the reconcile's `succeeded` → `needs_human` (and its token bumps on a succeeded
+  job). Model vs real compares `not_before` / `reconcile_after` / `reconciled_at` after every command; its
+  reconcile commands run only in a third family (starting from a resubmitted success), so the first two
+  families keep Step 9's exact command mix and coverage.
+- **The crash matrix judges `--expect step-10`**: Step 9's outcomes, each scenario drained until settled,
+  and the resubmit paths (first fault `before-submit`) reconciled with 1 match. It runs with
+  `--reconcile-margin-seconds 5` (CI and locally) so the reconcile is due inside the drain.
+- **verify-scenarios drains every family until settled**: the lag family's `[0, 0]` duplicates now end
+  `needs_human` / `duplicate_suspected` (D47's backstop, proven), the outage family's resubmitted jobs end
+  reconciled.
+
+## What 10b must do
+
+Step 10b builds section 12's commits 6–9 with reviewer decisions 1, 7 and 8, on top of 10a. Read this file
+(sections 4, 5, 8–10, the reviewer decisions and this "Built" section), `docs/REPO_NOTES.md` "Fleet Step 10a"
+and D48–D54.
+
+1. **Chaos changes** (`scripts/chaos.ts`, plan sections 4–5):
+   - the snapshot re-read fix (re-read `heldJobs` right after `docker kill` returns; `orphanedBy` uses it);
+   - `--bank-fault` (seeded `/control/errors/on` for 30 s and `/control/latency/2000` for 60 s) and the two
+     runs `bank-fault-only` and `bank-fault+kills` → `evidence/chaos/bank-fault-*-seed-<n>/`;
+   - **per-family expectations** (decision 7): the standard family fails on ANY job left for a human; the
+     zombie and bank-fault families state their expected escalations and outcomes, and the judge checks
+     exactly those (bank-fault: 0 DUPLICATE, 0 LOST, 0 `needs_human`, **0 `failed`**: the backoff of D49 is
+     what makes 0 failed possible);
+   - chaos must drain until **settled** (D50), not just terminal: a resubmitted job is reconciled
+     lease + settle + margin after it succeeded (60 s in Compose), and a `duplicate_suspected` found then is
+     a failure of the standard family.
+2. **`scripts/chaos-seeds.ts`** (decision 1): `npm run chaos-seeds -- --seeds 20 --jobs 500`; unattended;
+   each seed's evidence saved as it finishes; resumable (skips finished seeds); the tally at the end; never
+   runs the test suite; stops the fleet when done. Prove it on **2 seeds**; the builder runs the 20.
+   The **tally counts each recovery kind** across all seeds (decision 8): requeued, already_done,
+   resubmitted, deferred, escalated, duplicate_suspected, and says plainly if the resubmit path was never
+   exercised (the matrix, `crashSubmit.db.test.ts` and verify-scenarios cover it).
+3. **The matrix at 30 / 10**: `npm run crash-matrix -- --lease-seconds 30 --heartbeat-seconds 10 --expect step-10
+   --reconcile-margin-seconds 5 --drain-timeout 180s --out evidence/crash-matrix/step-10-production-30-10`, and
+   the 5 / 2 matrix re-run on the final code.
+4. **Docs** (section 8): the README "Fleet (Day 2): crash safety" case study replacing the per-step
+   subsections (including 10a's), the D-entries for chaos at scale, REPO_NOTES, the evidence index and the
+   before/after table; the full suite ×3; push; CI checked; the section-10 PR checklist filled in.
+
+Things 10a leaves for 10b or the reviewer: the open questions in the 10a handoff (lookup 1.3.0 for every
+match's reference; reconciling `failed` / `business_outcome` jobs after a resubmit; D31's cap of 3).
