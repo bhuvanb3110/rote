@@ -1190,3 +1190,264 @@ run, for the same transitions); judge by the oracle alone (see above).
 answer is at each boundary, not merely that nothing was duplicated or lost.
 
 **Date.** 2026-11-11
+
+**Amendment (Step 9, 2026-11-14).** `--expect step-09` (now the default) judges the after-intent points
+as **verified**: `before-submit` → T6.4 verify `[0, 0]` → resubmitted → attempt 2, 1 row;
+`after-submit` / `after-step-12` / `before-complete` → T6.4 verify `[1]` → `succeeded` / `already_done`,
+attempt 1, 1 row. The matrix also runs **scenarios**, not just points. A two-fault scenario `X>Y` runs
+three workers in turn: one that dies at X; one that recovers the job and dies at the recovery-internal
+point Y (inside T6, or in the verify phase); and a clean one. It passes only if both faults fired.
+There are seven, from step-08 section 9's second table: `src/chaos/crashExpected.ts`
+`RECOVERY_SCENARIOS`. The CI job moved to `--expect step-09` with a 60 s drain cap. Evidence:
+`evidence/crash-matrix/step-09/`, 23/23.
+
+## D41: A completion the state guard forbids is `illegal_transition`, not `lease_lost`
+
+(Step 9, reviewer decision A1.)
+
+**Decision.** When a fenced write (T4; and in Step 9 also T5, T7, T8) matches 0 rows, the same
+transaction re-reads the job's `fencing_token` (`readFence` in `src/worker/complete.ts`). Then:
+- **The token moved:** someone else holds the job, so the result is `lease_lost`, as before.
+- **The token is unchanged:** this worker still holds the job, and the guard (`completionAllowed`, or the
+  write's own state guard) refused the transition it asked for. That is a **bug** in the caller. The
+  attempt row (or verify phase row) records `illegal_transition`, the worker logs it at error level, and
+  the counter `illegal_transitions_total` goes up (`src/worker/metrics.ts`, in process; Day 3 exports it).
+
+In both cases the job is left as it is: its lease expires and recovery takes it. The model
+(`src/fleet/model.ts`) makes the same distinction, so the model-vs-real test checks it.
+
+**Alternatives considered.** Keep one `lease_lost` answer for every 0-row write: a bug that tries to
+requeue a job past its intent would look exactly like a routine lost lease, and nobody would see it.
+Throw and crash the worker: recovery would handle the job the same way, but every bug would also cost a
+browser, a process restart and the worker's other work.
+
+**Why.** "Someone else owns this job" is normal in a fleet; "this worker asked for a transition the state
+machine forbids" never is. They need different alarms.
+
+**Date.** 2026-11-13
+
+## D42: `transfer-history-lookup` 1.2.0 reads the first match's Reference and knows the bank's 503 page; the mock bank can lag its history
+
+(Step 9; step-08 reviewer decision 5, step-09 reviewer decisions 4 and 5.)
+
+**Decision.** Lookup 1.2.0 makes three changes:
+- After reading the count, its step-10 reads the first body row's **Reference** on the history grid
+  (output `firstMatchRef`), on all three tenants. A job that verify finds already done therefore keeps
+  `confirmationRef` = the bank's row id, and the oracle's MISMATCH check stays uniform (D32).
+- The bank's 503 "System unavailable" page is a **known outcome**, `BANK_UNAVAILABLE`. Verify can then
+  tell "the bank is down" from "a page it cannot understand" (D44).
+- The mock bank shows an empty filtered history as one "No matching transfers." row, so the grid's first
+  body row always exists.
+
+The mock bank also gains `/control/history-lag/:ms`. A ledger row stays hidden from the history pages, the
+count included, until it is that old. The rule is applied at read time, and `/control/ledger` (the oracle)
+sees every row at once.
+
+The new version was approved with `catalog approve` (version, digest, and the tenant-a/b/c override digests,
+D30). The basis is `evidence/transfer-history-lookup-1.2.0/` (26 script checks against the ledger), and
+`committedApprovals.test.ts` asserts the version and all three digests.
+
+**Alternatives considered.** Have the oracle accept `already_done` without a reference (weaker: a wrong row
+would pass). Read the reference only in verify, through a second capability (two artifacts to approve and
+keep in step for one page).
+
+**Why.** The history page is the only place verify can learn anything. The lookup has to return
+everything a decision needs, and say plainly when the bank itself is the problem.
+
+**Date.** 2026-11-13
+
+## D43: The verify phase: a run that may have committed goes straight into its owner's verify (T5); two lookups with a settle period between them decide; T7 writes the decision
+
+(Step 9; docs/plans/step-08.md section 5, step-09 reviewer decisions 1 and 4.)
+
+**Decision.**
+- **Who verifies.** Usually the worker whose own run may have committed. That covers a `commitUncertain`
+  result, and a throw or abort after a T3 that was not a `FencingError` (D37). `jobOutcomeFor` sends
+  such runs to **T5**, which moves the job from `running`/`committing` to `verifying`. In one fenced
+  transaction T5 bumps the token, grants a fresh lease, closes the attempt row, and opens a
+  `job_verifications` phase whose `prior_status` is the run's `ReplayResult` status. The worker then
+  verifies at once, under a heartbeat on the new token. Otherwise the verifier is a worker that claimed
+  the job in recovery (D45). T4 refuses a `verifying` target, in SQL and in `completeJob`.
+- **The procedure** (`src/worker/verify.ts`):
+  1. Lookup #1: lookup 1.2.0 for (memberId, memo_key), read-only, no `approveRisky`. A transient result
+     (session timeout, interstitials exhausted, a network-level throw) gets one retry.
+  2. If it counted 0, wait the **settle period** (`ROTE_VERIFY_SETTLE_MS`, default 5 s; the heartbeat can
+     abort the wait) and run lookup #2 the same way.
+  3. Decide with the pure `verifyDecision` (`src/fleet/stateMachine.ts`), one row per line of step-08
+     section 5's table:
+     - `[1]` or `[0, 1]` → `succeeded` / `already_done`, `confirmationRef` = `firstMatchRef`.
+     - `[0, 0]` with attempts left → `queued` (`commit_intent_at` cleared). This is **the only retry after
+       an intent**.
+     - `[0, 0]` with no attempts left → `failed` / `not_committed_attempts_exhausted`.
+     - `[0, 0]` after a refusal shown after Submit (`prior_status` = `business_outcome`) →
+       `business_outcome`; the refusal stands and the job is never retried.
+     - `[2+]` or `[0, 2+]` → `needs_human` / `ambiguous`.
+     - A page that loads but cannot be read → `needs_human` / `unreadable`.
+     - The bank unavailable → deferred (D44).
+  4. **T7** writes the decision, fenced on the verify token, and ends the phase row with its lookups and
+     decision. A non-success result keeps the original result and adds `result.verify` (lookups, evidence
+     references). A lost lease writes nothing to `jobs`; the phase row records `lease_lost`.
+
+**Alternatives considered.**
+- For T5, keep Step 8's interim and park every lost Submit response as `needs_human`: one human page per
+  lost response, for questions the bank's history answers in seconds.
+- Let recovery verify after the lease expires: a full lease of latency, for no safety gain.
+- A single lookup with no settle period: a history that lags the ledger reads 0, and that 0 resubmits a
+  transfer that happened (D47).
+- No retry at all (the brief's strict reading): approved as one retry (step-08 reviewer decision 4).
+- A dedicated verifier pool: more processes, for work every worker can already do.
+
+**Why.** After an intent, the job must not be retried blindly. The bank's own history, searched by the
+memo key the job wrote, is the only witness. Two looks with a pause between them, and a decision
+function with one row per case, make each outcome traceable to what the bank showed.
+
+**Date.** 2026-11-13
+
+## D44: A bank that is unavailable is not ambiguous: the verify defers (T8) within a budget, outside the crash cap
+
+(Step 9, step-09 reviewer decision 5.)
+
+**Decision.** `classifyLookup` tells four answers apart:
+- **unavailable**: the lookup's `BANK_UNAVAILABLE` outcome (the 503 page, D42), or a transient that is
+  still there after the one retry;
+- **transient**: session timeout, interstitials exhausted, or a network-level throw;
+- **unreadable**: anything else that is not a count (another business outcome, an unexpected page, a
+  count that is not a number);
+- **count**: the history was read, with n matches.
+
+Unreadable and 2+ matches go to `needs_human` at once. Unavailable **defers** the verify with T8, one
+fenced transaction:
+
+```sql
+UPDATE jobs
+SET fencing_token = fencing_token + 1, lease_expires_at = now() + make_interval(secs => $backoff),
+    error = $why, updated_at = now()
+WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3 AND state = 'verifying'
+RETURNING fencing_token;
+-- + the phase row: ended_at = now(), decision = 'deferred', lookups
+```
+
+- The job **stays `verifying`**. `lease_owner` stays the deferring worker, because
+  `jobs_active_has_owner` requires an owner on every active row. The **token is bumped**, so that worker
+  holds nothing any more: its heartbeat or a later write would match 0 rows.
+- The lease is set to `now() + backoff` on the database clock: 5 s, doubling each time, capped at 60 s
+  (`ROTE_VERIFY_DEFER_BACKOFF_SECONDS`). When it expires, any worker's recovery resumes the verify
+  (T6.7, D45) as a new phase with a fresh lease.
+- Deferral has its own **budget**: 600 s from the end of the cycle's first deferral
+  (`ROTE_VERIFY_DEFER_BUDGET_SECONDS`, measured with the database clock). After that, `verifyDecision`
+  escalates to `needs_human` / `verify_unavailable`.
+- Deferred phases **never count toward the 3-phase crash cap** (T6.6), and a deferred job keeps its tenant
+  slot (`verifying` is an active state).
+
+`job_verifications` gains the decision `deferred` and the reason `resumed`, and a phase row is decided
+exactly when it is ended (migration `0003_verify.sql`).
+
+**Alternatives considered.**
+- A new `deferred` state with no owner: a new state for every CHECK, for `ACTIVE_STATES` and for the
+  tenant cap, when the lease columns already express "nobody holds it until time T".
+- Set `lease_owner` to NULL: forbidden by `jobs_active_has_owner`, and relaxing that CHECK would weaken
+  every other active state.
+- Keep the verifier holding the job with its heartbeat while it sleeps: one worker and one browser tied
+  up per job for up to 10 minutes; in a fleet-wide outage every worker would be parked.
+- `needs_human` at once (the brief's strict rule): a 30 s outage would page a human for every in-flight
+  job.
+
+**Why.** For a legacy back office, an outage is the expected failure, not the exceptional one. A
+deferral costs nothing in safety: no decision is made without a readable history, and the job stays
+fenced. Saved evidence: `evidence/verify-bank-outage-30s/` (D47 has the history-lag counterpart).
+
+**Date.** 2026-11-13
+
+## D45: Recovery claims expired commits and verifies them itself (T6.4–T6.7); a verify cycle escalates after 3 dead phases
+
+(Step 9; docs/plans/step-08.md section 4, step-09 reviewer decision 2.)
+
+**Decision.** `recoveryAction` gains three ways to claim a job for the recovering worker (`state =
+'verifying'`, token + 1, `lease_owner` = the recoverer, its own lease, a new phase row):
+- **T6.4** an expired `committing` job (replaces Step 8's T6.3, which parked it);
+- **T6.5** an expired `verifying` job whose phase died (still open, closed `crashed` by this recovery,
+  `lease_lost`, or `illegal_transition`), while the cycle has had **fewer than 3 dead phases**;
+- **T6.7** a `verifying` job whose newest phase was `deferred` (D44) or `handed_off` (D46).
+
+**T6.6** escalates the third dead phase of a cycle to `needs_human` / `verify_exhausted`. A *cycle* is the
+run of phases since the newest one that started one (reason `commit_uncertain` or
+`lease_expired_in_committing`). `VERIFY_CYCLE_SQL` derives it from `job_verifications`, and the model
+derives it the same way. A claim is one statement (`CLAIM_TO_VERIFY_SQL`). The dead holder's open attempt
+or phase row is closed `crashed` in the same transaction. The sweep **stops at a claim**: that job becomes
+this loop iteration's work, so the worker verifies it at once. A kill inside T6 rolls back and releases the
+row lock, and the next recoverer takes the job (crash point `recover-in-transaction`).
+
+**Alternatives considered.**
+- Count every phase toward the cap: a long outage would exhaust jobs that never crashed (reviewer
+  decision 5).
+- Have recovery only release the job, for any worker to dequeue: a second state for "waiting to be
+  verified", and a gap in which nobody owns a possibly committed transfer.
+- Record verify phases as attempts: `attempt` counts Submit clicks (D21's `queued ⇒ attempt <
+  max_attempts`), and a verify never clicks.
+
+**Why.** A job that may have committed should be in someone's hands at every moment, under a lease. Only
+a verifier that keeps dying is a reason to stop; a slow bank is not.
+
+**Date.** 2026-11-13
+
+## D46: `rote jobs reverify <id>` hands one parked job to recovery, by id only, fenced on its state
+
+(Step 9; step-09 plan item 7, reviewer decision 3.)
+
+**Decision.** `rote jobs reverify <id> [--tenant] [--by] [--database-url]` (`npm run jobs`) moves **one**
+`needs_human` job to `verifying`. It accepts only the "could not tell" outcomes: `commit_uncertain`
+(including Step 6–8's parked jobs), `unreadable`, `verify_unavailable` and `verify_exhausted`. It never
+accepts `ambiguous`, which means two rows may exist and needs a person. One fenced transaction does the
+hand-off:
+- the job gets token + 1, `lease_owner` = `--by`, and a lease **already expired**;
+- a phase row is inserted already ended, with decision `handed_off` and the job's prior status.
+
+The next worker's recovery resumes the job (T6.7) and verifies it. Refusals exit 1 (no such job, wrong
+tenant, not reverifiable); bad arguments exit 2.
+
+**Alternatives considered.**
+- Move parked jobs automatically after Step 9 shipped: a person may already be working on one.
+- `--all-commit-uncertain`: rejected by the reviewer (one at a time, by id).
+- Have the CLI run the lookup itself: a second verify path to keep in step with the first.
+
+**Why.** Humans decide which parked jobs to hand back. The machinery that decides them stays the one
+recovery path (T6.7, then the verify phase), so a hand-off is verified exactly like a crash.
+
+**Date.** 2026-11-13
+
+## D47: The verify settle period must exceed the bank's history visibility delay (a deployment requirement); the reconcile pass is the backstop
+
+(Step 9, step-09 reviewer decisions 1 and 4.)
+
+**Decision.** `ROTE_VERIFY_SETTLE_MS` (default 5000) is documented, in `src/worker/main.ts`,
+`src/worker/verify.ts` and the README, as a **deployment requirement**: it must exceed the longest delay
+between the bank committing a transfer and the transfer appearing in its history search. Settle ≥ lag is
+**sufficient on every path**. Lookup #2 renders at least `settle` after lookup #1 began, and lookup #1
+begins after the write. A worker crash only adds margin: its job is verified once the lease expires
+(about 30 s in production). That margin cannot be counted on, because the T5 path verifies about 1 s
+after the write. A history slower than that has to be met by raising the setting, never by trusting the
+lease. The reconcile pass (Step 10) is the backstop that makes a duplicate from a misconfigured settle
+period loud.
+
+**Evidence** (`evidence/settle-vs-history-lag/`, `npm run verify-scenarios -- --family lag`). Six runs,
+each judged by a script against its own measured timing (render window per lookup, from the lookup's
+`run.jsonl`):
+- Immediate verify (T5): lag 3 s → `[0, 1]`, 1 row; lag 8 s → `[0, 0]` → resubmitted → 2 rows,
+  DUPLICATE. These are exactly the reviewer's predictions.
+- A crash after Submit at the matrix's 5 s lease: the same lags give `[1]` and `[0, 1]`, one row each; lag
+  30 s → DUPLICATE.
+
+The reviewer predicted `[0, 1]` and DUPLICATE for the crash path too. That prediction assumed the verify
+starts at the crash, and the README explains the difference.
+
+**Alternatives considered.**
+- Derive the settle period from the lease ("a crash always waits a lease anyway"): wrong for T5.
+- Keep looking until a timeout instead of exactly twice: it still needs a bound, which is the same setting
+  under another name, and every `[0, 0]` resubmit gets slower.
+- Have the mock bank never lag: the `[0, 1]` path would stay untested (the reviewer's reason for adding
+  `/control/history-lag`).
+
+**Why.** Verify can only be as good as the history it reads. Whether a history lags, and by how much, is
+a property of each deployment's bank, so it has to be configured and stated, not assumed.
+
+**Date.** 2026-11-14

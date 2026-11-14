@@ -244,14 +244,20 @@ curl "http://127.0.0.1:8080/jobs/<jobId>?tenant=tenant-a"
   another's job by id (another tenant's job is a 404, same as a missing one). Every port is bound to
   127.0.0.1.
 - A job ends `succeeded`, `business_outcome` (the bank refused: final, never retried), `failed`, or
-  `needs_human`. `outcome: "commit_uncertain"` means the Submit may have gone through: it is never
-  retried, and someone must check the bank's history for the `memoKey` (Day 2 automates this).
+  `needs_human`. ~~`outcome: "commit_uncertain"` means the Submit may have gone through: it is never
+  retried, and someone must check the bank's history for the `memoKey`.~~ **Since Step 9** a job whose
+  Submit may have gone through is **verified** in the bank's history by its `memoKey` (see "Day 2,
+  Step 9" below), and it ends `succeeded` / `already_done`, resubmitted, or `business_outcome`.
+  `needs_human` now means verify could not decide: `ambiguous` (2+ matches), `unreadable`,
+  `verify_unavailable` (the bank stayed down past the budget) or `verify_exhausted`. A job parked by
+  Steps 6–8 can be handed to verify with `npm run jobs -- reverify <jobId>`.
 - ~~**Day-1 limits, on purpose:** leases are taken but not heartbeated, and nothing recovers a dead
   worker's job yet.~~ **Since Step 8:** a 30 s lease with a 10 s heartbeat, the fenced commit intent,
   and recovery before every dequeue (see "Day 2, Step 8" below). A worker killed with SIGKILL (or OOM)
-  stops heartbeating; within lease + one poll another worker requeues its job (died before the intent)
-  or parks it `needs_human` / `commit_uncertain` (died after). `docker compose stop` is graceful: the
-  in-flight job gets 30 s, then is aborted and recorded.
+  stops heartbeating. Within lease + one poll, another worker requeues its job if it died before the
+  intent. If it died after, Step 8 parked the job `needs_human`; since Step 9 the recovering worker
+  verifies it. `docker compose stop` is graceful: the in-flight job gets 30 s, then is aborted and
+  recorded.
 
 Measured (evidence/fleet-day1-exit/check.txt, `RESULT: PASS`): 100 transfer jobs on 4 workers in
 102.6 s, all succeeded on the first attempt, exactly one ledger row per job, 0 duplicates, 0 lost.
@@ -266,7 +272,9 @@ module decides every verdict, for every harness:
 ```
 npm run oracle -- --drain-timed-out --out <dir>   # any time: jobs in Postgres vs GET /control/ledger
 npm run chaos -- --seed <n>                       # Compose fleet, seeded kills + a 45 s pause (D33)
-npm run crash-matrix                              # kill a worker at each of 16 transfer boundaries (D34)
+npm run crash-matrix                              # kill a worker at each of 16 transfer boundaries (D34),
+                                                  # plus 7 two-fault recovery scenarios (Step 9)
+npm run verify-scenarios -- --family lag|outage   # verify vs a lagging history / a 30 s bank outage (Step 9)
 ```
 
 - **Oracle verdicts:** DUPLICATE (2+ rows for a job, whatever its state), MISSING_COMMIT
@@ -312,6 +320,38 @@ against the real SQL (D39).
 Not done until Step 9: jobs that died after their intent wait for a human; verify will decide them from
 the bank's history. The zombie frozen between the intent and the click is the one case no client can
 close; Step 10 measures it and adds a pass that detects it (docs/plans/step-08.md sections 6 and 9a).
+
+### Day 2, Step 9: verify
+
+After a commit intent, a job is never retried blindly. Instead it is **verified**: someone searches the
+bank's own transfer history for the job's `memoKey` (lookup 1.2.0, which also reads the first match's
+Reference, D42).
+- **Who verifies:** the worker whose run may have committed does it at once (T5). If that worker died,
+  a recovering worker claims the job when its lease expires and verifies it (T6.4–T6.7, D45).
+- **The procedure** (D43): look up; on 0 matches, wait the **settle period** and look again.
+  - `[1]` or `[0, 1]`: the transfer happened → `succeeded` / `already_done`, `confirmationRef` = the
+    bank's row.
+  - `[0, 0]`: it did not happen → requeued for another attempt. This is the only retry after an intent.
+    If the bank refused after Submit, the refusal stands instead.
+  - 2+ matches, or a page that cannot be read → `needs_human` at once.
+  - **The bank unavailable is not ambiguous** (D44): the verify **defers** and resumes after a backoff
+    (5 s doubling, cap 60 s), for up to 10 minutes, before asking a human.
+- A verifier that keeps dying is escalated after 3 dead phases (`verify_exhausted`).
+- `npm run jobs -- reverify <jobId>` hands one parked job back to verify (D46).
+
+**Deployment requirement: `ROTE_VERIFY_SETTLE_MS` (default 5000) must exceed the bank's history
+visibility delay** (D47). If the bank shows a transfer in its history later than verify's second look,
+`[0, 0]` resubmits a transfer that happened. `evidence/settle-vs-history-lag/` shows it: an 8 s lag with
+a 5 s settle produced a duplicate when the verify started at once. The reconcile pass (Step 10) is the
+backstop. The other settings are `ROTE_VERIFY_DEFER_BACKOFF_SECONDS` (5) and
+`ROTE_VERIFY_DEFER_BUDGET_SECONDS` (600).
+
+| Judge | Step 8 | Step 9 |
+| --- | --- | --- |
+| Crash-point matrix (lease 5 s, heartbeat 2 s) | 16/16 against the interim (`needs_human` after the intent) | **23/23** (`evidence/crash-matrix/step-09/`): every after-intent point verified, `[0, 0]` → resubmitted or `[1]` → `already_done`; 7 two-fault scenarios (a worker dies inside recovery or verify), all 1 row |
+| Chaos (100 jobs, 4 workers, kills + a 45 s pause) | PASS, 1 job parked `needs_human` | **PASS** (`evidence/chaos/step-09-seed-14449393/`): 100 ok, 0 LOST, 0 duplicates, **0 `needs_human`**; 3 jobs killed after their intent verified `[1]` → `already_done`; 9 requeued; the frozen worker stopped by its heartbeat on waking |
+| History lag vs settle | – | **PASS** (`evidence/settle-vs-history-lag/`): `[0, 1]` rescued by the settle; a lag past lookup #2 → DUPLICATE, as the rule says |
+| A 30 s bank outage during verifies | – | **PASS** (`evidence/verify-bank-outage-30s/`): every verify deferred and completed afterwards; none escalated; 1 row per job |
 
 
 ## Saved demonstration runs

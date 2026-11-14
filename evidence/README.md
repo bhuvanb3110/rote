@@ -35,6 +35,12 @@ several runs — can't be told from a single `run.jsonl`.
 | [`crash-matrix/ci-linux-step-08/`](crash-matrix/ci-linux-step-08/) | The same matrix in CI on Linux (report-only job), on the Step 8 head. | `matrix.md`: **16/16**, `signal SIGKILL` at every point. |
 | [`chaos/step-08-seed-848183018/`](chaos/step-08-seed-848183018/) | Step 8: the same chaos harness, seed 848183018, 18 kills and a 45 s pause, against the 30 s lease, 10 s heartbeat, fenced intent and recovery. | `check.txt`: **ok=100, 0 LOST, 0 duplicates, `RESULT: PASS`**; 10 × T6.1, 1 × T6.3; the paused worker's heartbeat aborted it on waking (README traces it). |
 | [`step-08/`](step-08/) | Fleet Step 8: every full `npm test` log (raw, exit code and wall time) and the CI action-pin check. | `ci-action-pins.md`: 0 annotations after the pins (the Node 20 warning is gone). |
+| [`transfer-history-lookup-1.2.0/`](transfer-history-lookup-1.2.0/) | Step 9: `npm run evidence:transfer` for **lookup 1.2.0** (`firstMatchRef`, `BANK_UNAVAILABLE`, D42), the basis of its re-approval with the three override digests. | `check.txt` ends `RESULT: PASS` (26 checks): count and `firstMatchRef` = the ledger row on every tenant, 0 matches, 2 matches, a 60 s history lag hiding the row, the 503 page as `BANK_UNAVAILABLE` on every tenant. |
+| [`crash-matrix/step-09/`](crash-matrix/step-09/) | Step 9: the crash-point matrix against the Step 9 expectations, plus the 7 two-fault recovery scenarios (a worker dies at X, the recovering worker at Y). | `matrix.md`: **23/23**, `RESULT: PASS`, 1 row everywhere. After the intent every point is verified: `[0, 0]` → resubmitted (attempt 2) or `[1]` → `already_done` (attempt 1). The **Verify phases** column shows `crashed` then the decision for a killed verifier. |
+| [`settle-vs-history-lag/`](settle-vs-history-lag/) | Step 9, reviewer addition 4: the verify settle period vs a lagging bank history (`/control/history-lag`), after a crash and with the verify starting at once (T5). | `summary.md`: `RESULT: PASS`, six runs, each consistent with its own measured lookup timing. `[0, 1]` rescued by the settle; a lag past lookup #2 → `[0, 0]` → **2 rows, DUPLICATE** (expected; it demonstrates the rule). README: **the settle period must exceed the history lag** (D47), and why the plan's crash-path predictions shifted by a lease. |
+| [`verify-bank-outage-30s/`](verify-bank-outage-30s/) | Step 9, reviewer addition 5: the bank down for 30 s while four jobs killed after Submit / after the intent are verified. | `summary.md`: `RESULT: PASS`. Every job deferred 3 times (4 phases, past the dead-phase cap, which deferrals don't count) and was decided 13–21 s after the bank came back; none escalated; oracle `ok=4`. |
+| [`chaos/step-09-seed-14449393/`](chaos/step-09-seed-14449393/) | Step 9: the chaos harness, seed 14449393, 14 kills and a 45 s pause, against verify. | `check.txt`: **ok=100, 0 LOST, 0 duplicates, 0 `needs_human`, `RESULT: PASS`**; `T6.1 requeue x9`, `T6.4 verify x3` (all `already_done [1]`); the paused worker's heartbeat aborted it 0.18 s after waking. No kill landed between intent and click, so no resubmit this seed (README). |
+| [`step-09/`](step-09/) | Fleet Step 9: every full `npm test` log (raw, exit code and wall time) and the property tests' mutation check. | `mutation-check-property-tests.txt`: four planted bugs, each caught by the property tests, each reverted. |
 
 ## Day 2, Step 8: before / after
 
@@ -52,6 +58,26 @@ lines.
 `before-complete`; chaos: 1 of 100) instead of being verified against the bank's history; the
 recovery-internal crash points do not exist yet. Step 10: 20+ chaos seeds, the 30/10 matrix run, and the
 zombie-window measurement with the reconcile pass.
+
+## Day 2, Step 9: before / after
+
+The same judges, after Step 9 (verify: T5, the history lookup with settle-and-recheck, T7, deferral,
+recovery T6.4–T6.7). The matrix gained its `step-09` expectations and two-fault scenarios. Chaos gained
+its verify report lines and the "no `needs_human`" condition. Nothing else was retuned.
+
+| Judge | Before (Step 7) | Step 8 | After (Step 9) |
+| --- | --- | --- | --- |
+| Crash-point matrix | **1/16** (LOST at 15 points) | **16/16** against the interim: after-intent points `needs_human` | `crash-matrix/step-09/`: **23/23**: `before-submit` → verify `[0, 0]` → resubmitted, attempt 2; `after-submit` / `after-step-12` / `before-complete` → verify `[1]` → `already_done`, attempt 1; the 7 recovery-internal scenarios re-verified or requeued; 1 row in every scenario, none `needs_human` |
+| Chaos | **FAIL**: 39 LOST | **PASS**, 1 job parked `needs_human` | `chaos/step-09-seed-14449393/`: **PASS**, 100 ok, 0 LOST, 0 duplicates, **0 `needs_human`**: the 3 jobs killed after their intent were verified `[1]` → `already_done` |
+
+Step 9 adds two judges with no "before":
+- `settle-vs-history-lag/` (PASS). Its DUPLICATE runs are expected: they show what happens when the
+  settle period is shorter than the history lag (D47).
+- `verify-bank-outage-30s/` (PASS).
+
+**Still open after Step 9 (Step 10):** chaos at 20+ seeds; the matrix at the production 30/10; the
+zombie stall-after-intent duplicate, made loud by the reconcile pass (the only window verify cannot
+close); the crash tests required in CI.
 
 ## Provenance
 

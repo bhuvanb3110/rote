@@ -99,6 +99,56 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
+## Fleet Step 9: verify (2026-11-13/14)
+
+- **Migration `0003_verify.sql`** (forward-only): `job_verifications` gains the reason `resumed`, the
+  decisions `deferred`, `handed_off` and `illegal_transition`, and the rule "decided ⇔ ended". Tests that
+  list applied migrations name all three.
+- **The state machine** (`src/fleet/stateMachine.ts`):
+  - `jobOutcomeFor` sends every run that may have committed to `verifying` (T5) instead of `needs_human`.
+  - New pure functions: `classifyLookup` (count / unavailable / transient / unreadable) and
+    `verifyDecision`.
+  - `recoveryAction` gains T6.4 (claim an expired commit), T6.5 (re-claim a dead verifier's job), T6.6
+    (`verify_exhausted` after 3 dead phases) and T6.7 (resume a deferred or handed-off verify). **Step 8's
+    T6.3 is gone.**
+  - `src/fleet/model.ts` mirrors T5/T7/T8 and the claims; the model-vs-real test runs them.
+- **The worker:**
+  - `src/worker/verify.ts` runs one verify phase.
+  - `src/worker/verifySql.ts` holds T5, T7, T8, the cycle read and the reverify hand-off.
+  - `recover.ts` claims jobs to verify; the sweep stops at a claim.
+  - `loop.ts` runs T5, then the same worker's verify phase.
+  - New settings: `ROTE_VERIFY_SETTLE_MS` (5000; **must exceed the bank's history visibility delay**,
+    D47), `ROTE_VERIFY_DEFER_BACKOFF_SECONDS` (5, doubling to 60) and
+    `ROTE_VERIFY_DEFER_BUDGET_SECONDS` (600).
+  - A 0-row fenced write whose token did not move is `illegal_transition`, a bug (D41). The counters
+    `illegal_transitions_total` and `verify_decisions_total` live in process (`src/worker/metrics.ts`)
+    until Day 3 exports them.
+- **Lookup 1.2.0** (D42): `firstMatchRef`, and the 503 page is the known outcome `BANK_UNAVAILABLE`.
+  Re-approved with the three tenant override digests (`committedApprovals.test.ts` checks them). The mock
+  bank shows an empty filtered history as one "No matching transfers." row and gains
+  `/control/history-lag/:ms`.
+- **CLI:** `npm run jobs -- reverify <jobId> [--tenant] [--by]` (D46). Jobs parked `needs_human` /
+  `commit_uncertain` by Steps 6–8 stay parked until someone runs it.
+- **What a stuck job looks like now:** nothing waits for a human after a crash. An expired `committing`
+  job is verified within lease + one poll + about 7 s (two lookups and the settle). `needs_human` means
+  verify could not decide (`ambiguous`, `unreadable`, `verify_unavailable`, `verify_exhausted`). During a
+  bank outage a job sits in `verifying` with its lease set to the backoff and its tenant slot held; it is
+  not stuck.
+- **Crash matrix** (D40 amendment): `--expect step-09` is the default. `--points` takes scenario names
+  (`X>Y` for the 7 two-fault ones). The shared pieces are in `scripts/lib/harness.ts`. The CI job runs
+  `--expect step-09` with a 60 s drain cap (still report-only). `evidence/crash-matrix/step-09/`: 23/23.
+- **`scripts/verify-scenarios.ts`** (`npm run verify-scenarios`): `--family lag`
+  (`evidence/settle-vs-history-lag/`) and `--family outage` (`evidence/verify-bank-outage-30s/`). Like the
+  matrix, it needs port 4100 free and Postgres up.
+- **Chaos** now saves `verifications.json`, lists the verify phases' decisions, and fails if any job is
+  left `needs_human` (no bank faults are injected, so every job is decidable).
+- **The suite:** 58 files, 571 tests, usually 162–176 s wall locally. Two of Step 9's nine full runs took
+  243–246 s (the verify commit's, and the first of the final three). Their cumulative test time was
+  591–682 s against 485–514 s, spread across all tests: machine contention, not one slow test. The
+  3-minute line at which the slow integration tests move to a `slow` project (step-09 plan section 2) is
+  therefore crossed on a busy machine. The move is a reviewed change, proposed in
+  `docs/plans/step-10.md` (open question 6).
+
 ## Fleet Step 8: leases that mean something (2026-11-11/12)
 
 - **Migration `0002_day2.sql`** (forward-only): the partial index `jobs_lease_expiry`,

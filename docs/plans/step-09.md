@@ -195,3 +195,67 @@ at 5 / 2 timing plus one seeded chaos run; update the before/after table in `evi
   bank-down scenario, the matrix at production 30 / 10 timing, crash tests required in CI, the chaos
   snapshot re-read fix, `scripts/mutation-check`, README "Fleet (Day 2)", the Day-2 exit criteria from
   the brief, and what must be true before the PR from `fleet/day-1` to `main` opens.
+
+## Built (2026-11-13/14)
+
+Built in order: Part A (A1), then section 5's commits. Commits 2–5 landed as one, because each alone left
+the suite red: `jobOutcomeFor`'s `verifying` needs T5 in the worker, and T5 needs 0003 and the recovery
+claims. The reviewer additions' evidence followed as its own commit. Session note: the build was
+interrupted by a usage limit after commit 2–5 with commit 6 uncommitted in the working tree; it was
+resumed, checked (typecheck, `npm test` 571/571) and committed, not redone.
+
+| Commit | What |
+| --- | --- |
+| `9f1f873` | A1: `illegal_transition` (D41) |
+| `2935370` | 1: lookup 1.2.0, approvals with the three override digests, history lag in the mock bank (D42) |
+| `7337661` | 2–5: `verifyDecision`, T5/T7/T8, recovery T6.4–T6.7, `rote jobs reverify`, migration 0003, model + property + model-vs-real + DB + integration tests (D43–D46) |
+| `efcd7c5` | 6: matrix `step-09` expectations + the 7 two-fault scenarios; run: 23/23 |
+| `5416f60` | reviewer additions 4–5: `scripts/verify-scenarios.ts`; settle vs history lag, the 30 s outage (D47) |
+| `5aeec8a` | 7: chaos run, seed 14449393 |
+| (docs) | 8: D41–D47, the D40 amendment, REPO_NOTES, README, evidence index, this section; the full suite ×3 |
+
+Decisions D41–D47 and an amendment to D40. Evidence: `evidence/step-09/` (every `npm test` log and the
+mutation check), `evidence/transfer-history-lookup-1.2.0/`, `evidence/crash-matrix/step-09/`,
+`evidence/settle-vs-history-lag/`, `evidence/verify-bank-outage-30s/`, and
+`evidence/chaos/step-09-seed-14449393/`.
+
+Where the build went beyond, or differed from, the text above:
+
+- **"Unreadable" is four answers, not one** (reviewer decision 5, D44). `classifyLookup` returns count /
+  unavailable / transient / unreadable, and the lookup itself recognizes the bank's 503 page
+  (`BANK_UNAVAILABLE`), so verify can tell "down" from "garbled".
+- **T8, the deferral** (the SQL the reviewer asked for). The job stays `verifying`; `lease_owner` stays
+  the deferring worker (`jobs_active_has_owner`); the token is bumped, so that worker holds nothing; and
+  `lease_expires_at = now() + backoff`. When the lease expires, recovery resumes the job (**T6.7**, a
+  fourth claim not in the plan) as a phase with reason `resumed`. The backoff is 5 s doubling to 60 s and
+  the budget 600 s, both configurable; deferrals never count toward the cap. Migration **0003_verify.sql**
+  adds the values (`resumed`, `deferred`, `handed_off`, `illegal_transition`) and "decided ⇔ ended".
+- **The 3-phase cap counts dead phases only** (crashed, lease lost, illegal transition), per verify
+  *cycle* (the phases since a `commit_uncertain` or `lease_expired_in_committing` one).
+- **`rote jobs reverify`** hands the job to recovery instead of verifying in the CLI. It writes
+  `verifying` with a lease already expired and a `handed_off` phase, and the next worker resumes it
+  (T6.7). It accepts every "could not tell" outcome (`commit_uncertain`, `unreadable`,
+  `verify_unavailable`, `verify_exhausted`), never `ambiguous`.
+- **`illegal_transition` (A1) applies to T5, T7 and T8 too.**
+- **The mock bank's empty filtered history is one "No matching transfers." row**, so lookup 1.2.0's step-10
+  always has a first row to read.
+- **Reviewer addition 4's predicted outcomes held only when the verify starts at once.** With T5 (the bank
+  writes, then answers 503), lag 3 s gave `[0, 1]` and lag 8 s gave `[0, 0]` → DUPLICATE, as predicted.
+  With "a crash right after Submit", the verify starts only when the lease expires (~6 s after the write
+  at the matrix's 5 s lease), so lag 3 s gave `[1]` and lag 8 s `[0, 1]`, one row each. A 30 s lag gave the
+  crash-path duplicate. The evidence runs all six, each judged by a script against its own measured lookup
+  timing. The rule stands as the reviewer stated it: settle ≥ lag is sufficient on every path (D47).
+- **The 30 s outage is a saved evidence run** (`npm run verify-scenarios -- --family outage`). The 8 s
+  version runs in `npm test`.
+- **The crash matrix runs scenarios** (`X>Y`). Its harness pieces moved to `scripts/lib/harness.ts`. The
+  CI job runs `--expect step-09` with a 60 s drain cap, still report-only.
+- **Chaos now fails on any `needs_human`** and reports verify phases. The seed's 14 kills produced 3
+  verifies, all `already_done`. None landed between an intent and its click, so this seed shows no
+  resubmit. The seed was not re-drawn, and the matrix and verify scenarios cover that path.
+- **Found while planning Step 10:** a failure before the intent is requeued for immediate pickup with no
+  backoff, so a 30 s bank outage burns all 3 attempts and fails the job (safe, 0 rows, but not the brief's
+  "retries back off"). Step 10 designs it.
+- **Suite time:** 58 files, 571 tests, usually 162–176 s wall locally. Two of nine runs took 243–246 s
+  (the verify commit's, and final run 1), with the extra spread across all tests (contention). That crosses
+  section 2's 3-minute line. The `slow`-project move is a reviewed change, so it is proposed in step-10
+  (open question 6), not made here.
