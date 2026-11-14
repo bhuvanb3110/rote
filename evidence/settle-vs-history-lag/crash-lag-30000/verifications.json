@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "job_id": "5bf0a255-9b01-4ff4-bcc7-e8bd59941485",
+    "fencing_token": 2,
+    "worker_id": "clean-crash-lag-30000",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-14T07:26:02.238Z",
+    "ended_at": "2026-11-14T07:26:09.244Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  }
+]

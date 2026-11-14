@@ -30,7 +30,7 @@
 // Step 7: red. Step 8 (--expect step-08): before the intent -> requeued; after it -> needs_human (T6.3).
 // Step 9 (--expect step-09, the default): after the intent -> VERIFIED ([0, 0] resubmitted, attempt 2;
 // [1] already_done, attempt 1), always exactly 1 row; plus the 7 recovery-internal scenarios.
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resetLedger } from "../mock-app/data.js";
 import { findCapability } from "../src/catalog/registry.js";
@@ -39,7 +39,7 @@ import { enqueue } from "../src/queue/index.js";
 import { createTestSchema } from "../src/queue/testDb.js";
 import { EXPECTATION_PHASES, scenariosFor, judgePoint, type CrashScenario, type ExpectationPhase } from "../src/chaos/crashExpected.js";
 import { argValue, parseDuration } from "./lib/compose.js";
-import { BANK, closeBank, describeExit, listenBank, startWorker, TERMINAL, within, workerEnv, type Child } from "./lib/harness.js";
+import { BANK, closeBank, listenBank, runFaultWorker, startWorker, TERMINAL, within, workerEnv } from "./lib/harness.js";
 
 const DRAIN_TIMEOUT_MS = argValue("drain-timeout") ? parseDuration(argValue("drain-timeout")!) : 90_000;
 const LEASE_SECONDS = Number(argValue("lease-seconds") ?? 30);
@@ -78,14 +78,7 @@ interface Row {
 }
 
 /** Runs a fault worker to its death at `point`; returns whether it fired there and how it exited. */
-async function faultWorker(base: Record<string, string>, point: string, logFile: string): Promise<{ fired: boolean; exit: string }> {
-  const child: Child = startWorker({ ...base, ROTE_FAULT: point, ROTE_FAULT_ENABLE: "1", ROTE_WORKER_ID: `fault-${point}` }, logFile);
-  const first = await within(child.exited, FAULT_WORKER_TIMEOUT_MS);
-  if (first === "timeout") child.kill();
-  const end = first === "timeout" ? await child.exited : first;
-  const text = await readFile(logFile, "utf8");
-  return { fired: text.includes(`ROTE_FAULT firing at ${point}`), exit: first === "timeout" ? describeExit("timeout", FAULT_WORKER_TIMEOUT_MS) : describeExit(end, 0) };
-}
+const faultWorker = (base: Record<string, string>, point: string, logFile: string) => runFaultWorker(base, point, logFile, FAULT_WORKER_TIMEOUT_MS);
 
 async function runScenario(scenario: CrashScenario): Promise<{ row: Row; text: string }> {
   const dir = path.join(OUT, scenario.name.replace(">", "__"));

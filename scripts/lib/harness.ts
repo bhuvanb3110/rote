@@ -5,6 +5,7 @@
 // path as in Docker.
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import app from "../../mock-app/app.js";
 import { testDatabaseUrl, type TestSchema } from "../../src/queue/testDb.js";
@@ -79,4 +80,23 @@ export function workerEnv(db: TestSchema, extra: Record<string, string>): Record
 export function describeExit(end: { code: number | null; signal: NodeJS.Signals | null } | "timeout", timeoutMs: number): string {
   if (end === "timeout") return `still alive after ${timeoutMs} ms (killed)`;
   return end.signal ? `signal ${end.signal}` : `exit ${end.code}`;
+}
+
+/**
+ * Runs a fault worker (ROTE_FAULT=<point>, ROTE_FAULT_ENABLE=1) until it SIGKILLs itself at the point, or
+ * kills it after `timeoutMs`. Returns whether it fired THERE (its log line) and how it exited.
+ */
+export async function runFaultWorker(
+  base: Record<string, string>,
+  point: string,
+  logFile: string,
+  timeoutMs: number,
+  workerId = `fault-${point}`,
+): Promise<{ fired: boolean; exit: string }> {
+  const child = startWorker({ ...base, ROTE_FAULT: point, ROTE_FAULT_ENABLE: "1", ROTE_WORKER_ID: workerId }, logFile);
+  const first = await within(child.exited, timeoutMs);
+  if (first === "timeout") child.kill();
+  const end = first === "timeout" ? await child.exited : first;
+  const text = await readFile(logFile, "utf8");
+  return { fired: text.includes(`ROTE_FAULT firing at ${point}`), exit: first === "timeout" ? describeExit("timeout", timeoutMs) : describeExit(end, 0) };
 }

@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "job_id": "fafcfe85-bfc1-4aa2-99ae-801cf5a0fe76",
+    "attempt": 1,
+    "worker_id": "worker-t5-lag-15000",
+    "fencing_token": 1,
+    "started_at": "2026-11-14T07:26:32.332Z",
+    "ended_at": "2026-11-14T07:26:34.123Z",
+    "outcome": "failure",
+    "commit_uncertain": true,
+    "trace_id": "3b017857e6a96167f2a2bfcc9ac9d30f",
+    "error": "commit uncertain (not retried blindly): Attempted the irreversible step, then the run ended in failure (unexpected-state) at step-12: Could not resolve a live locator for \"Transfer reference value\" (only the visual fallback matched, which is a documented stub — no coordinate clicking implemented yet).. Verifying in the bank's history by memo_key (T5).",
+    "commit_intent_at": "2026-11-14T07:26:33.705Z"
+  },
+  {
+    "id": 2,
+    "job_id": "fafcfe85-bfc1-4aa2-99ae-801cf5a0fe76",
+    "attempt": 2,
+    "worker_id": "worker-t5-lag-15000",
+    "fencing_token": 3,
+    "started_at": "2026-11-14T07:26:42.508Z",
+    "ended_at": "2026-11-14T07:26:44.031Z",
+    "outcome": "success",
+    "commit_uncertain": false,
+    "trace_id": "3b017857e6a96167f2a2bfcc9ac9d30f",
+    "error": null,
+    "commit_intent_at": "2026-11-14T07:26:43.751Z"
+  }
+]

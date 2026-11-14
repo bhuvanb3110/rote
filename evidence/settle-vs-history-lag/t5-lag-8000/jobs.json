@@ -1,0 +1,34 @@
+[
+  {
+    "id": "20e0caab-e070-48ae-b031-c56ce47ad3f3",
+    "idempotency_key": "verify-t5-lag-8000",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 2,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 3,
+    "trace_id": "fec86a966038e16376d3287c78062535",
+    "commit_intent_at": "2026-11-14T07:26:30.693Z",
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000002"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/settle-vs-history-lag/t5-lag-8000/worker-evidence/transfer-2026-11-14T07-26-29-756Z-b994b761/run.jsonl"
+    },
+    "memo_key": "rote-20e0caab-e070-48ae-b031-c56ce47ad3f3",
+    "created_at": "2026-11-14T07:26:20.421Z",
+    "updated_at": "2026-11-14T07:26:30.934Z"
+  }
+]
