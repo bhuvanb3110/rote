@@ -314,3 +314,75 @@ the fleet when not in use (8 GB laptop).
    change. The suite usually runs 162–176 s, two runs took 243–246 s, and Step 10 adds about 60 s. Move the
    slow files as the first commit of Step 10 (recommended now that 3 minutes has been crossed twice), or with
    commit 4?
+
+## Reviewer decisions (2026-11-14)
+
+The reviewer **approved** this plan with the decisions below. Where they differ from the sections above,
+these win; everything else in this file stands.
+
+The reviewer re-ran Step 9 on Postgres 16: 570/571, only the version-17 assertion failing, as expected. The
+corrected history-lag results (step-09 "Built") are **accepted** and close step-09 reviewer addition 4: a
+crashed worker's job is verified only after its lease expires, so the crash path's lookups start later than
+the reviewer's prediction assumed.
+
+### The split: Step 10a, then Step 10b
+
+Step 10 is built in two halves, each in its own session.
+
+- **10a** (this half): section 12's commits 1–5, plus decisions 3 and 5 below:
+  - the `slow` vitest project (the first code commit, decision 6);
+  - 0004 + requeue backoff: pure, SQL, model, property, model-vs-real, DB and integration tests;
+  - the reconcile pass R1/R2, the `settled` field (decision 3) and `rote reconcile --since` (decision 5);
+  - `stall-after-intent` → `evidence/zombie-window-limit/`, showing the duplicate AND its detection
+    (`duplicate_suspected`, `duplicates_detected_total = 1`);
+  - `crashSubmit.db.test.ts` in `npm test`;
+  - `scripts/mutation-check` and its CI job;
+  - `crash-matrix` made required in CI.
+
+  At the end of 10a: run the crash matrix (5 / 2) and `verify-scenarios` on the 10a code. Then **stop**: no
+  chaos changes. The handoff report adds "What 10b must do", so the next session can pick it up from this
+  file.
+- **10b**: section 12's commits 6–9 (the chaos snapshot fix, `--bank-fault`, `chaos-seeds.ts` with the
+  batch runner proven on 2 seeds, the two bank-fault runs, the matrix at 30 / 10, the docs and the PR
+  checklist), with decisions 1, 7 and 8.
+
+### Open questions answered
+
+1. **Chaos size: 500 jobs per seed, 20 seeds.** Claude Code builds the batch runner and proves it on 2 seeds
+   (in 10b). The **builder** runs the 20-seed batch himself, overnight, with ONE command (for example
+   `npm run chaos-seeds -- --seeds 20 --jobs 500`). The runner must:
+   - run unattended;
+   - save each seed's evidence as soon as that seed finishes;
+   - resume after an interruption, skipping the seeds already finished;
+   - write the tally at the end;
+   - never run the test suite;
+   - stop the fleet when done.
+2. **Retry backoff: option B** (`not_before`, 10 s × 3^(attempt−1) with jitter): approved. Long outages are
+   Day 4's circuit breaker.
+3. **Reconcile moves `succeeded` → `needs_human`** (`duplicate_suspected` / `reconcile_unreadable`):
+   approved. **Added:** `GET /jobs/:id` returns `settled: boolean`, true when the job is terminal and either
+   no reconcile is due or it was reconciled. The README documents that a succeeded job can still change to
+   `needs_human` until it is settled.
+4. **`stall-after-intent` with the heartbeat suspended:** approved as the evidence. No `SIGSTOP` variant.
+5. **Reconcile's own limit:** state it as the honest limit, **and** add a batch command
+   `rote reconcile --since <duration>` (end-of-day reconciliation, as banks do). It re-runs the lookup for
+   every job in the window that succeeded after a resubmit, regardless of `reconciled_at`, and flags 2+
+   matches exactly like R2. Read-only toward the bank. Tested. A D-entry.
+6. **The `slow` test project is the FIRST code commit.** It still runs in `npm test` and in CI.
+
+### Reviewer additions
+
+7. **Chaos expectations per scenario family.** The standard family fails on ANY job left for a human. The
+   zombie and bank-fault families state their expected escalations and outcomes explicitly, and the judge
+   checks exactly those.
+8. **The 20-seed tally counts each recovery kind** (requeued, already_done, resubmitted, deferred,
+   escalated, duplicate_suspected) across all seeds, so it is visible whether chaos exercised the resubmit
+   path at all. If it did not, the tally says so; the matrix and `verify-scenarios` cover that path.
+
+### Also required
+
+- Memory: 8 GB laptop. Never run the full suite while the fleet is up; stop the fleet containers when not
+  in use.
+- `npm test` before every commit; never commit or push on red. The full suite 3 times at the end of each
+  half, logs unfiltered. Push, then check CI with `gh` and report it; if it is red, fix it in that half.
+- Each half ends with the usual handoff report (10a adds "What 10b must do").
