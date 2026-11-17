@@ -481,3 +481,46 @@ and D48–D54.
 
 Things 10a leaves for 10b or the reviewer: the open questions in the 10a handoff (lookup 1.3.0 for every
 match's reference; reconciling `failed` / `business_outcome` jobs after a resubmit; D31's cap of 3).
+
+## Reviewer decisions on 10a (2026-11-14)
+
+The reviewer re-ran 10a on Postgres 16: 626/627, only the version-17 assertion failing, as expected. **10a is
+approved.** Where these decisions differ from "What 10b must do" above, these win.
+
+1. **Lookup 1.3.0** (a lookup that reads every matching reference) is **deferred to the Day-4 hardening
+   step**. Recorded under "Follow-ups" below.
+2. **Reconcile covers EVERY terminal job that went through a resubmit**, not only succeeded ones: a zombie's
+   late click can land on a job that ended `failed` or `business_outcome` after a resubmit.
+   - Mark `reconcile_after` on any terminal transition of a job with a `resubmitted` verification.
+   - The expected match count is **1 for `succeeded`** and **0 for `failed` or `business_outcome`**.
+   - Any other count → `needs_human`, with outcome **`duplicate_suspected`** (succeeded, 2+) or
+     **`unrecorded_commit_suspected`** (failed / business_outcome, 1+), plus the metric hook and the evidence.
+   - The same in `rote reconcile --since`.
+   - Update the pure decision, the model, the property tests and the model-vs-real test.
+   - Add a deterministic test: a resubmitted job that ends `failed`, then a zombie row → flagged.
+   - A D-entry (amending D50 / D51).
+3. **Branch protection**, at the end of 10b, with `gh`: protect `main` by requiring the status checks `test`,
+   `docker`, `crash-matrix` and `mutation-check`, with no force-push and no deletion. Show the exact `gh`
+   command before running it. Do **not** protect `fleet/day-1`.
+4. **The browser cap stays at 3** (D31).
+
+10b's scope is "What 10b must do" above, with these decisions: the chaos snapshot re-read fix; `--bank-fault`
+and its two runs (bank slow, bank down for 30 s), requiring 0 duplicates, 0 lost and 0 failed jobs; per-family
+expectations (decision 7); draining until every job is settled; `scripts/chaos-seeds.ts` with decision 1's
+requirements (unattended, saves each seed as it finishes, resumable, writes the tally counting each recovery
+kind (decision 8), never runs the test suite, stops the fleet when done), proven on 2 seeds of 500 jobs that
+are committed as `evidence/chaos/day2-exit/` seeds 1–2; the crash matrix at production 30 / 10 timing, plus a
+re-run at 5 / 2 on the final code; the README "Fleet (Day 2)" case study (the problem; the design, with the
+state machine; the results, with numbers linked to evidence; the honest limits: the zombie window made loud,
+settle ≥ history lag, a single machine); and section 10's PR checklist, filled in with what is done and what
+waits for the 20-seed run. At the end, the builder gets the exact command for the 20-seed overnight run, how
+long it should take, how to resume it, and where its tally will be.
+
+Memory: an 8 GB laptop with as little as 0.65 GB free during runs. Never run the full suite while the fleet is
+up; stop the fleet containers when not in use; run the chaos seeds with nothing else running.
+
+### Follow-ups
+
+- **Lookup 1.3.0** (read every matching transfer's Reference, so a `duplicate_suspected` job carries both
+  references in a field, not only in the reconcile's screenshot): the Day-4 hardening step (decision 1). It
+  is a capability change and needs re-approval with the override digests.
