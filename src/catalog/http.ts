@@ -91,9 +91,10 @@ export function jobView(job: JobRow) {
     /** A queued job that failed an attempt is retried no earlier than this (the requeue backoff, D49). */
     notBefore: job.not_before?.toISOString() ?? null,
     /**
-     * Terminal AND no reconcile due (D50, step-10 reviewer decision 3). A `succeeded` job that is not yet
-     * settled succeeded after a resubmit and will be re-read in the bank's history; until then it can still
-     * change to needs_human / duplicate_suspected.
+     * Terminal AND no reconcile due (D50, step-10 reviewer decision 3; D55). A succeeded, failed or
+     * business_outcome job that is not yet settled ended after a [0, 0] verify (e.g. a resubmit) and will be
+     * re-read in the bank's history; until then it can still change to needs_human (duplicate_suspected /
+     * unrecorded_commit_suspected / reconcile_unreadable).
      */
     settled: jobSettled(job),
     createdAt: job.created_at.toISOString(),

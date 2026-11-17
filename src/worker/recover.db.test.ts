@@ -245,6 +245,10 @@ describe("T6: what it never touches, and when it stops", () => {
       expect(sql).toMatch(/AND lease_expires_at < now\(\)/);
     }
     expect(CLAIM_TO_VERIFY_SQL).toMatch(/lease_expires_at = now\(\) \+ make_interval\(secs => \$5\)/);
+    // D55: T6.2 (failed) marks a job a verify once read [0, 0] on for the reconcile pass, by the database clock.
+    expect(RECOVER_JOB_SQL).toMatch(/reconcile_after = CASE WHEN \$4 IN \('succeeded', 'failed', 'business_outcome'\) AND EXISTS/);
+    expect(RECOVER_JOB_SQL).toMatch(/v\.decision IN \('resubmitted', 'exhausted', 'not_committed_final'\)/);
+    expect(RECOVER_JOB_SQL).toMatch(/THEN now\(\) \+ make_interval\(secs => \$7\)/);
   });
 });
 

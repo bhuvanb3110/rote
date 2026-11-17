@@ -199,12 +199,13 @@ async function main(): Promise<void> {
     runJob: (job, options) => runJob({ credentials, evidenceBaseDir, fault }, job, options),
     // Step 9: a job that may have committed is verified in the bank's history (T5/T6.4-T6.7 -> T7/T8).
     verify: (claim, controller, hardSignal) => runVerifyPhase(verifyCtx, claim, controller, hardSignal),
-    // Step 10: a job that succeeded after a resubmit is re-read once it is due (R1 -> lookup -> R2, D50).
+    // Step 10: a terminal job a verify once read [0, 0] on is re-read once it is due (R1 -> lookup -> R2,
+    // D50, D55).
     reconcile: (claim, controller, hardSignal) => runReconcilePhase(verifyCtx, claim, controller, hardSignal),
     // Seam 4: every loop iteration recovers up to 10 expired leases before it dequeues (T6, D38); a
     // claim to verify (T6.4/T6.5/T6.7) is the iteration's work; otherwise at most one due reconcile is
-    // (R1, D50).
-    beforeDequeue: createRecoverySweep({ pool, workerId, leaseSeconds, log, fault, reconcile: true }),
+    // (R1, D50). T6.2 marks a resubmitted job it fails for the reconcile pass (D55).
+    beforeDequeue: createRecoverySweep({ pool, workerId, leaseSeconds, log, fault, reconcile: true, reconcileDueSeconds: reconcileDue }),
     onTick: healthFile
       ? () => {
           writeFile(healthFile, new Date().toISOString()).catch(() => undefined);

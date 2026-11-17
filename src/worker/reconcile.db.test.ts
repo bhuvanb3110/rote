@@ -4,13 +4,14 @@
 // lookup against the real bank is in reconcileBank.db.test.ts.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Capability, ReplayResult } from "../artifact/index.js";
-import { jobOutcomeFor, jobSettled, type LookupEnd } from "../fleet/stateMachine.js";
+import { jobOutcomeFor, jobSettled, type JobOutcome, type LookupEnd, type VerifyDecision } from "../fleet/stateMachine.js";
 import { dequeue, enqueue, JobRowSchema, type JobRow, type Pool } from "../queue/index.js";
 import { createTestSchema, resetQueueTables, type TestSchema } from "../queue/testDb.js";
 import { createRedactor, loadTenantCredentials } from "./credentials.js";
 import { completeJob } from "./complete.js";
 import { writeCommitIntent } from "./intent.js";
 import { InMemoryCounters } from "./metrics.js";
+import { recoverExpired } from "./recover.js";
 import {
   claimReconcile,
   claimReconcileJob,
@@ -87,6 +88,37 @@ async function succeededAfterResubmit(ref = "TXN-000002"): Promise<JobRow> {
   return row(a2.id);
 }
 
+/** A terminal outcome T4 writes from `running` (no commit intent in this attempt). */
+const terminal = (state: "failed" | "business_outcome"): JobOutcome => ({
+  state,
+  outcome: state === "failed" ? "failure" : "business_outcome",
+  error: state === "failed" ? "attempt 2 failed before anything irreversible" : "business_outcome NO_SUCH_RECIPIENT",
+  result: null,
+  attemptOutcome: state === "failed" ? "failure" : "business_outcome",
+  commitUncertain: false,
+});
+
+/** ... or attempt 2 ended failed / business_outcome (T4) after the resubmit (D55): marked too. */
+async function endedAfterResubmit(state: "failed" | "business_outcome" = "failed"): Promise<JobRow> {
+  const a2 = await resubmittedAndLeased();
+  expect(await completeJob(pool, { jobId: a2.id, fencingToken: a2.fencing_token, workerId: "w2", outcome: terminal(state), reconcileDueSeconds: DUE })).toEqual({ recorded: true });
+  return row(a2.id);
+}
+
+/** Attempt 1 intent + commit-uncertain -> T5, then the verify's own decision (T7). */
+async function verifiedOnce(decision: Exclude<VerifyDecision, { decision: "deferred" | "resubmitted" | "already_done" }>, maxAttempts = 1): Promise<JobRow> {
+  const { job } = await enqueue(pool, { capability: CAP, tenantId: "tenant-a", idempotencyKey: `v-${Math.random()}`, params: { memberId: "1" }, maxAttempts });
+  const a1 = (await dequeue(pool, { workerId: "w1", leaseSeconds: LEASE }))!;
+  await writeCommitIntent(pool, { jobId: a1.id, fencingToken: a1.fencing_token, workerId: "w1", leaseSeconds: LEASE });
+  const outcome = jobOutcomeFor({ kind: "result", result: cuFailure }, { attempt: 1, maxAttempts, irreversibleStarted: true });
+  const moved = await completeIntoVerify(pool, { jobId: a1.id, fencingToken: a1.fencing_token, workerId: "w1", leaseSeconds: LEASE, outcome });
+  if (!moved.recorded) throw new Error(moved.detail);
+  const lookups = decision.decision === "escalated" ? [2] : [0, 0];
+  const t7 = await writeVerifyResult(pool, { jobId: job.id, fencingToken: moved.fencingToken, workerId: "w1", lookups, evidenceRefs: lookups.map(() => "e"), decision, result: null, reconcileDueSeconds: DUE });
+  if (!t7.recorded) throw new Error(t7.detail);
+  return row(job.id);
+}
+
 const count = (n: number, ref = n > 0 ? "TXN-000001" : "No matching transfers."): LookupEnd => ({
   kind: "result",
   result: { status: "success", outputs: { matchingCount: String(n), firstMatchRef: ref }, evidenceRef: `evidence://fake-${n}` },
@@ -121,7 +153,7 @@ function ctx(script: LookupEnd[], over: Partial<VerifyContext> = {}): VerifyCont
   };
 }
 
-describe("marking (T4 / T7): only a job that succeeded AFTER A RESUBMIT gets reconcile_after = now() + lease + settle + margin", () => {
+describe("marking (T4 / T6.2 / T7): a job that turns terminal after a [0, 0] verify gets reconcile_after = now() + lease + settle + margin (D50, D55)", () => {
   it("T4 succeeded after a resubmit: reconcile_after ~60 s out (database clock), reconciled_at NULL, not settled", async () => {
     const j = await succeededAfterResubmit();
     expect(j).toMatchObject({ state: "succeeded", attempt: 2, reconciled_at: null });
@@ -140,11 +172,61 @@ describe("marking (T4 / T7): only a job that succeeded AFTER A RESUBMIT gets rec
     expect(jobSettled(j)).toBe(true);
   });
 
-  it("T4 to anything but succeeded after a resubmit (a failure): no reconcile", async () => {
+  it("T4 requeue after a resubmit (not terminal): no reconcile", async () => {
     const a2 = await resubmittedAndLeased();
     const outcome = jobOutcomeFor({ kind: "result", result: { ...cuFailure, commitUncertain: undefined } as ReplayResult }, { attempt: 2, maxAttempts: 3, irreversibleStarted: false });
     await completeJob(pool, { jobId: a2.id, fencingToken: a2.fencing_token, workerId: "w2", outcome, reconcileDueSeconds: DUE });
     expect(await row(a2.id)).toMatchObject({ state: "queued", reconcile_after: null });
+  });
+
+  it("D55: T4 FAILED or BUSINESS_OUTCOME after a resubmit: marked like a success (a zombie's late click would be an unrecorded commit); not settled", async () => {
+    for (const state of ["failed", "business_outcome"] as const) {
+      const j = await endedAfterResubmit(state);
+      expect(j, state).toMatchObject({ state, attempt: 2, reconciled_at: null });
+      expect(await dueIn(j.id)).toBeGreaterThan(DUE - 2);
+      expect(jobSettled(j)).toBe(false);
+    }
+  });
+
+  it("D55: T4 failed with no [0, 0] verify ever (a plain failure on the last attempt): no reconcile, settled", async () => {
+    await enqueue(pool, { capability: CAP, tenantId: "tenant-a", idempotencyKey: "plain-fail", params: { memberId: "1" }, maxAttempts: 1 });
+    const a1 = (await dequeue(pool, { workerId: "w1", leaseSeconds: LEASE }))!;
+    await completeJob(pool, { jobId: a1.id, fencingToken: a1.fencing_token, workerId: "w1", outcome: terminal("failed"), reconcileDueSeconds: DUE });
+    const j = await row(a1.id);
+    expect(j).toMatchObject({ state: "failed", reconcile_after: null });
+    expect(jobSettled(j)).toBe(true);
+  });
+
+  it("D55: T6.2 (the last attempt's worker died before its intent) after a resubmit: failed AND marked", async () => {
+    const { job } = await enqueue(pool, { capability: CAP, tenantId: "tenant-a", idempotencyKey: "t62", params: { memberId: "1" }, maxAttempts: 2 });
+    const a1 = (await dequeue(pool, { workerId: "w1", leaseSeconds: LEASE }))!;
+    await writeCommitIntent(pool, { jobId: a1.id, fencingToken: a1.fencing_token, workerId: "w1", leaseSeconds: LEASE });
+    const moved = await completeIntoVerify(pool, {
+      jobId: a1.id,
+      fencingToken: a1.fencing_token,
+      workerId: "w1",
+      leaseSeconds: LEASE,
+      outcome: jobOutcomeFor({ kind: "result", result: cuFailure }, { attempt: 1, maxAttempts: 2, irreversibleStarted: true }),
+    });
+    if (!moved.recorded) throw new Error(moved.detail);
+    await writeVerifyResult(pool, { jobId: job.id, fencingToken: moved.fencingToken, workerId: "w1", lookups: [0, 0], evidenceRefs: ["e", "e"], decision: { decision: "resubmitted", to: "queued", outcome: null, error: "r" }, result: null, reconcileDueSeconds: DUE });
+    await dequeue(pool, { workerId: "dead", leaseSeconds: LEASE }); // attempt 2/2, then the worker dies
+    await pool.query("UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", [job.id]);
+    const { recovered } = await recoverExpired(pool, { workerId: "rescuer", leaseSeconds: LEASE, reconcileDueSeconds: DUE });
+    expect(recovered.map((r) => r.action.label)).toEqual(["T6.2"]);
+    expect(await row(job.id)).toMatchObject({ state: "failed", outcome: "lease_expired", reconciled_at: null });
+    expect(await dueIn(job.id)).toBeGreaterThan(DUE - 2);
+  });
+
+  it("D55: T7 exhausted / not_committed_final are [0, 0] reads themselves: marked with no resubmit before; T7 escalated (needs_human) is a human's: not marked", async () => {
+    const exhausted = await verifiedOnce({ decision: "exhausted", to: "failed", outcome: "not_committed_attempts_exhausted", error: "x" });
+    expect(exhausted).toMatchObject({ state: "failed", reconciled_at: null });
+    expect(await dueIn(exhausted.id)).toBeGreaterThan(DUE - 2);
+    const final = await verifiedOnce({ decision: "not_committed_final", to: "business_outcome", outcome: "business_outcome", error: "x" }, 3);
+    expect(final).toMatchObject({ state: "business_outcome" });
+    expect(await dueIn(final.id)).toBeGreaterThan(DUE - 2);
+    const escalated = await verifiedOnce({ decision: "escalated", to: "needs_human", outcome: "ambiguous", error: "x" }, 3);
+    expect(escalated).toMatchObject({ state: "needs_human", reconcile_after: null });
   });
 
   it("T7 already_done after an earlier resubmit (attempt 2 crashed after Submit, verified [1]): marked", async () => {
@@ -255,6 +337,72 @@ describe("R1 (the claim) and R2 (the result)", () => {
     await runReconcilePhase(ctx([count(1)]), (await claimReconcile(pool, { workerId: "reconciler", leaseSeconds: LEASE }))!);
     expect((await phases(j.id)).filter((p) => p.reason === "reconcile").map((p) => p.decision)).toEqual(["reconcile_deferred", "reconciled"]);
     expect(jobSettled(await row(j.id))).toBe(true);
+  });
+});
+
+describe("D55: the reconcile pass on a job that ended FAILED or BUSINESS_OUTCOME after a [0, 0] verify (expects 0 rows)", () => {
+  it("R1 claims a due failed job: it STAYS failed, token + 1, the reconcile lease, a 'reconcile' phase; the claim says which state it promised", async () => {
+    const j = await endedAfterResubmit("failed");
+    expect(await claimReconcile(pool, { workerId: "r1", leaseSeconds: LEASE })).toBeNull(); // not due yet
+    await makeDue(j.id);
+    const claim = (await claimReconcile(pool, { workerId: "r1", leaseSeconds: LEASE }))!;
+    expect(claim).toMatchObject({ label: "R1", state: "failed", fencingToken: j.fencing_token + 1, job: { id: j.id } });
+    expect(await row(j.id)).toMatchObject({ state: "failed", lease_owner: "r1" });
+    expect((await phases(j.id)).at(-1)).toMatchObject({ reason: "reconcile", decision: null });
+  });
+
+  it("0 matches -> reconciled: stays failed / business_outcome, reconciled_at set, lease released, settled", async () => {
+    for (const state of ["failed", "business_outcome"] as const) {
+      const j = await endedAfterResubmit(state);
+      await makeDue(j.id);
+      const c = ctx([count(0)]);
+      const done = await runReconcilePhase(c, (await claimReconcile(pool, { workerId: "reconciler", leaseSeconds: LEASE }))!);
+      expect(done, state).toMatchObject({ recorded: true, decision: { decision: "reconciled", to: state, matches: 0 } });
+      const after = await row(j.id);
+      expect(after).toMatchObject({ state, lease_owner: null });
+      expect(after.reconciled_at).toBeInstanceOf(Date);
+      expect(jobSettled(after)).toBe(true);
+      expect(c.metrics.get("reconcile_decisions_total", { decision: "reconciled" })).toBe(1);
+    }
+  });
+
+  it("the reviewer's case: a resubmitted job that ended failed, then a zombie row (1 match) -> unrecorded_commit_suspected: needs_human, its result kept + result.reconcile, unrecorded_commits_detected_total = 1, an error-level log line", async () => {
+    const j = await endedAfterResubmit("failed");
+    await makeDue(j.id);
+    const errors: Array<Record<string, unknown>> = [];
+    const c = ctx([count(1, "TXN-000009")], { log: { info() {}, warn() {}, error: (o) => errors.push(o) } });
+    await runReconcilePhase(c, (await claimReconcile(pool, { workerId: "reconciler", leaseSeconds: LEASE }))!);
+    const after = await row(j.id);
+    expect(after).toMatchObject({ state: "needs_human", outcome: "unrecorded_commit_suspected", lease_owner: null });
+    expect(after.error).toMatch(/reconcile found 1 transfer\(s\) with this memo_key although the job ended failed/);
+    expect(after.result).toMatchObject({ reconcile: { decision: "unrecorded_commit_suspected", matches: 1, firstMatchRef: "TXN-000009", lookups: [1], evidenceRefs: ["evidence://fake-1"] } });
+    expect(jobSettled(after)).toBe(true);
+    expect(c.metrics.get("unrecorded_commits_detected_total")).toBe(1);
+    expect(c.metrics.get("duplicates_detected_total")).toBe(0);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ decision: "unrecorded_commit_suspected", jobState: "failed", matches: 1, unrecorded_commits_detected_total: 1 });
+    expect((await phases(j.id)).at(-1)).toMatchObject({ reason: "reconcile", decision: "unrecorded_commit_suspected", lookups: [1] });
+  });
+
+  it("R2's guard: a decision that would move a failed job to ANOTHER terminal state (failed -> succeeded) is refused as illegal_transition; the job is untouched", async () => {
+    const j = await endedAfterResubmit("failed");
+    await makeDue(j.id);
+    const claim = (await claimReconcile(pool, { workerId: "r", leaseSeconds: LEASE }))!;
+    const wrong = { decision: "reconciled" as const, to: "succeeded" as const, outcome: null, matches: 1 as const, firstMatchRef: "TXN-1", error: null };
+    const res = await writeReconcileResult(pool, { jobId: j.id, fencingToken: claim.fencingToken, workerId: "r", decision: wrong, lookups: [1], evidenceRefs: ["e"], patch: {} });
+    expect(res).toMatchObject({ recorded: false, reason: "illegal_transition" });
+    expect(await row(j.id)).toMatchObject({ state: "failed", lease_owner: "r", reconciled_at: null });
+  });
+
+  it("rote reconcile --since covers them too: a failed job the workers' pass reconciled with 0, a late row appears, the batch flags it unrecorded_commit_suspected", async () => {
+    const j = await endedAfterResubmit("failed");
+    await makeDue(j.id);
+    await runReconcilePhase(ctx([count(0)]), (await claimReconcile(pool, { workerId: "reconciler", leaseSeconds: LEASE }))!);
+    expect(await row(j.id)).toMatchObject({ state: "failed" });
+    const report = await reconcileWindow(ctx([count(1)], { workerId: "reconcile:batch" }), { sinceSeconds: 3600 });
+    expect(report.rows).toMatchObject([{ jobId: j.id, state: "failed", result: "unrecorded_commit_suspected", matches: 1 }]);
+    expect(report).toMatchObject({ flagged: 1, undecided: 0 });
+    expect(await row(j.id)).toMatchObject({ state: "needs_human", outcome: "unrecorded_commit_suspected" });
   });
 });
 

@@ -28,12 +28,15 @@
 //
 // Step 10 adds the requeue backoff (D49): T4's requeue after a failure sets not_before, and a separate
 // simulation (below) proves that an outage shorter than the backoff schedule fails no job. And the
-// reconcile pass (D50): a job that succeeded after a resubmit is re-read once due (R1 in an idle worker's
+// reconcile pass (D50; every terminal state since the reviewer decisions on 10a, D55): a job that turned
+// succeeded / failed / business_outcome after a [0, 0] verify is re-read once due (R1 in an idle worker's
 // loop, one `lookup`, `decide` = R2); the drain runs past the reconcile delay, so:
-//   property 4  terminal states are final, with ONE exception: reconcile's succeeded -> needs_human
+//   property 4  terminal states are final, with ONE exception: a reconcile's flag (terminal -> needs_human)
 //   property 8  a duplicate never stays silently `succeeded`, unless a row became visible in the history
 //               only after the reconcile's read (the zombie that clicks after the pass: the honest limit)
-//   property 9  with the end-of-day batch (rote reconcile --since, D51) after the drain: never
+//   property 10 an unrecorded commit (a row against a job that ended failed / business_outcome) never stays
+//               silent either, with the same exemption (D55)
+//   property 9  with the end-of-day batch (rote reconcile --since, D51) after the drain: neither, ever
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import type { ReplayResult } from "../artifact/index.js";
@@ -62,10 +65,12 @@ import {
 } from "./model.js";
 import {
   alreadyDoneResult,
+  isReconcilable,
   jobOutcomeFor,
   lookupsColumn,
   minRequeueScheduleSeconds,
   readingsComplete,
+  RECONCILE_FLAGS,
   reconcileDecision,
   reconcileDueSeconds,
   requeueBackoffSeconds,
@@ -73,6 +78,7 @@ import {
   type CompletionTarget,
   type DeferConfig,
   type LookupReading,
+  type ReconcilableState,
   type RunEnd,
 } from "./stateMachine.js";
 
@@ -231,6 +237,32 @@ const lateZombieArb: fc.Arbitrary<Ev[]> = fc.boolean().chain((clickBeforeDecide)
       : ([{ k: "decide", w: 1 }, { k: "resume", w: 0, beatFirst: false }, { k: "click", w: 0, commits: true }] as Ev[])),
   ]),
 );
+/**
+ * D55 (the reviewer decisions on 10a, decision 2): the zombie window again, but the job does NOT succeed
+ * after the resubmit -- attempt 2 fails before Submit, is refused, or its worker dies -- and the zombie's
+ * late click lands on a job that says no money moved. Or (resubmit: false) the verify on the LAST attempt
+ * reads [0, 0] and fails the job outright (exhausted) while its own worker is still frozen.
+ */
+const zombieThenNotSucceededArb: fc.Arbitrary<Ev[]> = fc
+  .tuple(fc.constantFrom<"failure" | "refused" | "crash">("failure", "refused", "crash"), fc.boolean())
+  .chain(([end, resubmit]) =>
+    withNoise([
+      { k: "dequeue", w: 0 },
+      { k: "intent", w: 0 },
+      { k: "pause", w: 0 },
+      { k: "tick", dt: 31 },
+      { k: "dequeue", w: 1 }, // T6.4
+      { k: "lookup", w: 1 },
+      { k: "tick", dt: 5 },
+      { k: "lookup", w: 1 },
+      { k: "decide", w: 1 }, // [0, 0]: resubmitted (attempts left) or exhausted
+      ...(resubmit
+        ? ([{ k: "dequeue", w: 2 }, end === "crash" ? { k: "crash", w: 2 } : { k: "finish", w: 2, how: end }, { k: "tick", dt: 31 }, { k: "recover", w: 1 }] as Ev[])
+        : []),
+      { k: "resume", w: 0, beatFirst: false },
+      { k: "click", w: 0, commits: true },
+    ]),
+  );
 const lagArb = fc.oneof(fc.constant(0), fc.integer({ min: 0, max: 12 }));
 const scenarioArb = fc.record({
   maxAttempts: fc.integer({ min: 1, max: 3 }),
@@ -243,6 +275,7 @@ const scenarioArb = fc.record({
     { weight: 1, arbitrary: deadVerifiersArb },
     { weight: 1, arbitrary: outageArb },
     { weight: 1, arbitrary: lateZombieArb },
+    { weight: 1, arbitrary: zombieThenNotSucceededArb },
   ),
 });
 type Scenario = { maxAttempts: number; lag: number; events: Ev[] };
@@ -264,8 +297,8 @@ interface SimWorker {
   clickedRow: LedgerRow | null;
   /** Its verify phase: the lookups so far and when the first one was read. */
   verify: { readings: LookupReading[]; firstAt: number | null } | null;
-  /** Its reconcile run: the one lookup, when it was read, and the ledger rows the history showed then. */
-  rec: { reading: LookupReading | null; at: number | null; seen: string[] } | null;
+  /** Its reconcile run: the state it claimed the job in, the one lookup, when it was read, and the ledger rows the history showed then. */
+  rec: { state: ReconcilableState; reading: LookupReading | null; at: number | null; seen: string[] } | null;
 }
 
 interface SimRow extends LedgerRow {
@@ -399,7 +432,7 @@ function beat(world: World, w: SimWorker): void {
 
 /** T6 by `w` (idle): may hand it a job to verify; if not, R1 may hand it a due reconcile (the sweep). */
 function recover(world: World, w: SimWorker): boolean {
-  const { db, claimed } = modelRecover(world.db, RECOVER_PER_LOOP, { owner: idOf(w), leaseSeconds: LEASE });
+  const { db, claimed } = modelRecover(world.db, RECOVER_PER_LOOP, { owner: idOf(w), leaseSeconds: LEASE, reconcileDueSeconds: RECONCILE_DUE });
   commit(world, db);
   if (!claimed) return reconcileClaim(world, w);
   startVerify(world, w, claimed.token, job(world).attempt);
@@ -407,7 +440,9 @@ function recover(world: World, w: SimWorker): boolean {
 }
 
 function startReconcile(world: World, w: SimWorker, token: number): void {
-  Object.assign(w, { phase: "reconcile", held: { token, attempt: job(world).attempt }, clickedRow: null, verify: null, rec: { reading: null, at: null, seen: [] }, lastExtendedAt: world.db.now });
+  const state = job(world).state;
+  if (!isReconcilable(state)) throw new Error(`the simulation: a reconcile claimed a ${state} job`);
+  Object.assign(w, { phase: "reconcile", held: { token, attempt: job(world).attempt }, clickedRow: null, verify: null, rec: { state, reading: null, at: null, seen: [] }, lastExtendedAt: world.db.now });
   world.lastHolder = idOf(w);
 }
 
@@ -434,7 +469,7 @@ function reconcileDecide(world: World, w: SimWorker): void {
   if (!rec.reading) return;
   const j = job(world);
   const cycle = modelReconcileCycle(j, world.db.now);
-  const d = reconcileDecision({ reading: rec.reading, deferrals: cycle.deferrals, deferredForSeconds: cycle.deferredForSeconds, defer: DEFER });
+  const d = reconcileDecision({ jobState: rec.state, reading: rec.reading, deferrals: cycle.deferrals, deferredForSeconds: cycle.deferredForSeconds, defer: DEFER });
   const { db, result } = modelReconcileResult(world.db, refOf(w), d, lookupsColumn([rec.reading]));
   commit(world, db);
   if (result === "recorded") {
@@ -448,13 +483,13 @@ function reconcileDecide(world: World, w: SimWorker): void {
 }
 
 /**
- * The end-of-day batch (rote reconcile --since, D51) after the drain: if the job succeeded after a
- * resubmit and the workers' pass is due (or ran), re-read it regardless of reconciled_at, once every row
- * is visible (the drain's last tick plus the largest lag).
+ * The end-of-day batch (rote reconcile --since, D51) after the drain: if the job is terminal after a [0, 0]
+ * verify (D55) and the workers' pass is due (or ran), re-read it regardless of reconciled_at, once every
+ * row is visible (the drain's last tick plus the largest lag).
  */
 function endOfDayBatch(world: World): void {
   const j = job(world);
-  if (!(j.state === "succeeded" && j.reconcileAfter !== null)) return;
+  if (!(isReconcilable(j.state) && j.reconcileAfter !== null)) return;
   if (j.reconciledAt === null && j.reconcileAfter > world.db.now) return; // not due: the workers' pass's
   commit(world, modelTick(world.db, 13)); // past the largest history lag (12 s)
   const batch: SimWorker = { name: "batch", incarnation: 0, alive: true, paused: false, ...IDLE(), lastExtendedAt: 0 };
@@ -665,11 +700,12 @@ function checkTransitions(transitions: Transition[], at: string, found: Found): 
   for (const { from, to } of transitions) {
     const what = `${at}: ${from.state}/${from.token} -> ${to.state}/${to.token}`;
     // Terminal states are final, except: reverify (needs_human -> verifying; not modelled here), and the
-    // reconcile pass on a succeeded job: its claim / deferral bump the token (succeeded -> succeeded), and
-    // its flag moves it to needs_human (duplicate_suspected / reconcile_unreadable) -- the ONE exception.
+    // reconcile pass on a succeeded / failed / business_outcome job: its claim / deferral bump the token (the
+    // state stays), and its flag moves it to needs_human (duplicate_suspected / unrecorded_commit_suspected /
+    // reconcile_unreadable) -- the ONE exception (D50, D55).
     const reverify = from.state === "needs_human" && to.state === "verifying";
-    const reconcileTouch = from.state === "succeeded" && to.state === "succeeded";
-    const reconcileFlag = from.state === "succeeded" && to.state === "needs_human" && (to.outcome === "duplicate_suspected" || to.outcome === "reconcile_unreadable");
+    const reconcileTouch = isReconcilable(from.state) && to.state === from.state;
+    const reconcileFlag = isReconcilable(from.state) && to.state === "needs_human" && (RECONCILE_FLAGS as readonly string[]).includes(to.outcome ?? "");
     if (isTerminal(from.state) && !reverify && !reconcileTouch && !reconcileFlag) found.terminalMoved.push(what);
     if (to.state === "queued" && !(to.attempt < to.maxAttempts)) found.queuedExhausted.push(`${what} at attempt ${to.attempt}/${to.maxAttempts}`);
     if (to.state === "queued" && from.state !== "running") {
@@ -743,6 +779,10 @@ function oracleFor(world: World) {
 const lateRow = (world: World) => world.lastReconciledSeen !== null && world.ledger.some((r) => !world.lastReconciledSeen!.includes(r.id));
 /** Property 8: a succeeded job with 2+ rows, and no row that became visible only after the reconcile's read. */
 const silentDuplicate = (world: World) => job(world).state === "succeeded" && world.ledger.length >= 2 && !lateRow(world);
+/** A job that says no money moved (failed / business_outcome) with a ledger row: the oracle's UNRECORDED_COMMIT. */
+const unrecordedCommit = (world: World) => (job(world).state === "failed" || job(world).state === "business_outcome") && world.ledger.length >= 1;
+/** Property 10 (D55): an unrecorded commit, and no row that became visible only after the reconcile's read. */
+const silentUnrecorded = (world: World) => unrecordedCommit(world) && !lateRow(world);
 
 /** Property 1's precondition: no zombie click, and the settle period covers the history lag. */
 const p1Holds = (world: World) => !world.zombieClick && world.lag <= SETTLE;
@@ -852,12 +892,40 @@ describe("fleet state machine, pure model (Step 9: verify, settle, history lag, 
     );
   }, PROPERTY_TIMEOUT_MS);
 
-  it("property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded -- the honest limit of property 8 is closed", () => {
+  it("property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read", () => {
+    fc.assert(
+      fc.property(scenarioArb, (s) => {
+        const { world } = simulate(s);
+        expect(silentUnrecorded(world), `${world.ledger.length} rows, job ${job(world).state}/${job(world).outcome}, phases ${JSON.stringify(job(world).phases.map((p) => p.decision))}, last reconciled read saw ${JSON.stringify(world.lastReconciledSeen)}`).toBe(false);
+      }),
+      params,
+    );
+  }, PROPERTY_TIMEOUT_MS);
+
+  it("property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed", () => {
     fc.assert(
       fc.property(scenarioArb, (s) => {
         const { world } = simulate(s);
         endOfDayBatch(world);
         expect(job(world).state === "succeeded" && world.ledger.length >= 2, `${world.ledger.length} rows, job ${job(world).state}/${job(world).outcome}`).toBe(false);
+        expect(unrecordedCommit(world), `${world.ledger.length} rows, job ${job(world).state}/${job(world).outcome}`).toBe(false);
+      }),
+      params,
+    );
+  }, PROPERTY_TIMEOUT_MS);
+
+  it("property 10's cases are real: fast-check finds an unrecorded commit that the workers' pass flagged, and every one of them had a [0, 0] verify (no other path leaves a row on a job that says no money moved)", () => {
+    const flagged = fc.check(
+      fc.property(scenarioArb, (s) => job(simulate(s).world).outcome !== "unrecorded_commit_suspected"),
+      params,
+    );
+    expect(flagged.failed, "fast-check never reached unrecorded_commit_suspected").toBe(true);
+    fc.assert(
+      fc.property(scenarioArb, (s) => {
+        const { world } = simulate(s);
+        if (job(world).outcome === "unrecorded_commit_suspected" || unrecordedCommit(world)) {
+          expect(job(world).phases.some((p) => p.decision === "resubmitted" || p.decision === "exhausted" || p.decision === "not_committed_final")).toBe(true);
+        }
       }),
       params,
     );
@@ -933,9 +1001,13 @@ describe("the simulation reaches the interesting states (so the properties are n
       "decision:escalated:verify_unavailable",
       "decision:reconciled",
       "decision:duplicate_suspected",
+      "decision:unrecorded_commit_suspected", // D55
       "succeeded->succeeded", // R1's token bump on a succeeded job
+      "failed->failed", // ... on a failed one (D55)
       "succeeded->needs_human", // the one exception (reconcile)
+      "failed->needs_human",
       "final:needs_human/duplicate_suspected",
+      "final:needs_human/unrecorded_commit_suspected",
       "lookups:[0,1]",
       "phase:crashed",
       "final:succeeded/success",
@@ -1133,6 +1205,105 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
     endOfDayBatch(world);
     expect(world.decisions.at(-1)).toBe("duplicate_suspected:[2]");
     expect(job(world)).toMatchObject({ state: "needs_human", outcome: "duplicate_suspected" });
+  });
+
+  // The reviewer decisions on 10a, decision 2 (D55): the zombie's late click on a job that did NOT succeed.
+  const zombieAfterResubmit: Ev[] = [
+    { k: "dequeue", w: 0 },
+    { k: "intent", w: 0 },
+    { k: "pause", w: 0 }, // frozen after its intent
+    { k: "tick", dt: 31 },
+    { k: "dequeue", w: 1 }, // T6.4: w1 verifies
+    { k: "lookup", w: 1 },
+    { k: "tick", dt: 5 },
+    { k: "lookup", w: 1 },
+    { k: "decide", w: 1 }, // [0, 0]: resubmitted
+    { k: "dequeue", w: 2 }, // attempt 2 (the last of 2)
+  ];
+
+  it("D55, the reviewer's case: a resubmitted job that ends FAILED (attempt 2 fails before Submit), then the zombie's row -> the reconcile reads 1 where failed promises 0 -> needs_human / unrecorded_commit_suspected", () => {
+    const { world, found } = run(
+      [
+        ...zombieAfterResubmit,
+        { k: "finish", w: 2, how: "failure" }, // before Submit, attempts exhausted: T4 failed, marked (a resubmit before it)
+        { k: "resume", w: 0, beatFirst: false },
+        { k: "click", w: 0, commits: true }, // the zombie's late click: 1 row against a failed job
+      ],
+      { maxAttempts: 2 },
+    );
+    expect(world.zombieClick).toBe(true);
+    expect(rows(world)).toBe(1);
+    expect(world.decisions).toEqual(["resubmitted:[0,0]", "unrecorded_commit_suspected:[1]"]);
+    expect(job(world)).toMatchObject({ state: "needs_human", outcome: "unrecorded_commit_suspected", attempt: 2 });
+    expect(job(world).result).toMatchObject({ reconcile: { decision: "unrecorded_commit_suspected" } });
+    expect(Object.values(found).flat()).toEqual([]); // failed -> needs_human is the reconcile's exception, nothing else moved
+    expect(oracleFor(world).pass).toBe(true); // needs_human with its 1 row, listed (D32)
+  });
+
+  it("D55: the same with attempt 2 refused before Submit (business_outcome), or its worker dying on the last attempt (T6.2 failed): flagged the same way", () => {
+    for (const end of [
+      [{ k: "finish", w: 2, how: "refused" }] as Ev[],
+      [{ k: "crash", w: 2 }, { k: "tick", dt: 31 }, { k: "recover", w: 1 }] as Ev[], // T6.2 marks it
+    ]) {
+      const { world } = run([...zombieAfterResubmit, ...end, { k: "resume", w: 0, beatFirst: false }, { k: "click", w: 0, commits: true }], { maxAttempts: 2 });
+      expect(world.decisions.at(-1), JSON.stringify(end)).toBe("unrecorded_commit_suspected:[1]");
+      expect(job(world)).toMatchObject({ state: "needs_human", outcome: "unrecorded_commit_suspected" });
+    }
+  });
+
+  it("D55: with no zombie, the resubmitted job that ended failed is reconciled with 0 rows and stays failed (settled)", () => {
+    const { world } = run([...zombieAfterResubmit, { k: "finish", w: 2, how: "failure" }, { k: "resume", w: 0, beatFirst: true }], { maxAttempts: 2 });
+    expect(rows(world)).toBe(0);
+    expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:[0]"]);
+    expect(job(world)).toMatchObject({ state: "failed", attempt: 2 });
+    expect(job(world).reconciledAt).not.toBeNull();
+    expect(oracleFor(world).pass).toBe(true);
+  });
+
+  it("D55, why `exhausted` is a trigger too: on the LAST attempt, T6.4 verifies [0, 0] and fails the job while its own worker is still frozen -- no resubmit ever happened, so the reviewer's rule alone would leave the zombie's row silent; it is flagged", () => {
+    const { world } = run(
+      [
+        { k: "dequeue", w: 0 },
+        { k: "intent", w: 0 },
+        { k: "pause", w: 0 },
+        { k: "tick", dt: 31 },
+        { k: "dequeue", w: 1 },
+        { k: "lookup", w: 1 },
+        { k: "tick", dt: 5 },
+        { k: "lookup", w: 1 },
+        { k: "decide", w: 1 }, // [0, 0] on attempt 1/1: exhausted -> failed
+        { k: "resume", w: 0, beatFirst: false },
+        { k: "click", w: 0, commits: true },
+      ],
+      { maxAttempts: 1 },
+    );
+    expect(job(world).phases.some((p) => p.decision === "resubmitted")).toBe(false); // no resubmit at all
+    expect(world.decisions).toEqual(["exhausted:[0,0]", "unrecorded_commit_suspected:[1]"]);
+    expect(job(world)).toMatchObject({ state: "needs_human", outcome: "unrecorded_commit_suspected", attempt: 1 });
+  });
+
+  it("D55, the honest limit and the batch: the zombie still frozen when the reconcile READ the failed job's history clicks after it -- the row stays silent (property 10's exemption); the end-of-day batch flags it", () => {
+    const { world } = run(
+      [
+        ...zombieAfterResubmit,
+        { k: "finish", w: 2, how: "failure" },
+        { k: "tick", dt: 45 },
+        { k: "tick", dt: 20 }, // past the reconcile delay
+        { k: "dequeue", w: 1 }, // R1 on the failed job
+        { k: "lookup", w: 1 }, // 0 rows
+        { k: "decide", w: 1 }, // reconciled: stays failed
+        { k: "resume", w: 0, beatFirst: false },
+        { k: "click", w: 0, commits: true },
+      ],
+      { maxAttempts: 2 },
+    );
+    expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:[0]"]);
+    expect(job(world).state).toBe("failed");
+    expect(unrecordedCommit(world)).toBe(true);
+    expect(silentUnrecorded(world)).toBe(false); // exempt: the row came after the read
+    endOfDayBatch(world);
+    expect(world.decisions.at(-1)).toBe("unrecorded_commit_suspected:[1]");
+    expect(job(world)).toMatchObject({ state: "needs_human", outcome: "unrecorded_commit_suspected" });
   });
 
   it("frozen after the intent, and its heartbeat fires first on waking: the run is aborted, no click; verify resubmits; 1 row", () => {

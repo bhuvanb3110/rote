@@ -8,9 +8,10 @@
 //                                 its attempt row closed, a job_verifications row (starts a verify cycle)
 //   T7  VERIFY_RESULT_SQL         the verifier writes its decision and releases the job (a resubmit
 //                                 clears commit_intent_at, and is dequeueable at once: not_before NULL,
-//                                 D49); already_done on a job resubmitted before marks it for the
-//                                 reconcile pass (reconcile_after, D50); its phase row gets the decision
-//                                 and lookups
+//                                 D49); a terminal decision on a job a verify read [0, 0] on (an earlier
+//                                 resubmit, or this decision itself: exhausted / not_committed_final)
+//                                 marks it for the reconcile pass (reconcile_after, D50, D55); its phase
+//                                 row gets the decision and lookups
 //   T8  VERIFY_DEFER_SQL          the bank is unavailable: the job STAYS verifying, token + 1 (the
 //                                 deferring verifier is fenced out of its own job), the lease set to
 //                                 now + the backoff, lease_owner kept (jobs_active_has_owner); recovery
@@ -33,7 +34,17 @@ import {
   type VerifyCycle,
   type VerifyDecision,
 } from "../fleet/stateMachine.js";
-import { END_ATTEMPT_SQL, MARK_ILLEGAL_TRANSITION_SQL, MARK_LEASE_LOST_SQL, describeFence, readFence, type FencedOutReason } from "./complete.js";
+import {
+  END_ATTEMPT_SQL,
+  MARK_ILLEGAL_TRANSITION_SQL,
+  MARK_LEASE_LOST_SQL,
+  RECONCILABLE_STATES_SQL,
+  RECONCILE_TRIGGERED_SQL,
+  RECONCILE_TRIGGERS_SQL,
+  describeFence,
+  readFence,
+  type FencedOutReason,
+} from "./complete.js";
 
 // ------------------------------------------------------------------------------------------- cycle
 
@@ -150,8 +161,7 @@ SET state = $4, outcome = $5, error = $6,
                   ELSE COALESCE(result, '{}'::jsonb) || jsonb_build_object('verify', $8::jsonb) END,
     commit_intent_at = CASE WHEN $4 = 'queued' THEN NULL ELSE commit_intent_at END,
     not_before = NULL,
-    reconcile_after = CASE WHEN $4 = 'succeeded' AND EXISTS (
-                        SELECT 1 FROM job_verifications v WHERE v.job_id = $1 AND v.decision = 'resubmitted')
+    reconcile_after = CASE WHEN $4 IN (${RECONCILABLE_STATES_SQL}) AND ($10 IN (${RECONCILE_TRIGGERS_SQL}) OR ${RECONCILE_TRIGGERED_SQL})
                       THEN now() + make_interval(secs => $9) ELSE reconcile_after END,
     lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
 WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3 AND state = 'verifying'
@@ -186,9 +196,9 @@ export async function fencedOutPhase(
 }
 
 /**
- * T7. The decision must not be `deferred` (that is T8). `reconcileDueSeconds`: a success of a job that was
- * resubmitted before is re-read by the reconcile pass that long after (D50; default lease 30 + settle 5 +
- * margin 25).
+ * T7. The decision must not be `deferred` (that is T8). `reconcileDueSeconds`: a terminal decision on a job
+ * a verify read [0, 0] on is re-read by the reconcile pass that long after (D50, D55; default lease 30 +
+ * settle 5 + margin 25). $10 is this decision: exhausted / not_committed_final are [0, 0] reads themselves.
  */
 export async function writeVerifyResult(
   pool: Pool,
@@ -206,6 +216,7 @@ export async function writeVerifyResult(
       d.to === "succeeded" ? JSON.stringify(input.result) : null,
       JSON.stringify({ decision: d.decision, lookups: input.lookups, evidenceRefs: input.evidenceRefs, phaseToken: input.fencingToken }),
       input.reconcileDueSeconds ?? reconcileDueSeconds(30, 5000),
+      d.decision,
     ]);
     if (updated.rowCount === 1) {
       await client.query(END_PHASE_SQL, [input.jobId, input.fencingToken, input.lookups, d.decision, d.error]);

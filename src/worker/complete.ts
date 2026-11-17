@@ -17,9 +17,10 @@
 // now() + $8 seconds (requeueBackoffSeconds, computed by the worker; NULL = dequeueable at once), so a
 // bank outage does not burn every attempt in seconds. Any other target leaves not_before NULL.
 //
-// A success of a job that was RESUBMITTED before (a verify phase decided `resubmitted`) is marked for the
-// reconcile pass (Step 10, D50): reconcile_after = now() + $9 seconds (lease + settle + margin). Only such
-// a job can carry a zombie's late second transfer.
+// A TERMINAL write (succeeded, failed, business_outcome) of a job on which a verify read [0, 0] before (a
+// phase decided `resubmitted`; RECONCILE_TRIGGERS) is marked for the reconcile pass (Step 10, D50; widened
+// to every terminal state by D55): reconcile_after = now() + $9 seconds (lease + settle + margin). Only such
+// a job can carry a zombie's late click: a second transfer on a success, or an unrecorded one on a failure.
 //
 // 0 rows has two causes, told apart by re-reading the job's fencing token in the same transaction
 // (step-09 reviewer decision A1, D41):
@@ -34,17 +35,24 @@
 import { withTransaction, type Pool, type Queryable } from "../queue/index.js";
 import { createBackoff, sleep } from "./backoff.js";
 import { isTransientDbError } from "../queue/index.js";
-import { reconcileDueSeconds, type JobOutcome } from "../fleet/stateMachine.js";
+import { RECONCILABLE_STATES, RECONCILE_TRIGGERS, reconcileDueSeconds, type JobOutcome } from "../fleet/stateMachine.js";
 
 /** The reconcile delay with the production defaults (lease 30 + settle 5 + margin 25 = 60 s). */
 export const DEFAULT_RECONCILE_DUE_SECONDS = reconcileDueSeconds(30, 5000);
+
+const sqlList = (values: readonly string[]) => values.map((v) => `'${v}'`).join(", ");
+/** The terminal states a reconcile covers, as an SQL list (from RECONCILABLE_STATES: one source of truth). */
+export const RECONCILABLE_STATES_SQL = sqlList(RECONCILABLE_STATES);
+/** The verify decisions that make a terminal job reconciled, as an SQL list (from RECONCILE_TRIGGERS, D55). */
+export const RECONCILE_TRIGGERS_SQL = sqlList(RECONCILE_TRIGGERS);
+/** A verify once read [0, 0] on job $1 (T4's, T6's and T7's mark; D50, D55). */
+export const RECONCILE_TRIGGERED_SQL = `EXISTS (SELECT 1 FROM job_verifications v WHERE v.job_id = $1 AND v.decision IN (${RECONCILE_TRIGGERS_SQL}))`;
 
 export const COMPLETE_JOB_SQL = `
 UPDATE jobs
 SET state = $4, outcome = $5, error = $6, result = $7::jsonb,
     not_before = CASE WHEN $4 = 'queued' THEN now() + make_interval(secs => $8) END,
-    reconcile_after = CASE WHEN $4 = 'succeeded' AND EXISTS (
-                        SELECT 1 FROM job_verifications v WHERE v.job_id = $1 AND v.decision = 'resubmitted')
+    reconcile_after = CASE WHEN $4 IN (${RECONCILABLE_STATES_SQL}) AND ${RECONCILE_TRIGGERED_SQL}
                       THEN now() + make_interval(secs => $9) ELSE reconcile_after END,
     lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
 WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3
@@ -113,7 +121,7 @@ export interface CompleteInput {
    * null: at once.
    */
   requeueAfterSeconds?: number | null;
-  /** A success after a resubmit: seconds until the reconcile pass re-reads it (D50). Default: 60. */
+  /** A terminal write after a [0, 0] verify: seconds until the reconcile pass re-reads it (D50, D55). Default: 60. */
   reconcileDueSeconds?: number;
 }
 

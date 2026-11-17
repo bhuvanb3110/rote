@@ -1613,7 +1613,9 @@ carry such a late second transfer, so only those are reconciled.
   in a field. Reading every match is a lookup 1.3.0 (re-approval), not done here.
 - Only `succeeded` jobs are reconciled. A job that ends `failed` or `business_outcome` after a resubmit can
   also meet a zombie's late click (1 row against a job that says it did not move money; the oracle's
-  UNRECORDED_COMMIT). Not covered; an open question for the reviewer.
+  UNRECORDED_COMMIT). Not covered; an open question for the reviewer. **Closed by D55** (the reviewer decisions
+  on 10a, decision 2): every terminal job a verify read `[0, 0]` on is reconciled, expecting 1 row for
+  succeeded and 0 for failed / business_outcome.
 
 **Tests.** Unit: every row of `reconcileDecision`, `reconcileDueSeconds`, `jobSettled`. Property: terminal
 finality with the one exception; **property 8**: after a drain past the reconcile delay, a job never stays
@@ -1652,7 +1654,8 @@ npm run reconcile -- --since 24h [--tenant tenant-a] [--by <name>] [--database-u
 ```
 
 - **The window** (`RECONCILE_WINDOW_SQL`): every job still `succeeded` with `reconcile_after` set (it
-  succeeded after a resubmit) whose `reconcile_after` is inside `--since`. `reconcile_after` is the success
+  succeeded after a resubmit) whose `reconcile_after` is inside `--since`. (**D55** widens it to `failed` and
+  `business_outcome` jobs marked after a `[0, 0]` verify, flagged `unrecorded_commit_suspected` on 1+ rows.) `reconcile_after` is the success
   moment plus the reconcile delay (moved later by a deferral), so the window reaches back `since` plus one
   delay: a few more jobs than strictly "succeeded in the window", never fewer, and it is read-only.
 - **Each job, one at a time**: the batch's claim (`RECONCILE_CLAIM_JOB_SQL`: by id, `succeeded`, reconcile
@@ -1800,3 +1803,79 @@ that no longer applies fails loudly).
 design argument says is caught; the check proves it is, on every push.
 
 **Date.** 2026-11-14
+
+## D55: The reconcile pass covers every terminal job a verify once read [0, 0] on: 1 row expected for `succeeded`, 0 for `failed` / `business_outcome`; `unrecorded_commit_suspected` (amends D50, D51)
+
+(Step 10b; the reviewer decisions on 10a, decision 2, 2026-11-14.)
+
+**Decision.** D50 re-read only a job that **succeeded** after a resubmit. A zombie's late click can also land on a
+job that ended **failed** or **business_outcome** after a resubmit: 1 ledger row against a job that says no money
+moved (the oracle's UNRECORDED_COMMIT), and nothing looked again. So:
+- **Marking.** Every terminal transition to `succeeded`, `failed` or `business_outcome` of a job with a `[0, 0]`
+  verify sets `reconcile_after = now() + lease + settle + margin`: T4 (`COMPLETE_JOB_SQL`), **T6.2**
+  (`RECOVER_JOB_SQL`, `$7`: the last attempt's worker died before its intent) and T7 (`VERIFY_RESULT_SQL`). The
+  trigger decisions are `RECONCILE_TRIGGERS` = `resubmitted`, `exhausted`, `not_committed_final`; the SQL lists
+  are generated from that constant and `RECONCILABLE_STATES` (`complete.ts`), so the model, the SQL and the
+  mutants share one source. T7 passes its own decision (`$10`), because `exhausted` / `not_committed_final` are
+  the `[0, 0]` read that ends the job. `needs_human` is never marked: a human owns it already.
+- **The expected count** is the job's own promise (`reconcileExpectedMatches`): **1 for `succeeded`, 0 for
+  `failed` / `business_outcome`**. `reconcileDecision` takes the claimed state (`jobState`):
+
+  | job state | lookup | decision | job |
+  | --- | --- | --- | --- |
+  | succeeded | 1 | `reconciled` | stays succeeded |
+  | succeeded | 2+ | `duplicate_suspected` | needs_human; `duplicates_detected_total` + 1 |
+  | succeeded | 0 | `reconcile_unreadable` | needs_human |
+  | failed / business_outcome | 0 | `reconciled` | stays in its state |
+  | failed / business_outcome | 1+ | **`unrecorded_commit_suspected`** | needs_human; **`unrecorded_commits_detected_total`** + 1; an error-level log line |
+  | any | unreadable | `reconcile_unreadable` | needs_human |
+  | any | unavailable | `reconcile_deferred` (budget spent: `reconcile_unreadable`) | stays / needs_human |
+- **R1, R2 and the batch** take the three states: the claim returns the state it claimed the job in; R2 is
+  fenced on `state IN (succeeded, failed, business_outcome) AND ($4 = state OR $4 = 'needs_human')`, so no
+  caller can turn a failed job into a succeeded one; `rote reconcile --since` reads all three and reports each
+  job's state; its `flagged` count includes the new decision.
+- **Migration `0005_reconcile_terminal.sql`** (0004 is applied everywhere and never edited): the decision
+  `unrecorded_commit_suspected` in both CHECKs, and the partial index `jobs_reconcile_due` over the three states.
+- The one exception to terminal finality widens accordingly: a reconcile's flag moves `succeeded`, `failed` or
+  `business_outcome` to `needs_human`; its claim and deferral bump the token on a terminal job. `settled`
+  (`GET /jobs/:id`) is unchanged in form (terminal, and no reconcile due) and now also covers those jobs.
+
+**Beyond the decision as written: `exhausted` and `not_committed_final` are triggers too.** Decision 2 says "a
+job with a `resubmitted` verification". The same hazard exists with no resubmit: on the **last** attempt, T6.4
+claims an expired `committing` job, the verify reads `[0, 0]` and decides `exhausted` (failed) while that
+attempt's own worker is still frozen after its intent; it wakes and clicks, and the job says failed with 1 row.
+And with a history lag over the settle period (D47) a `[0, 0]` that ends a job (`exhausted`,
+`not_committed_final`) can simply be wrong. The property tests show it: with `RECONCILE_TRIGGERS =
+["resubmitted"]` (mutant 10) the deterministic test "why `exhausted` is a trigger too" fails and property 10
+finds silent unrecorded commits. Reverting to the narrow rule is the one-line mutant; it costs one history read
+per job that ended after a `[0, 0]`, which is rare.
+
+**Tests.** Unit: every row above, the expected counts, a non-reconcilable state refused, `jobSettled` on failed
+jobs. Property: property 4's exception is the flag from any of the three states; **property 10** (after the
+drain, no unrecorded commit stays silently failed / business_outcome unless its row became visible only after
+the reconcile's read); property 9 with the batch closes both; "property 10's cases are real" (fast-check reaches
+`unrecorded_commit_suspected`, and every unrecorded commit had a `[0, 0]` verify); a new scenario template
+(`zombieThenNotSucceededArb`); deterministic: **the reviewer's case** (a resubmitted job that ends failed, then
+the zombie's row → `unrecorded_commit_suspected`), the same after a refusal and after T6.2, the no-zombie case
+(`reconciled [0]`, stays failed), the `exhausted` case, and the honest limit closed by the batch. Model vs real:
+the reconcile family starts from succeeded, failed, business_outcome (each after a resubmit) or a T7
+`exhausted`; R2 per state, `unrecorded_commit_suspected`, and a "wrong state" R2 that both must refuse as
+`illegal_transition`; R1's claimed state compared. DB: T4 failed / business_outcome after a resubmit marked, a
+plain failure not marked, T6.2 marked, T7 `exhausted` / `not_committed_final` marked and `escalated` not; R1 on a
+failed job; R2 0 → reconciled, 1 → flagged with the metric and the log line; R2's guard; the batch; 0005's
+CHECKs and index. Integration (real lookup, real bank): a resubmitted job whose attempt 2 ended failed plus a
+zombie's row → `unrecorded_commit_suspected`, the oracle's UNRECORDED_COMMIT turned into a listed needs_human.
+Mutants **09** (1+ matches on a failed job read as reconciled) and **10** (the narrow trigger rule) join D54's
+check; 03, 07 and 08 were regenerated (their context moved).
+
+**Alternatives considered.**
+- Exactly the decision's rule (`resubmitted` only): leaves the last-attempt T6.4 path silent (above).
+- Reconcile every failed / business_outcome job: a history read per failure, most of which never reached the
+  intent; only a `[0, 0]` verify means a clicker may still be alive.
+- Also reconcile `needs_human`: a human already owns the job and reads the history anyway.
+- Edit 0004 instead of adding 0005: forbidden (forward-only; 0004 is applied on every database that ran 10a).
+
+**Why.** A job that says "no money moved" is a claim about the bank as strong as "it moved once"; when a frozen
+worker could still have clicked, the system must look again and say so as loudly as a duplicate.
+
+**Date.** 2026-11-17

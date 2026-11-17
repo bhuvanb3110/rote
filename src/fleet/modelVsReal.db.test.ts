@@ -38,7 +38,7 @@ import { FencingError } from "../worker/leaseErrors.js";
 import { recoverExpired } from "../worker/recover.js";
 import { claimReconcile, claimReconcileJob, writeReconcileResult } from "../worker/reconcile.js";
 import { completeIntoVerify, deferVerify, readVerifyCycle, reverifyJob, writeVerifyResult } from "../worker/verifySql.js";
-import { jobOutcomeFor, type JobOutcome, type ReconcileDecision, type VerifyDecision } from "./stateMachine.js";
+import { isReconcilable, jobOutcomeFor, reconcileExpectedMatches, type JobOutcome, type ReconcilableState, type ReconcileDecision, type VerifyDecision } from "./stateMachine.js";
 import {
   isActive,
   leaseRemaining,
@@ -69,6 +69,8 @@ const SEED = 1111;
 const RUNS = 200;
 /** The verify-focused property (sequences that start in verifying). */
 const VERIFY_RUNS = 100;
+/** The reconcile-focused property: four starting states (D55), so more runs than the verify family. */
+const RECONCILE_RUNS = 160;
 const TENANT = "tenant-a";
 const WORKERS = ["wA", "wB", "wC"] as const;
 type W = (typeof WORKERS)[number];
@@ -479,13 +481,13 @@ class ReverifyCmd implements Cmd {
   toString = () => `reverify(job ${this.i})`;
 }
 
-/** A succeeded job's reconcile_after within 1 s of now: whether R1 takes it could differ by the few ms of real time. */
+/** A terminal job's reconcile_after within 1 s of now: whether R1 takes it could differ by the few ms of real time. */
 function nearReconcileDue(m: Model): boolean {
-  return m.db.jobs.some((j) => j.state === "succeeded" && j.reconcileAfter !== null && Math.abs(j.reconcileAfter - m.db.now) < 1);
+  return m.db.jobs.some((j) => isReconcilable(j.state) && j.reconcileAfter !== null && Math.abs(j.reconcileAfter - m.db.now) < 1);
 }
-/** A succeeded job's reconcile lease within 1 s of expiry: whether a claim may take it could differ. */
+/** A terminal job's reconcile lease within 1 s of expiry: whether a claim may take it could differ. */
 function nearReconcileLease(m: Model): boolean {
-  return m.db.jobs.some((j) => j.state === "succeeded" && j.leaseExpiresAt !== null && Math.abs(j.leaseExpiresAt - m.db.now) < 1);
+  return m.db.jobs.some((j) => isReconcilable(j.state) && j.leaseExpiresAt !== null && Math.abs(j.leaseExpiresAt - m.db.now) < 1);
 }
 
 /** R1: a worker's reconcile claim. */
@@ -497,6 +499,8 @@ class ReconcileClaimCmd implements Cmd {
     const real = await claimReconcile(r.pool, { workerId: this.w, leaseSeconds: LEASE });
     expect(real ? `${real.job.id}:${real.fencingToken}` : null, this.toString()).toEqual(claimed ? `${claimed.jobId}:${claimed.token}` : null);
     hit(`R1:${claimed ? "claimed" : "none"}`);
+    if (real) hit(`R1:claimed:${real.state}`); // D55: the claimed terminal state
+    if (real && claimed) expect(real.state, `${this.toString()}: claimed state`).toBe(m.db.jobs.find((j) => j.id === claimed.jobId)!.state);
     m.db = next;
     if (claimed) m.held[this.w] = { jobId: claimed.jobId, token: claimed.token };
     await compare(m, r, this.toString());
@@ -506,7 +510,7 @@ class ReconcileClaimCmd implements Cmd {
 
 /** Two due jobs sharing a reconcile_after: Postgres breaks the tie by id, the model by creation order. */
 function reconcileTie(m: Model): boolean {
-  const due = m.db.jobs.filter((j) => j.state === "succeeded" && j.reconciledAt === null && j.reconcileAfter !== null && j.reconcileAfter <= m.db.now);
+  const due = m.db.jobs.filter((j) => isReconcilable(j.state) && j.reconciledAt === null && j.reconcileAfter !== null && j.reconcileAfter <= m.db.now);
   return new Set(due.map((j) => j.reconcileAfter)).size < due.length;
 }
 
@@ -530,19 +534,36 @@ class ReconcileClaimJobCmd implements Cmd {
   toString = () => `reconcileClaimJob(${this.w}, job ${this.i})`;
 }
 
-const RECONCILE_DECISIONS: Record<ReconcileDecision["decision"], ReconcileDecision> = {
-  reconciled: { decision: "reconciled", to: "succeeded", outcome: null, matches: 1, firstMatchRef: "TXN-000001", error: null },
-  duplicate_suspected: { decision: "duplicate_suspected", to: "needs_human", outcome: "duplicate_suspected", matches: 2, firstMatchRef: "TXN-000001", error: "2 matches" },
-  reconcile_unreadable: { decision: "reconcile_unreadable", to: "needs_human", outcome: "reconcile_unreadable", matches: 0, firstMatchRef: null, error: "0 matches" },
-  reconcile_deferred: { decision: "reconcile_deferred", to: "succeeded", outcome: null, backoffSeconds: 20, error: "bank unavailable" },
-};
+/**
+ * R2's decisions, for a job in `state` (the reconcile leaves a job in its own state, or flags it needs_human,
+ * D55). `wrong_state`: a "reconciled" that names ANOTHER terminal state (failed -> succeeded...): R2's guard
+ * (`$4 = state OR $4 = 'needs_human'`) must refuse it, in the model as in the SQL.
+ */
+type R2Name = ReconcileDecision["decision"] | "wrong_state";
+function reconcileDecisionFor(name: R2Name, state: string): ReconcileDecision {
+  const s: ReconcilableState = isReconcilable(state) ? state : "succeeded";
+  switch (name) {
+    case "reconciled":
+      return { decision: "reconciled", to: s, outcome: null, matches: reconcileExpectedMatches(s), firstMatchRef: s === "succeeded" ? "TXN-000001" : null, error: null };
+    case "wrong_state":
+      return { decision: "reconciled", to: s === "succeeded" ? "failed" : "succeeded", outcome: null, matches: 1, firstMatchRef: "TXN-000001", error: null };
+    case "duplicate_suspected":
+      return { decision: "duplicate_suspected", to: "needs_human", outcome: "duplicate_suspected", matches: 2, firstMatchRef: "TXN-000001", error: "2 matches" };
+    case "unrecorded_commit_suspected":
+      return { decision: "unrecorded_commit_suspected", to: "needs_human", outcome: "unrecorded_commit_suspected", matches: 1, firstMatchRef: "TXN-000001", error: "1 match on a failed job" };
+    case "reconcile_unreadable":
+      return { decision: "reconcile_unreadable", to: "needs_human", outcome: "reconcile_unreadable", matches: 0, firstMatchRef: null, error: "0 matches" };
+    case "reconcile_deferred":
+      return { decision: "reconcile_deferred", to: s, outcome: null, backoffSeconds: 20, error: "bank unavailable" };
+  }
+}
 
-/** The worker that holds a succeeded job's reconcile lease right now (by the model), if any. */
+/** The worker that holds a terminal job's reconcile lease right now (by the model), if any. */
 function reconcilerOf(m: Readonly<Model>): W | undefined {
   return WORKERS.find((x) => {
     const h = m.held[x];
     const j = h && m.db.jobs.find((jj) => jj.id === h.jobId);
-    return j !== undefined && j.state === "succeeded" && j.token === h!.token && j.owner === x;
+    return j !== undefined && isReconcilable(j.state) && j.token === h!.token && j.owner === x;
   });
 }
 const resolveReconciler = (m: Readonly<Model>, who: Who): W | undefined => (who === "holder" ? reconcilerOf(m) : m.held[who] ? who : undefined);
@@ -551,13 +572,13 @@ const resolveReconciler = (m: Readonly<Model>, who: Who): W | undefined => (who 
 class ReconcileResultCmd implements Cmd {
   constructor(
     readonly who: Who,
-    readonly decision: ReconcileDecision["decision"],
+    readonly decision: R2Name,
   ) {}
   check = (m: Readonly<Model>) => resolveReconciler(m, this.who) !== undefined;
   async run(m: Model, r: Real) {
     const w = resolveReconciler(m, this.who)!;
     const h = m.held[w]!;
-    const d = RECONCILE_DECISIONS[this.decision];
+    const d = reconcileDecisionFor(this.decision, m.db.jobs.find((j) => j.id === h.jobId)!.state);
     const lookups = d.decision === "reconcile_deferred" ? [null] : [d.matches];
     const { db: next, result } = modelReconcileResult(m.db, { jobId: h.jobId, token: h.token, owner: w }, d, lookups);
     const real = await realFenced(() => writeReconcileResult(r.pool, { jobId: h.jobId, fencingToken: h.token, workerId: w, decision: d, lookups, evidenceRefs: ["e"], patch: { decision: d.decision } }));
@@ -618,9 +639,14 @@ const commandArbs = [
 const reconcileArbs = [
   ...Array.from({ length: 2 }, () => w.map((x): Cmd => new ReconcileClaimCmd(x))),
   fc.tuple(w, fc.constantFrom(0, 1)).map(([x, i]): Cmd => new ReconcileClaimJobCmd(x, i)),
-  ...Array.from({ length: 2 }, () =>
-    fc.tuple(who, fc.constantFrom<ReconcileDecision["decision"]>("reconciled", "duplicate_suspected", "reconcile_unreadable", "reconcile_deferred")).map(([x, d]): Cmd => new ReconcileResultCmd(x, d)),
+  // R2 three times over (it needs a worker holding a terminal job's reconcile lease, rarer than a claim),
+  // plus R2 with a decision naming another terminal state (D55's guard).
+  ...Array.from({ length: 3 }, () =>
+    fc
+      .tuple(who, fc.constantFrom<R2Name>("reconciled", "duplicate_suspected", "unrecorded_commit_suspected", "reconcile_unreadable", "reconcile_deferred"))
+      .map(([x, d]): Cmd => new ReconcileResultCmd(x, d)),
   ),
+  who.map((x): Cmd => new ReconcileResultCmd(x, "wrong_state")),
 ].map((arb) => arb.map((c) => synced(c)));
 
 describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema", () => {
@@ -685,11 +711,16 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
     );
   }, 300_000);
 
-  it(`${VERIFY_RUNS} more sequences that START with a job that succeeded after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4 succeeded): the reconcile pass; then every Step 9 and Step 10 path was exercised`, async () => {
+  it(`${RECONCILE_RUNS} more sequences that START with a job that turned terminal after a [0, 0] verify -- succeeded, failed or business_outcome after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4), or failed by T7 exhausted (D55): the reconcile pass; then every Step 9 and Step 10 path was exercised`, async () => {
     const pool = db.pool;
     await fc.assert(
       fc.asyncProperty(
-        fc.record({ maxAttempts: fc.constantFrom(2, 3), jobs: fc.constantFrom(1, 2), early: fc.boolean() }),
+        fc.record({
+          maxAttempts: fc.constantFrom(2, 3),
+          jobs: fc.constantFrom(1, 2),
+          early: fc.boolean(),
+          start: fc.constantFrom<"succeeded" | "failed" | "business_outcome" | "exhausted">("succeeded", "succeeded", "failed", "business_outcome", "exhausted"),
+        }),
         fc.commands([...commandArbs, ...reconcileArbs], { maxCommands: 15, size: "max" }),
         async (cfg, cmds) => {
           await resetQueueTables(pool);
@@ -701,21 +732,20 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
           }
           const model = { db: { now: 0, jobs, caps: { [TENANT]: 2 } }, held: {} } as Model;
           const real = { pool, tokens: new Map<string, number>(), lastSync: Date.now() } as Real;
-          // The prefix, through the same commands (compared too): job 0 is resubmitted and succeeds on attempt 2
-          // (marked: reconcile due in 60 s); `early` also moves the clock to it.
-          const prefix: Cmd[] = [
-            new DequeueCmd("wA"),
-            new CompleteIntoVerifyCmd("wA", "failure"),
-            new VerifyResultCmd("wA", "resubmitted"),
-            new DequeueCmd("wB"),
-            new CompleteCmd("wB", "succeeded"),
-            ...(cfg.early ? [new TickCmd(45), new TickCmd(29)] : []),
-          ];
+          // The prefix, through the same commands (compared too): job 0 is resubmitted and ends on attempt 2 in
+          // `start` (T4), or its first verify reads [0, 0] and fails it outright (T7 exhausted); either way it
+          // is marked (reconcile due in 60 s). `early` also moves the clock to it.
+          const prefix: Cmd[] =
+            cfg.start === "exhausted"
+              ? [new DequeueCmd("wA"), new CompleteIntoVerifyCmd("wA", "failure"), new VerifyResultCmd("wA", "exhausted")]
+              : [new DequeueCmd("wA"), new CompleteIntoVerifyCmd("wA", "failure"), new VerifyResultCmd("wA", "resubmitted"), new DequeueCmd("wB"), new CompleteCmd("wB", cfg.start)];
+          if (cfg.early) prefix.push(new TickCmd(45), new TickCmd(29));
           for (const c of prefix.map(synced)) await c.run(model, real);
+          expect(model.db.jobs[0]!.reconcileAfter, `the ${cfg.start} prefix marks job 0`).not.toBeNull();
           await fc.asyncModelRun(() => ({ model, real }), cmds);
         },
       ),
-      { numRuns: VERIFY_RUNS, seed: SEED + 2 },
+      { numRuns: RECONCILE_RUNS, seed: SEED + 2 },
     );
     // Every Step 9 and Step 10 path was exercised, recorded AND fenced, not just generated (all three tests together).
     const seen = JSON.stringify(Object.fromEntries(hits));
@@ -727,7 +757,9 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
       "recover:T6.1", "recover:T6.2", "recover:T6.4", "recover:T6.5", "recover:T6.7",
       "dequeue:held_back_by_not_before",
       "R1:claimed", "R1:none", "batchClaim:claimed", "batchClaim:refused",
+      "R1:claimed:succeeded", "R1:claimed:failed", "R1:claimed:business_outcome", // D55
       "R2:reconciled:recorded", "R2:duplicate_suspected:recorded", "R2:reconcile_unreadable:recorded", "R2:reconcile_deferred:recorded",
+      "R2:unrecorded_commit_suspected:recorded", "R2:wrong_state:illegal_transition",
       "reverify:moved", "reverify:refused",
     ]) {
       expect(hits.get(key) ?? 0, `never happened: ${key}; seen ${seen}`).toBeGreaterThan(0);

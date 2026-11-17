@@ -8,12 +8,21 @@
 //   verify_decisions_total      one per finished verify phase, by decision (already_done, resubmitted,
 //                               deferred, ...); Step 9
 //   reconcile_decisions_total   one per recorded reconcile run, by decision (reconciled,
-//                               duplicate_suspected, reconcile_unreadable, reconcile_deferred); Step 10 (D50)
-//   duplicates_detected_total   a reconcile found 2+ transfers for one job (duplicate_suspected): the zombie
-//                               window, made loud. Its error-level log line carries the process's total
+//                               duplicate_suspected, unrecorded_commit_suspected, reconcile_unreadable,
+//                               reconcile_deferred); Step 10 (D50, D55)
+//   duplicates_detected_total   a reconcile found 2+ transfers for one succeeded job (duplicate_suspected):
+//                               the zombie window, made loud. Its error-level log line carries the total
+//   unrecorded_commits_detected_total
+//                               a reconcile found 1+ transfers for a job that ended failed / business_outcome
+//                               (unrecorded_commit_suspected, D55). Its error-level log line carries the total
 //
 // Labels are a small fixed set per counter (the decision name), never a job id.
-export type WorkerCounter = "illegal_transitions_total" | "verify_decisions_total" | "reconcile_decisions_total" | "duplicates_detected_total";
+export type WorkerCounter =
+  | "illegal_transitions_total"
+  | "verify_decisions_total"
+  | "reconcile_decisions_total"
+  | "duplicates_detected_total"
+  | "unrecorded_commits_detected_total";
 
 export interface WorkerMetrics {
   inc(name: WorkerCounter, labels?: Record<string, string>): void;

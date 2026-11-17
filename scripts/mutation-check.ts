@@ -82,6 +82,18 @@ export const MUTANTS: Mutant[] = [
     what: "Step 10: T4's requeue after a failure sets no not_before (retries do not back off)",
     tests: ["src/fleet/modelVsReal.db.test.ts", "src/worker/complete.db.test.ts"],
   },
+  {
+    id: "09",
+    patch: "09-reconcile-ignores-unrecorded-commits.patch",
+    what: "Step 10b (D55): the reconcile reads 1+ matches on a failed / business_outcome job as reconciled (the unrecorded commit stays silent)",
+    tests: ["src/fleet/stateMachine.property.test.ts", "src/fleet/stateMachine.test.ts"],
+  },
+  {
+    id: "10",
+    patch: "10-reconcile-marks-only-resubmitted.patch",
+    what: "Step 10b (D55): only a `resubmitted` verify marks a terminal job for the reconcile pass (a T6.4 [0, 0] that fails the job outright, `exhausted`, is never re-read)",
+    tests: ["src/fleet/stateMachine.property.test.ts"],
+  },
 ];
 
 function argValue(name: string): string | undefined {

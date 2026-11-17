@@ -481,10 +481,12 @@ jobsCommand
 program
   .command("reconcile")
   .description(
-    "End-of-day reconciliation (D51): re-read the bank's history for EVERY job in the window that succeeded after a " +
-      "resubmit, regardless of whether the workers' reconcile pass already ran, and flag 2+ matches exactly like it " +
-      "(needs_human / duplicate_suspected). Read-only toward the bank (the history lookup only). Needs the tenants' " +
-      "ROTE_CRED_* variables, like a worker. Exit 0: nothing flagged; 1: something flagged or left undecided; 2: could not run.",
+    "End-of-day reconciliation (D51, D55): re-read the bank's history for EVERY job in the window that ended succeeded, " +
+      "failed or business_outcome after a [0, 0] verify (e.g. a resubmit), regardless of whether the workers' reconcile " +
+      "pass already ran, and flag it exactly like that pass: a succeeded job with 2+ matches (needs_human / " +
+      "duplicate_suspected), a failed / business_outcome job with 1+ (needs_human / unrecorded_commit_suspected). " +
+      "Read-only toward the bank (the history lookup only). Needs the tenants' ROTE_CRED_* variables, like a worker. " +
+      "Exit 0: nothing flagged; 1: something flagged or left undecided; 2: could not run.",
   )
   .requiredOption("--since <duration>", "the window, e.g. 24h, 30m, 2d (jobs whose reconcile_after is within it)")
   .option("--tenant <tenant>", "only this tenant's jobs")
@@ -528,9 +530,16 @@ program
         },
         { sinceSeconds, tenant: opts.tenant },
       );
-      for (const r of report.rows) logger.info({ jobId: r.jobId, tenant: r.tenant, result: r.result, matches: r.matches, detail: r.detail }, "reconcile: job");
+      for (const r of report.rows) logger.info({ jobId: r.jobId, tenant: r.tenant, state: r.state, result: r.result, matches: r.matches, detail: r.detail }, "reconcile: job");
       logger.info(
-        { since: opts.since, jobs: report.rows.length, flagged: report.flagged, undecided: report.undecided, duplicates_detected_total: metrics.get("duplicates_detected_total") },
+        {
+          since: opts.since,
+          jobs: report.rows.length,
+          flagged: report.flagged,
+          undecided: report.undecided,
+          duplicates_detected_total: metrics.get("duplicates_detected_total"),
+          unrecorded_commits_detected_total: metrics.get("unrecorded_commits_detected_total"),
+        },
         report.flagged > 0 ? "reconcile: FLAGGED jobs for a human (needs_human)" : report.undecided > 0 ? "reconcile: some jobs could not be decided; run it again" : "reconcile: every job in the window reconciled",
       );
       if (report.flagged > 0 || report.undecided > 0) process.exitCode = 1;

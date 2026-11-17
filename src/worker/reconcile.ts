@@ -1,46 +1,51 @@
-// The reconcile pass (Step 10: docs/plans/step-10.md section 2; reviewer decisions 3 and 5; D50, D51).
-// Verify + resubmit reopens the zombie window: a worker frozen after its intent can click after another
-// worker verified [0, 0] and resubmitted. The window is not closed; it is made LOUD. A job that SUCCEEDED
-// AFTER A RESUBMIT is marked by T4 / T7 (reconcile_after = now() + lease + settle + margin), and once it is
-// due, one worker re-reads the bank's history for its memo_key:
+// The reconcile pass (Step 10: docs/plans/step-10.md section 2; reviewer decisions 3 and 5; D50, D51; every
+// terminal state since the reviewer decisions on 10a, decision 2: D55). Verify + resubmit reopens the zombie
+// window: a worker frozen after its intent can click after another worker verified [0, 0] and decided. The
+// window is not closed; it is made LOUD. A TERMINAL job (succeeded, failed, business_outcome) on which a
+// verify once read [0, 0] (resubmitted, exhausted, not_committed_final) is marked by T4 / T6.2 / T7
+// (reconcile_after = now() + lease + settle + margin), and once it is due, one worker re-reads the bank's
+// history for its memo_key, expecting 1 row for succeeded and 0 for failed / business_outcome:
 //
 //   R1  claim (RECONCILE_CLAIM_SQL, in the worker's beforeDequeue after the recovery sweep, at most one
-//       per loop iteration): the job STAYS succeeded; the reconcile lease lives in lease_owner /
-//       lease_expires_at (jobs_lease_pair holds; jobs_active_has_owner does not apply to succeeded);
+//       per loop iteration): the job STAYS in its terminal state; the reconcile lease lives in lease_owner /
+//       lease_expires_at (jobs_lease_pair holds; jobs_active_has_owner does not apply to terminal states);
 //       token + 1; a job_verifications row with reason 'reconcile'. A dead reconciler's open row is closed
 //       `crashed`, and its expired lease is simply claimable again here (T6 only looks at active states).
 //   one lookup (the verify lookup, 1.2.0; one retry if transient). No heartbeat: a lookup takes about a
 //       second against the lease, and a reconciler whose lease expired is fenced out by the next claim's
 //       token bump and simply runs again (it is read-only).
-//   decide with the pure reconcileDecision (src/fleet/stateMachine.ts)
-//   R2  write it (RECONCILE_RESULT_SQL), fenced on (id, token, owner, state succeeded): reconciled (stays
-//       succeeded), duplicate_suspected / reconcile_unreadable (needs_human, result.reconcile kept), or
-//       reconcile_deferred (reconcile_after moves by D44's backoff). 0 rows -> readFence (D41).
+//   decide with the pure reconcileDecision (src/fleet/stateMachine.ts), given the claimed state
+//   R2  write it (RECONCILE_RESULT_SQL), fenced on (id, token, owner, the claimed state): reconciled (stays),
+//       duplicate_suspected / unrecorded_commit_suspected / reconcile_unreadable (needs_human, result.reconcile
+//       kept), or reconcile_deferred (reconcile_after moves by D44's backoff). 0 rows -> readFence (D41).
 //
 // The end-of-day batch (reviewer decision 5, D51): `rote reconcile --since <duration>` runs the same phase
-// for every succeeded-after-resubmit job in the window, regardless of reconciled_at (RECONCILE_CLAIM_JOB_SQL
-// claims one job by id), so a zombie that clicked after the pass ran is still found. Read-only toward the
-// bank: only the lookup, never approveRisky.
+// for every such job in the window, regardless of reconciled_at (RECONCILE_CLAIM_JOB_SQL claims one job by
+// id), so a zombie that clicked after the pass ran is still found. Read-only toward the bank: only the
+// lookup, never approveRisky.
 import type { JobRow, Pool, Queryable } from "../queue/index.js";
 import { withTransaction } from "../queue/index.js";
 import {
   DEFAULT_DEFER_CONFIG,
+  isReconcilable,
   lookupsColumn,
+  RECONCILE_FLAGS,
   reconcileDecision,
   reconcileResultPatch,
   type LookupReading,
+  type ReconcilableState,
   type ReconcileDecision,
 } from "../fleet/stateMachine.js";
-import { retryTransient, type FencedOutReason } from "./complete.js";
+import { RECONCILABLE_STATES_SQL, retryTransient, type FencedOutReason } from "./complete.js";
 import { NO_METRICS } from "./metrics.js";
 import { createLookup, type VerifyContext } from "./verify.js";
 import { END_PHASE_SQL, fencedOutPhase, type FencedWrite } from "./verifySql.js";
 
 /** R1, the worker's claim: the due job with the earliest reconcile_after that nobody holds. */
 export const RECONCILE_CLAIM_SQL = `
-SELECT id, fencing_token, tenant_id, params, memo_key, attempt, max_attempts, result
+SELECT id, state, fencing_token, tenant_id, params, memo_key, attempt, max_attempts, result
 FROM jobs
-WHERE state = 'succeeded' AND reconciled_at IS NULL AND reconcile_after <= now()
+WHERE state IN (${RECONCILABLE_STATES_SQL}) AND reconciled_at IS NULL AND reconcile_after <= now()
   AND (lease_expires_at IS NULL OR lease_expires_at < now())
 ORDER BY reconcile_after, id
 LIMIT 1
@@ -48,9 +53,9 @@ FOR UPDATE SKIP LOCKED`;
 
 /** The batch's claim of one job (rote reconcile --since): regardless of reconciled_at. */
 export const RECONCILE_CLAIM_JOB_SQL = `
-SELECT id, fencing_token, tenant_id, params, memo_key, attempt, max_attempts, result
+SELECT id, state, fencing_token, tenant_id, params, memo_key, attempt, max_attempts, result
 FROM jobs
-WHERE id = $1 AND state = 'succeeded' AND reconcile_after IS NOT NULL
+WHERE id = $1 AND state IN (${RECONCILABLE_STATES_SQL}) AND reconcile_after IS NOT NULL
   AND (lease_expires_at IS NULL OR lease_expires_at < now())
 FOR UPDATE SKIP LOCKED`;
 
@@ -62,15 +67,17 @@ WHERE job_id = $1 AND fencing_token = $2 AND ended_at IS NULL`;
 export const RECONCILE_LEASE_SQL = `
 UPDATE jobs SET fencing_token = fencing_token + 1, lease_owner = $3,
        lease_expires_at = now() + make_interval(secs => $4), updated_at = now()
-WHERE id = $1 AND fencing_token = $2 AND state = 'succeeded'
+WHERE id = $1 AND fencing_token = $2 AND state IN (${RECONCILABLE_STATES_SQL})
 RETURNING fencing_token`;
 
 export const INSERT_RECONCILE_PHASE_SQL = `
 INSERT INTO job_verifications (job_id, fencing_token, worker_id, reason) VALUES ($1, $2, $3, 'reconcile')`;
 
 /**
- * R2. $4 = the job's state (succeeded | needs_human), $5 outcome, $6 error, $7 the result.reconcile patch,
- * $8 the decision, $9 the deferral's backoff in seconds (reconcile_deferred only).
+ * R2. $4 = the job's new state (the state it was claimed in: a reconciled / deferred run leaves it; or
+ * needs_human: a flag), $5 outcome, $6 error, $7 the result.reconcile patch, $8 the decision, $9 the
+ * deferral's backoff in seconds (reconcile_deferred only). The guard: the job is still in a reconcilable
+ * terminal state, and $4 is that same state or needs_human (never failed -> succeeded).
  */
 export const RECONCILE_RESULT_SQL = `
 UPDATE jobs
@@ -81,8 +88,8 @@ SET state = $4,
     reconciled_at = CASE WHEN $8 = 'reconcile_deferred' THEN reconciled_at ELSE now() END,
     reconcile_after = CASE WHEN $8 = 'reconcile_deferred' THEN now() + make_interval(secs => $9) ELSE reconcile_after END,
     lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
-WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3 AND state = 'succeeded'
-  AND $4 IN ('succeeded', 'needs_human')
+WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3 AND state IN (${RECONCILABLE_STATES_SQL})
+  AND ($4 = state OR $4 = 'needs_human')
 RETURNING id`;
 
 /** The job's reconcile deferrals: how many, and seconds since the first one ended (database clock). */
@@ -94,6 +101,8 @@ FROM job_verifications WHERE job_id = $1 AND reason = 'reconcile'`;
 export interface ReconcileClaim {
   label: "R1";
   job: Pick<JobRow, "id" | "tenant_id" | "params" | "memo_key" | "attempt" | "max_attempts">;
+  /** The terminal state the job was claimed in: what the history must agree with (1 row or 0, D55). */
+  state: ReconcilableState;
   /** This run's token (the new one). */
   fencingToken: number;
   /** The job's own result.outputs.confirmationRef, for the record. */
@@ -102,6 +111,7 @@ export interface ReconcileClaim {
 
 type ClaimRow = {
   id: string;
+  state: string;
   fencing_token: number;
   tenant_id: string;
   params: Record<string, unknown>;
@@ -117,6 +127,8 @@ function confirmationRefOf(result: unknown): string | null {
 }
 
 async function leaseFor(client: Queryable, row: ClaimRow, workerId: string, leaseSeconds: number): Promise<ReconcileClaim> {
+  if (!isReconcilable(row.state)) throw new Error(`reconcile: job ${row.id} claimed in state ${row.state}`);
+  const state = row.state;
   await client.query(CLOSE_DEAD_RECONCILE_SQL, [row.id, row.fencing_token, `reconcile lease expired; re-claimed by ${workerId}`]);
   const updated = await client.query<{ fencing_token: number }>(RECONCILE_LEASE_SQL, [row.id, row.fencing_token, workerId, leaseSeconds]);
   if (updated.rowCount !== 1) throw new Error(`reconcile: job ${row.id} changed under its row lock (token ${row.fencing_token})`);
@@ -125,6 +137,7 @@ async function leaseFor(client: Queryable, row: ClaimRow, workerId: string, leas
   return {
     label: "R1",
     job: { id: row.id, tenant_id: row.tenant_id, params: row.params, memo_key: row.memo_key, attempt: row.attempt, max_attempts: row.max_attempts },
+    state,
     fencingToken: token,
     confirmationRef: confirmationRefOf(row.result),
   };
@@ -138,7 +151,7 @@ export async function claimReconcile(pool: Pool, input: { workerId: string; leas
   });
 }
 
-/** The batch's claim of ONE job by id, regardless of reconciled_at; null if it is not succeeded or someone holds it. */
+/** The batch's claim of ONE job by id, regardless of reconciled_at; null if it is no longer reconcilable or someone holds it. */
 export async function claimReconcileJob(pool: Pool, input: { jobId: string; workerId: string; leaseSeconds: number }): Promise<ReconcileClaim | null> {
   return withTransaction(pool, async (client) => {
     const row = (await client.query<ClaimRow>(RECONCILE_CLAIM_JOB_SQL, [input.jobId])).rows[0];
@@ -189,15 +202,17 @@ export interface ReconcilePhaseOutcome {
 // ------------------------------------------------------------------------------- the end-of-day batch
 
 /**
- * The batch's window (rote reconcile --since): every job that succeeded after a resubmit (reconcile_after
- * set) and is still succeeded, whose reconcile_after is inside the window. reconcile_after is the success
- * moment + the reconcile delay (moved later by a deferral), so the window reaches back `since` plus one
- * delay: a few more jobs than strictly "succeeded in the window", never fewer (it is read-only).
+ * The batch's window (rote reconcile --since): every job marked for the reconcile pass (reconcile_after set:
+ * terminal after a [0, 0] verify) and still in that terminal state (succeeded, failed, business_outcome; a
+ * flagged job is needs_human, a human's already), whose reconcile_after is inside the window.
+ * reconcile_after is the terminal moment + the reconcile delay (moved later by a deferral), so the window
+ * reaches back `since` plus one delay: a few more jobs than strictly "ended in the window", never fewer (it
+ * is read-only).
  */
 export const RECONCILE_WINDOW_SQL = `
-SELECT id, tenant_id, reconcile_after, reconciled_at, (reconciled_at IS NULL AND reconcile_after > now()) AS not_due
+SELECT id, tenant_id, state, reconcile_after, reconciled_at, (reconciled_at IS NULL AND reconcile_after > now()) AS not_due
 FROM jobs
-WHERE state = 'succeeded' AND reconcile_after IS NOT NULL
+WHERE state IN (${RECONCILABLE_STATES_SQL}) AND reconcile_after IS NOT NULL
   AND reconcile_after > now() - make_interval(secs => $1)
   AND ($2::text IS NULL OR tenant_id = $2)
 ORDER BY reconcile_after, id`;
@@ -216,6 +231,8 @@ export type BatchRowResult = ReconcileDecision["decision"] | "not_due" | "busy" 
 export interface BatchRow {
   jobId: string;
   tenant: string;
+  /** The terminal state the job was in when the window was read. */
+  state: string;
   /** The decision R2 recorded; not_due (the workers' pass has not run yet, skipped); busy (someone holds it); not_recorded (fenced out / stopped). */
   result: BatchRowResult;
   wasReconciledAt: Date | null;
@@ -226,31 +243,32 @@ export interface BatchRow {
 export interface BatchReport {
   sinceSeconds: number;
   rows: BatchRow[];
-  /** duplicate_suspected + reconcile_unreadable: jobs moved to needs_human by this run. */
+  /** duplicate_suspected + unrecorded_commit_suspected + reconcile_unreadable: jobs moved to needs_human by this run. */
   flagged: number;
   /** reconcile_deferred + busy + not_recorded: jobs this run could not decide (run it again). */
   undecided: number;
 }
 
 /**
- * `rote reconcile --since <duration>` (reviewer decision 5, D51): runs the reconcile phase (claim by id,
- * one lookup, R2) on every job in the window that succeeded after a resubmit, REGARDLESS of reconciled_at,
- * one at a time. A job the workers' pass has not reached yet (not due) is left to it.
+ * `rote reconcile --since <duration>` (reviewer decision 5, D51; every terminal state, D55): runs the
+ * reconcile phase (claim by id, one lookup, R2) on every job in the window that a verify once read [0, 0]
+ * on, REGARDLESS of reconciled_at, one at a time. A job the workers' pass has not reached yet (not due) is
+ * left to it.
  */
 export async function reconcileWindow(ctx: VerifyContext, input: { sinceSeconds: number; tenant?: string }): Promise<BatchReport> {
   const candidates = (
-    await ctx.pool.query<{ id: string; tenant_id: string; reconciled_at: Date | null; not_due: boolean }>(RECONCILE_WINDOW_SQL, [input.sinceSeconds, input.tenant ?? null])
+    await ctx.pool.query<{ id: string; tenant_id: string; state: string; reconciled_at: Date | null; not_due: boolean }>(RECONCILE_WINDOW_SQL, [input.sinceSeconds, input.tenant ?? null])
   ).rows;
   const rows: BatchRow[] = [];
   for (const c of candidates) {
-    const base = { jobId: c.id, tenant: c.tenant_id, wasReconciledAt: c.reconciled_at };
+    const base = { jobId: c.id, tenant: c.tenant_id, state: c.state, wasReconciledAt: c.reconciled_at };
     if (c.not_due) {
       rows.push({ ...base, result: "not_due", matches: null, detail: "the workers' reconcile pass is not due yet; left to it" });
       continue;
     }
     const claim = await claimReconcileJob(ctx.pool, { jobId: c.id, workerId: ctx.workerId, leaseSeconds: ctx.leaseSeconds });
     if (!claim) {
-      rows.push({ ...base, result: "busy", matches: null, detail: "held by another reconciler, or no longer succeeded" });
+      rows.push({ ...base, result: "busy", matches: null, detail: "held by another reconciler, or no longer in its terminal state" });
       continue;
     }
     const done = await runReconcilePhase(ctx, claim);
@@ -265,7 +283,7 @@ export async function reconcileWindow(ctx: VerifyContext, input: { sinceSeconds:
   return {
     sinceSeconds: input.sinceSeconds,
     rows,
-    flagged: rows.filter((r) => r.result === "duplicate_suspected" || r.result === "reconcile_unreadable").length,
+    flagged: rows.filter((r) => (RECONCILE_FLAGS as readonly string[]).includes(r.result)).length,
     undecided: rows.filter((r) => r.result === "reconcile_deferred" || r.result === "busy" || r.result === "not_recorded").length,
   };
 }
@@ -279,7 +297,7 @@ export async function runReconcilePhase(
 ): Promise<ReconcilePhaseOutcome> {
   const started = Date.now();
   const metrics = ctx.metrics ?? NO_METRICS;
-  const log = { workerId: ctx.workerId, jobId: claim.job.id, tenant: claim.job.tenant_id, label: claim.label, fencingToken: claim.fencingToken };
+  const log = { workerId: ctx.workerId, jobId: claim.job.id, tenant: claim.job.tenant_id, label: claim.label, jobState: claim.state, fencingToken: claim.fencingToken };
   const done = (rest: Omit<ReconcilePhaseOutcome, "claim" | "durationMs">): ReconcilePhaseOutcome => ({ claim, durationMs: Date.now() - started, ...rest });
   ctx.log?.info(log, "reconcile: started");
   let reading: LookupReading | null = null;
@@ -287,7 +305,7 @@ export async function runReconcilePhase(
     reading = await createLookup(ctx, claim, controller).withRetry();
     const cycle = await retryTransient(() => readReconcileCycle(ctx.pool, claim.job.id), { signal: hardSignal });
     if (cycle === null) return done({ reading, decision: null, recorded: false });
-    const decision = reconcileDecision({ reading, deferrals: cycle.deferrals, deferredForSeconds: cycle.deferredForSeconds, defer: ctx.defer ?? DEFAULT_DEFER_CONFIG });
+    const decision = reconcileDecision({ jobState: claim.state, reading, deferrals: cycle.deferrals, deferredForSeconds: cycle.deferredForSeconds, defer: ctx.defer ?? DEFAULT_DEFER_CONFIG });
     controller.signal.throwIfAborted();
     const lookups = lookupsColumn([reading]);
     const written = await retryTransient(
@@ -319,8 +337,20 @@ export async function runReconcilePhase(
         { ...fields, matches: decision.matches, firstMatchRef: decision.firstMatchRef, jobConfirmationRef: claim.confirmationRef, duplicates_detected_total: metrics.value?.("duplicates_detected_total") ?? null, error: decision.error },
         "reconcile: DUPLICATE SUSPECTED: the job is needs_human / duplicate_suspected",
       );
+    } else if (decision.decision === "unrecorded_commit_suspected") {
+      metrics.inc("unrecorded_commits_detected_total");
+      ctx.log?.error(
+        {
+          ...fields,
+          matches: decision.matches,
+          firstMatchRef: decision.firstMatchRef,
+          unrecorded_commits_detected_total: metrics.value?.("unrecorded_commits_detected_total") ?? null,
+          error: decision.error,
+        },
+        `reconcile: UNRECORDED COMMIT SUSPECTED: the job ended ${claim.state} but the history shows ${decision.matches}; it is needs_human / unrecorded_commit_suspected`,
+      );
     } else if (decision.decision === "reconcile_unreadable") ctx.log?.warn({ ...fields, error: decision.error }, "reconcile: escalated to a human (reconcile_unreadable)");
-    else ctx.log?.info(fields, decision.decision === "reconciled" ? "reconcile: reconciled (1 match)" : `reconcile: deferred ${decision.backoffSeconds} s (bank unavailable)`);
+    else ctx.log?.info(fields, decision.decision === "reconciled" ? `reconcile: reconciled (${decision.matches} match${decision.matches === 1 ? "" : "es"}, as ${claim.state} promises)` : `reconcile: deferred ${decision.backoffSeconds} s (bank unavailable)`);
     return done({ reading, decision, recorded: true });
   } catch (err) {
     if (controller.signal.aborted) {

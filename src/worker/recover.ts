@@ -35,6 +35,7 @@ import {
   type RecoveryAction,
   type VerifyCycle,
 } from "../fleet/stateMachine.js";
+import { DEFAULT_RECONCILE_DUE_SECONDS, RECONCILABLE_STATES_SQL, RECONCILE_TRIGGERED_SQL } from "./complete.js";
 import type { WorkerLogger } from "./loop.js";
 import { claimReconcile, type ReconcileClaim } from "./reconcile.js";
 import { INSERT_PHASE_SQL, readVerifyCycle } from "./verifySql.js";
@@ -55,11 +56,15 @@ FOR UPDATE SKIP LOCKED`;
  * T6.1/T6.2/T6.6: the decided state ($4) and outcome ($5; NULL keeps it, for a requeue), token + 1,
  * lease cleared. The jobs_queued_has_attempts_left CHECK still refuses a requeue with no attempt left (D21).
  * A crash requeue (T6.1) does not back off (not_before NULL, D49): the bank did nothing wrong, and the
- * lease expiry already cost a full lease.
+ * lease expiry already cost a full lease. T6.2 (failed) on a job a verify read [0, 0] on earlier (it was
+ * resubmitted) marks it for the reconcile pass, $7 seconds out (D55): the earlier attempt's zombie can
+ * still click.
  */
 export const RECOVER_JOB_SQL = `
 UPDATE jobs
 SET state = $4, outcome = COALESCE($5, outcome), error = $6, not_before = NULL,
+    reconcile_after = CASE WHEN $4 IN (${RECONCILABLE_STATES_SQL}) AND ${RECONCILE_TRIGGERED_SQL}
+                      THEN now() + make_interval(secs => $7) ELSE reconcile_after END,
     fencing_token = fencing_token + 1, lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
 WHERE id = $1 AND fencing_token = $2 AND state = $3 AND lease_expires_at < now()
 RETURNING fencing_token`;
@@ -120,6 +125,8 @@ export interface RecoverOptions {
   leaseSeconds: number;
   /** Test-only crash point recover-in-transaction: after the claim's updates, before COMMIT (D34). */
   fault?: FaultInjector;
+  /** T6.2 on a job a verify read [0, 0] on: seconds until the reconcile pass re-reads it (D55). Default 60. */
+  reconcileDueSeconds?: number;
 }
 
 /** T6 for at most one job. null = no expired lease that another recoverer is not already holding. */
@@ -158,7 +165,15 @@ export async function recoverOne(pool: Pool, options: RecoverOptions): Promise<R
             options.leaseSeconds,
             note,
           ])
-        : await client.query<{ fencing_token: number }>(RECOVER_JOB_SQL, [row.id, row.fencing_token, row.state, action.to, action.outcome, note]);
+        : await client.query<{ fencing_token: number }>(RECOVER_JOB_SQL, [
+            row.id,
+            row.fencing_token,
+            row.state,
+            action.to,
+            action.outcome,
+            note,
+            options.reconcileDueSeconds ?? DEFAULT_RECONCILE_DUE_SECONDS,
+          ]);
     if (updated.rowCount !== 1) {
       // Impossible while we hold the row lock; if it ever happens, roll back and say so loudly.
       throw new Error(`recovery: job ${row.id} changed under its row lock (token ${row.fencing_token}, state ${row.state})`);
@@ -231,6 +246,8 @@ export function createRecoverySweep(options: {
   onRecovered?: (r: RecoveredJob) => void;
   /** Also claim one due reconcile (R1) when recovery claimed nothing to verify. The entrypoint sets it. */
   reconcile?: boolean;
+  /** T6.2's reconcile mark (D55): lease + settle + margin. Default 60. */
+  reconcileDueSeconds?: number;
 }): () => Promise<VerifyClaim | ReconcileClaim | null> {
   return async () => {
     try {
@@ -239,6 +256,7 @@ export function createRecoverySweep(options: {
         leaseSeconds: options.leaseSeconds,
         fault: options.fault,
         max: options.max,
+        reconcileDueSeconds: options.reconcileDueSeconds,
         onRecovered: (r) => {
           options.log?.warn(
             {
@@ -260,7 +278,7 @@ export function createRecoverySweep(options: {
       });
       if (claim || !options.reconcile) return claim;
       const due = await claimReconcile(options.pool, { workerId: options.workerId, leaseSeconds: options.leaseSeconds });
-      if (due) options.log?.info({ workerId: options.workerId, jobId: due.job.id, fencingToken: due.fencingToken }, "worker: a job that succeeded after a resubmit is due; reconciling it (R1)");
+      if (due) options.log?.info({ workerId: options.workerId, jobId: due.job.id, fencingToken: due.fencingToken }, "worker: a terminal job a verify once read [0, 0] on is due; reconciling it (R1)");
       return due;
     } catch (err) {
       if (!isTransientDbError(err)) throw err;

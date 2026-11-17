@@ -315,9 +315,10 @@ export type PhaseDecision =
   | "lease_lost"
   | "crashed"
   | "illegal_transition"
-  // A reconcile run's decisions (Step 10, D50).
+  // A reconcile run's decisions (Step 10, D50; unrecorded_commit_suspected: D55).
   | "reconciled"
   | "duplicate_suspected"
+  | "unrecorded_commit_suspected"
   | "reconcile_unreadable"
   | "reconcile_deferred";
 /** Phases that ended without a decision: they count toward the 3-phase cap (T6.6). */
@@ -648,32 +649,39 @@ export function alreadyDoneResult(d: Extract<VerifyDecision, { decision: "alread
 export const REVERIFIABLE_OUTCOMES = ["commit_uncertain", "unreadable", "verify_unavailable", "verify_exhausted"] as const;
 
 // ---------------------------------------------------------------------------------------------------
-// The reconcile pass (Step 10: docs/plans/step-10.md section 2; reviewer decisions 3 and 5; D50).
+// The reconcile pass (Step 10: docs/plans/step-10.md section 2; reviewer decisions 3 and 5; D50; widened by
+// the reviewer decisions on 10a, decision 2: D55).
 //
 // Verify + resubmit reopens the zombie window (docs/plans/step-08.md section 6): a worker frozen after its
-// intent can click after another worker verified [0, 0] and resubmitted, and the bank has no lease to
-// check. The window is not closed; it is made LOUD. Only a job that SUCCEEDED AFTER A RESUBMIT can carry
-// such a late second transfer, so T4 (succeeded) and T7 (already_done) mark it: reconcile_after = now() +
-// reconcileDueSeconds (lease + settle + margin: by then a zombie frozen across its lease has had a full
-// settle period, and the margin, to click). R1 claims a due job under a reconcile lease, one history
-// lookup (the same lookup as verify, one retry if transient) reads it, and R2 writes reconcileDecision:
+// intent can click after another worker verified [0, 0] and decided, and the bank has no lease to check.
+// The window is not closed; it is made LOUD. A job can carry such a late click when a verify once read
+// [0, 0] on it -- the decision `resubmitted`, `exhausted` or `not_committed_final` (RECONCILE_TRIGGERS) --
+// whatever terminal state it then reached. So every TERMINAL transition to succeeded, failed or
+// business_outcome (T4, T6.2, T7) of such a job marks it: reconcile_after = now() + reconcileDueSeconds
+// (lease + settle + margin: by then a zombie frozen across its lease has had a full settle period, and the
+// margin, to click). R1 claims a due job under a reconcile lease, one history lookup (the same lookup as
+// verify, one retry if transient) reads it, and R2 writes reconcileDecision. The count the job's own state
+// promises: 1 row for succeeded, 0 for failed / business_outcome (reconcileExpectedMatches):
 //
-//   lookup                      decision               job
-//   1 match                     reconciled             stays succeeded (reconciled_at = now)
-//   2+ matches                  duplicate_suspected    needs_human; duplicates_detected_total + 1; an error log line
-//   0 matches / unreadable      reconcile_unreadable   needs_human (a succeeded job the history cannot show is an alarm)
-//   unavailable, within budget  reconcile_deferred     stays succeeded, reconcile_after = now + backoff (D44's)
-//   unavailable, budget spent   reconcile_unreadable   needs_human
+//   job state            lookup                      decision                      job
+//   succeeded            1 match                     reconciled                    stays succeeded (reconciled_at = now)
+//   succeeded            2+ matches                  duplicate_suspected           needs_human; duplicates_detected_total + 1; an error log line
+//   succeeded            0 matches                   reconcile_unreadable          needs_human (a succeeded job the history cannot show is an alarm)
+//   failed / bus. out.   0 matches                   reconciled                    stays failed / business_outcome
+//   failed / bus. out.   1+ matches                  unrecorded_commit_suspected   needs_human; unrecorded_commits_detected_total + 1; an error log line
+//   any                  unreadable                  reconcile_unreadable          needs_human
+//   any                  unavailable, within budget  reconcile_deferred            stays as it is, reconcile_after = now + backoff (D44's)
+//   any                  unavailable, budget spent   reconcile_unreadable          needs_human
 //
-// The one exception to "terminal states are final": succeeded -> needs_human (reviewer decision 3). A job
-// is SETTLED (GET /jobs/:id `settled`) once it is terminal and no reconcile is due: it never had a
-// reconcile_after, or the reconcile decided (reconciled_at). Until then a succeeded job can still become
-// needs_human.
+// The one exception to "terminal states are final": a reconcile's flag, succeeded / failed / business_outcome
+// -> needs_human (reviewer decision 3; 10a decision 2). A job is SETTLED (GET /jobs/:id `settled`) once it
+// is terminal and no reconcile is due: it never had a reconcile_after, or the reconcile decided
+// (reconciled_at). Until then a terminal job can still become needs_human.
 //
 // The honest limit (reviewer decision 5): a zombie frozen longer than the delay that also beats its own
-// overdue heartbeat on waking clicks AFTER the reconcile read, and that duplicate is silent again. The
-// end-of-day batch `rote reconcile --since <duration>` re-reads every such job in a window, regardless of
-// reconciled_at, and flags 2+ matches exactly like R2.
+// overdue heartbeat on waking clicks AFTER the reconcile read, and that row is silent again. The end-of-day
+// batch `rote reconcile --since <duration>` re-reads every such job in a window, regardless of
+// reconciled_at, and flags it exactly like R2.
 
 /** The reconcile margin's default (ROTE_RECONCILE_MARGIN_SECONDS): production delay 30 + 5 + 25 = 60 s. */
 export const DEFAULT_RECONCILE_MARGIN_SECONDS = 25;
@@ -684,15 +692,39 @@ export function reconcileDueSeconds(leaseSeconds: number, settleMs: number, marg
   return leaseSeconds + Math.ceil(settleMs / 1000) + marginSeconds;
 }
 
-export type ReconcileDecisionName = "reconciled" | "duplicate_suspected" | "reconcile_unreadable" | "reconcile_deferred";
+/** The terminal states a reconcile re-reads (and leaves a job in when the history agrees). needs_human is a human's already. */
+export type ReconcilableState = "succeeded" | "failed" | "business_outcome";
+export const RECONCILABLE_STATES: readonly ReconcilableState[] = ["succeeded", "failed", "business_outcome"];
+export const isReconcilable = (state: string): state is ReconcilableState => (RECONCILABLE_STATES as readonly string[]).includes(state);
+
+/**
+ * The verify decisions that read [0, 0] ("not committed") while the attempt's clicker may still be alive
+ * (a zombie): a job with one of them is reconciled once it is terminal (D55). `resubmitted` is the
+ * reviewer's rule (10a decision 2); `exhausted` and `not_committed_final` are the same [0, 0] read ending the
+ * job at once (a T6.4 verify on the last attempt reads [0, 0] while that attempt's frozen worker can still
+ * click; and with a history lag over the settle period, D47, [0, 0] can simply be wrong).
+ */
+export const RECONCILE_TRIGGERS: readonly PhaseDecision[] = ["resubmitted", "exhausted", "not_committed_final"];
+
+/** How many rows the job's own terminal state promises: 1 for succeeded, 0 for failed / business_outcome. */
+export function reconcileExpectedMatches(state: ReconcilableState): 0 | 1 {
+  return state === "succeeded" ? 1 : 0;
+}
+
+export type ReconcileDecisionName = "reconciled" | "duplicate_suspected" | "unrecorded_commit_suspected" | "reconcile_unreadable" | "reconcile_deferred";
+/** The reconcile decisions that move the job to needs_human (a flag). */
+export const RECONCILE_FLAGS: readonly ReconcileDecisionName[] = ["duplicate_suspected", "unrecorded_commit_suspected", "reconcile_unreadable"];
 
 export type ReconcileDecision =
-  | { decision: "reconciled"; to: "succeeded"; outcome: null; matches: 1; firstMatchRef: string | null; error: null }
+  | { decision: "reconciled"; to: ReconcilableState; outcome: null; matches: 0 | 1; firstMatchRef: string | null; error: null }
   | { decision: "duplicate_suspected"; to: "needs_human"; outcome: "duplicate_suspected"; matches: number; firstMatchRef: string | null; error: string }
+  | { decision: "unrecorded_commit_suspected"; to: "needs_human"; outcome: "unrecorded_commit_suspected"; matches: number; firstMatchRef: string | null; error: string }
   | { decision: "reconcile_unreadable"; to: "needs_human"; outcome: "reconcile_unreadable"; matches: number | null; firstMatchRef: null; error: string }
-  | { decision: "reconcile_deferred"; to: "succeeded"; outcome: null; backoffSeconds: number; error: string };
+  | { decision: "reconcile_deferred"; to: ReconcilableState; outcome: null; backoffSeconds: number; error: string };
 
 export interface ReconcileInput {
+  /** The job's terminal state when the reconcile claimed it: what the history must agree with. */
+  jobState: ReconcilableState;
   /** The one lookup, after its one retry (afterRetry). */
   reading: LookupReading;
   /** The job's reconcile deferrals so far and seconds since the first one ended (database clock). */
@@ -702,10 +734,25 @@ export interface ReconcileInput {
 }
 
 export function reconcileDecision(input: ReconcileInput): ReconcileDecision {
-  const { reading } = input;
+  const { reading, jobState } = input;
+  if (!isReconcilable(jobState)) throw new Error(`reconcileDecision: a ${String(jobState)} job is never reconciled`);
   switch (reading.kind) {
     case "count":
-      if (reading.n === 1) return { decision: "reconciled", to: "succeeded", outcome: null, matches: 1, firstMatchRef: reading.firstMatchRef, error: null };
+      if (reading.n === reconcileExpectedMatches(jobState)) {
+        return { decision: "reconciled", to: jobState, outcome: null, matches: reconcileExpectedMatches(jobState), firstMatchRef: reading.n > 0 ? reading.firstMatchRef : null, error: null };
+      }
+      if (jobState !== "succeeded") {
+        return {
+          decision: "unrecorded_commit_suspected",
+          to: "needs_human",
+          outcome: "unrecorded_commit_suspected",
+          matches: reading.n,
+          firstMatchRef: reading.firstMatchRef,
+          error:
+            `reconcile found ${reading.n} transfer(s) with this memo_key although the job ended ${jobState} after a [0, 0] verify ` +
+            `(first ${reading.firstMatchRef ?? "?"}): money may have moved that the job says did not (a zombie's late click?). A human must check`,
+        };
+      }
       if (reading.n >= 2) {
         return {
           decision: "duplicate_suspected",
@@ -743,7 +790,7 @@ export function reconcileDecision(input: ReconcileInput): ReconcileDecision {
         };
       }
       const backoffSeconds = deferBackoffSeconds(input.deferrals, input.defer);
-      return { decision: "reconcile_deferred", to: "succeeded", outcome: null, backoffSeconds, error: `reconcile deferred ${backoffSeconds} s (deferral ${input.deferrals + 1}; the bank is unavailable): ${reading.detail}` };
+      return { decision: "reconcile_deferred", to: jobState, outcome: null, backoffSeconds, error: `reconcile deferred ${backoffSeconds} s (deferral ${input.deferrals + 1}; the bank is unavailable): ${reading.detail}` };
     }
   }
 }
@@ -761,8 +808,8 @@ export function reconcileResultPatch(d: ReconcileDecision, evidenceRef: string |
 
 /**
  * Settled (GET /jobs/:id): terminal, and no reconcile is due -- the job never had one (reconcile_after
- * NULL) or the reconcile pass decided (reconciled_at set). Until then a succeeded job can still change to
- * needs_human (reviewer decision 3).
+ * NULL) or the reconcile pass decided (reconciled_at set). Until then a succeeded, failed or
+ * business_outcome job can still change to needs_human (reviewer decision 3; D55).
  */
 export function jobSettled(job: { state: string; reconcile_after: Date | null | undefined; reconciled_at: Date | null | undefined }): boolean {
   if (!(TERMINAL_STATES as readonly string[]).includes(job.state)) return false;

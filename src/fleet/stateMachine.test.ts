@@ -18,14 +18,19 @@ import {
   readingsComplete,
   recoveryAction,
   jobSettled,
+  RECONCILABLE_STATES,
+  RECONCILE_FLAGS,
+  RECONCILE_TRIGGERS,
   reconcileDecision,
   reconcileDueSeconds,
+  reconcileExpectedMatches,
   reconcileResultPatch,
   requeueBackoffBaseSeconds,
   requeueBackoffSeconds,
   verifyDecision,
   type CompletionTarget,
   type LookupReading,
+  type ReconcilableState,
   type VerifyCycle,
   type VerifyInput,
 } from "./stateMachine.js";
@@ -296,13 +301,47 @@ describe("requeueBackoffSeconds (Step 10 section 1, reviewer decision 2: option 
   });
 });
 
-describe("reconcileDecision (Step 10 section 2, R2's table; D50)", () => {
+describe("reconcileDecision (Step 10 section 2, R2's table; D50; every terminal state, D55)", () => {
   const defer = { budgetSeconds: 600, backoffBaseSeconds: 5, backoffCapSeconds: 60 };
   const count = (n: number, ref: string | null = n > 0 ? "TXN-000001" : null): LookupReading => ({ kind: "count", n, firstMatchRef: ref, evidenceRef: "e" });
-  const decide = (reading: LookupReading, deferrals = 0, deferredForSeconds: number | null = null) => reconcileDecision({ reading, deferrals, deferredForSeconds, defer });
+  const decide = (reading: LookupReading, deferrals = 0, deferredForSeconds: number | null = null, jobState: ReconcilableState = "succeeded") =>
+    reconcileDecision({ jobState, reading, deferrals, deferredForSeconds, defer });
 
-  it("1 match -> reconciled: stays succeeded", () => {
+  it("succeeded, 1 match -> reconciled: stays succeeded", () => {
     expect(decide(count(1))).toEqual({ decision: "reconciled", to: "succeeded", outcome: null, matches: 1, firstMatchRef: "TXN-000001", error: null });
+  });
+
+  it("the expected count is the job's own promise: 1 row for succeeded, 0 for failed / business_outcome", () => {
+    expect(RECONCILABLE_STATES.map(reconcileExpectedMatches)).toEqual([1, 0, 0]);
+    expect(RECONCILE_TRIGGERS).toEqual(["resubmitted", "exhausted", "not_committed_final"]);
+    expect(RECONCILE_FLAGS).toEqual(["duplicate_suspected", "unrecorded_commit_suspected", "reconcile_unreadable"]);
+  });
+
+  it("failed / business_outcome, 0 matches -> reconciled: stays in its state (no money moved, as the job says)", () => {
+    for (const s of ["failed", "business_outcome"] as const) {
+      expect(decide(count(0, "No matching transfers."), 0, null, s)).toEqual({ decision: "reconciled", to: s, outcome: null, matches: 0, firstMatchRef: null, error: null });
+    }
+  });
+
+  it("failed / business_outcome, 1+ matches -> unrecorded_commit_suspected: needs_human, with the count and the first match's reference", () => {
+    for (const s of ["failed", "business_outcome"] as const) {
+      for (const n of [1, 2]) {
+        expect(decide(count(n), 0, null, s), `${s} ${n}`).toMatchObject({ decision: "unrecorded_commit_suspected", to: "needs_human", outcome: "unrecorded_commit_suspected", matches: n, firstMatchRef: "TXN-000001" });
+      }
+    }
+    expect(decide(count(1), 0, null, "failed").error).toMatch(/reconcile found 1 transfer\(s\) with this memo_key although the job ended failed after a \[0, 0\] verify/);
+  });
+
+  it("failed / business_outcome: an unreadable page -> reconcile_unreadable; the bank unavailable -> reconcile_deferred, staying in its state", () => {
+    expect(decide({ kind: "unreadable", detail: "garbled", evidenceRef: null }, 0, null, "failed")).toMatchObject({ decision: "reconcile_unreadable", to: "needs_human" });
+    expect(decide({ kind: "unavailable", detail: "503", evidenceRef: null }, 0, null, "business_outcome")).toMatchObject({ decision: "reconcile_deferred", to: "business_outcome", backoffSeconds: 5 });
+    expect(decide({ kind: "unavailable", detail: "503", evidenceRef: null }, 10, 600, "failed")).toMatchObject({ decision: "reconcile_unreadable", to: "needs_human" });
+  });
+
+  it("never for a state the reconcile does not cover (needs_human is a human's already; active states are not terminal)", () => {
+    for (const s of ["needs_human", "queued", "running", "committing", "verifying"]) {
+      expect(() => reconcileDecision({ jobState: s as ReconcilableState, reading: count(1), deferrals: 0, deferredForSeconds: null, defer }), s).toThrow(/is never reconciled/);
+    }
   });
 
   it("2+ matches -> duplicate_suspected: needs_human, with the count and the first match's reference", () => {
@@ -342,6 +381,8 @@ describe("reconcileDecision (Step 10 section 2, R2's table; D50)", () => {
     expect(jobSettled({ state: "succeeded", reconcile_after: at, reconciled_at: null })).toBe(false);
     expect(jobSettled({ state: "succeeded", reconcile_after: at, reconciled_at: at })).toBe(true);
     expect(jobSettled({ state: "needs_human", reconcile_after: at, reconciled_at: at })).toBe(true);
+    expect(jobSettled({ state: "failed", reconcile_after: at, reconciled_at: null })).toBe(false); // D55
+    expect(jobSettled({ state: "business_outcome", reconcile_after: at, reconciled_at: at })).toBe(true);
     for (const state of ["queued", "running", "committing", "verifying"]) expect(jobSettled({ state, reconcile_after: null, reconciled_at: null }), state).toBe(false);
   });
 });

@@ -5,6 +5,8 @@
 //   - a second ledger row with its memo (what a zombie's late click leaves) -> the worker's reconcile reads
 //     2 matches -> needs_human / duplicate_suspected, the count and both references on the job;
 //   - no second row -> 1 match -> reconciled, settled;
+//   - (D55) a resubmitted job whose attempt 2 ended failed, plus a zombie's row -> 1 match where failed
+//     promises 0 -> needs_human / unrecorded_commit_suspected;
 //   - the end-of-day batch (rote reconcile --since) after the workers' pass reconciled the job: the late row
 //     is found and flagged, and the ledger is unchanged (read-only toward the bank).
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -13,6 +15,7 @@ import type { ReplayResult } from "../artifact/index.js";
 import { jobOutcomeFor, jobSettled } from "../fleet/stateMachine.js";
 import { checkLedger, readJobs } from "../oracle/index.js";
 import { dequeue, type JobRow } from "../queue/index.js";
+import { completeJob } from "./complete.js";
 import { writeCommitIntent } from "./intent.js";
 import { InMemoryCounters } from "./metrics.js";
 import { reconcileWindow } from "./reconcile.js";
@@ -96,6 +99,41 @@ describe("the reconcile pass, real lookup, real bank", () => {
     expect(jobSettled(after)).toBe(true);
     expect((await phases(j.id)).at(-1)).toMatchObject({ reason: "reconcile", decision: "reconciled", lookups: [1] });
     expect(checkLedger({ jobs: [after], ledger: await env.ledger(), drainTimedOut: false }).pass).toBe(true);
+  }, 120_000);
+
+  it("D55, the reviewer's case: a resubmitted job whose attempt 2 ended FAILED, then a zombie's row -> the worker's reconcile reads 1 where failed promises 0 -> needs_human / unrecorded_commit_suspected; the oracle's UNRECORDED_COMMIT becomes a listed needs_human", async () => {
+    const [queued] = await env.enqueueTransfers(1, {}, ["tenant-a"]);
+    const a1 = (await dequeue(env.pool, { workerId: "attempt-1", leaseSeconds: 30 }))!;
+    await writeCommitIntent(env.pool, { jobId: a1.id, fencingToken: a1.fencing_token, workerId: "attempt-1", leaseSeconds: 30 });
+    const moved = await completeIntoVerify(env.pool, {
+      jobId: a1.id,
+      fencingToken: a1.fencing_token,
+      workerId: "attempt-1",
+      leaseSeconds: 30,
+      outcome: jobOutcomeFor({ kind: "result", result: cuFailure }, { attempt: 1, maxAttempts: 3, irreversibleStarted: true }),
+    });
+    if (!moved.recorded) throw new Error(moved.detail);
+    await writeVerifyResult(env.pool, { jobId: a1.id, fencingToken: moved.fencingToken, workerId: "attempt-1", lookups: [0, 0], evidenceRefs: [null, null], decision: { decision: "resubmitted", to: "queued", outcome: null, error: "verified not committed" }, result: null });
+    const a2 = (await dequeue(env.pool, { workerId: "attempt-2", leaseSeconds: 30 }))!;
+    const failed = { state: "failed" as const, outcome: "failure" as const, error: "attempt 2 failed before Submit", result: null, attemptOutcome: "failure" as const, commitUncertain: false };
+    expect(await completeJob(env.pool, { jobId: a2.id, fencingToken: a2.fencing_token, workerId: "attempt-2", outcome: failed })).toEqual({ recorded: true });
+    const j = await job(queued!.id);
+    expect(j).toMatchObject({ state: "failed", attempt: 2, reconciled_at: null });
+    expect(jobSettled(j)).toBe(false);
+    zombieRow(j); // attempt 1's frozen worker wakes and clicks
+    expect(checkLedger({ jobs: [j], ledger: await env.ledger(), drainTimedOut: false }).findings[0]!.verdict).toBe("UNRECORDED_COMMIT");
+    await makeDue(j.id);
+    const metrics = new InMemoryCounters();
+    expect(await env.newWorker({ metrics, verifyCtx: { metrics } }).tick()).toBe("ran"); // R1 -> the real lookup -> R2
+    const after = await job(j.id);
+    expect(after).toMatchObject({ state: "needs_human", outcome: "unrecorded_commit_suspected", lease_owner: null });
+    expect(after.result).toMatchObject({ reconcile: { decision: "unrecorded_commit_suspected", matches: 1, lookups: [1] } });
+    expect((await phases(j.id)).at(-1)).toMatchObject({ reason: "reconcile", decision: "unrecorded_commit_suspected", lookups: [1] });
+    expect(metrics.get("unrecorded_commits_detected_total")).toBe(1);
+    expect(jobSettled(after)).toBe(true);
+    const report = checkLedger({ jobs: [after], ledger: await env.ledger(), drainTimedOut: false });
+    expect(report.pass).toBe(true); // needs_human with its 1 row, listed (D32)
+    expect(report.findings[0]).toMatchObject({ state: "needs_human", rows: 1 });
   }, 120_000);
 
   it("rote reconcile --since: after the workers' pass reconciled the job (1 row), a late row appears; the batch reads it regardless of reconciled_at, flags it like R2, and never writes to the bank", async () => {

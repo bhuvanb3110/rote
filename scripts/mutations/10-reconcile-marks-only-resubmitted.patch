@@ -1,0 +1,12 @@
+diff --git a/src/fleet/stateMachine.ts b/src/fleet/stateMachine.ts
+--- a/src/fleet/stateMachine.ts
++++ b/src/fleet/stateMachine.ts
+@@ -704,7 +704,7 @@
+  * job at once (a T6.4 verify on the last attempt reads [0, 0] while that attempt's frozen worker can still
+  * click; and with a history lag over the settle period, D47, [0, 0] can simply be wrong).
+  */
+-export const RECONCILE_TRIGGERS: readonly PhaseDecision[] = ["resubmitted", "exhausted", "not_committed_final"];
++export const RECONCILE_TRIGGERS: readonly PhaseDecision[] = ["resubmitted"];
+ 
+ /** How many rows the job's own terminal state promises: 1 for succeeded, 0 for failed / business_outcome. */
+ export function reconcileExpectedMatches(state: ReconcilableState): 0 | 1 {

@@ -285,10 +285,19 @@ describe("0004_day2_exit: the requeue backoff and the reconcile pass (D49, D50)"
     expect(await rejection(insertJob({ state: "succeeded", lease_owner: "reconciler" }))).toEqual({ code: "23514", constraint: "jobs_lease_pair" });
   });
 
-  it("job_verifications: reason 'reconcile' and its four decisions", async () => {
+  it("0005 (D55): a failed or business_outcome job may hold a reconcile lease and carry reconcile_after too", async () => {
+    for (const state of ["failed", "business_outcome"]) {
+      const job = await insertJob({ state, reconcile_after: new Date(), lease_owner: "reconciler", lease_expires_at: later() });
+      expect(job).toMatchObject({ state, lease_owner: "reconciler", reconciled_at: null });
+    }
+    const idx = await pool.query<{ def: string }>("SELECT pg_get_indexdef(indexrelid) AS def FROM pg_index WHERE indexrelid = 'jobs_reconcile_due'::regclass");
+    expect(idx.rows[0]!.def).toMatch(/WHERE \(\(state = ANY \(ARRAY\['succeeded'::text, 'failed'::text, 'business_outcome'::text\]\)\) AND \(reconcile_after IS NOT NULL\) AND \(reconciled_at IS NULL\)\)/);
+  });
+
+  it("job_verifications: reason 'reconcile' and its five decisions (unrecorded_commit_suspected: 0005, D55)", async () => {
     const job = await insertJob({ state: "succeeded" });
     let token = 1;
-    for (const decision of ["reconciled", "duplicate_suspected", "reconcile_unreadable", "reconcile_deferred", "crashed", "lease_lost"]) {
+    for (const decision of ["reconciled", "duplicate_suspected", "unrecorded_commit_suspected", "reconcile_unreadable", "reconcile_deferred", "crashed", "lease_lost"]) {
       const { rows } = await insert(job.id, { fencing_token: token++, decision, ended_at: later(), lookups: [2] });
       expect(rows[0]).toMatchObject({ reason: "reconcile", decision });
     }
@@ -302,6 +311,10 @@ describe("0004_day2_exit: the requeue backoff and the reconcile pass (D49, D50)"
       constraint: "job_verifications_reconcile_decisions",
     });
     expect(await rejection(insert(job.id, { fencing_token: 4, decision: "resubmitted", ended_at: later() }))).toEqual({
+      code: "23514",
+      constraint: "job_verifications_reconcile_decisions",
+    });
+    expect(await rejection(insert(job.id, { fencing_token: 6, reason: "lease_expired_in_committing", decision: "unrecorded_commit_suspected", ended_at: later() }))).toEqual({
       code: "23514",
       constraint: "job_verifications_reconcile_decisions",
     });
