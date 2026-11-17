@@ -1879,3 +1879,64 @@ check; 03, 07 and 08 were regenerated (their context moved).
 worker could still have clicked, the system must look again and say so as loudly as a duplicate.
 
 **Date.** 2026-11-17
+
+## D56: Chaos at scale: three families with explicit expectations, seeded bank faults, a drain until settled, the post-kill snapshot, and an unattended, resumable seed runner
+
+(Step 10b; plan sections 4–5; step-10 reviewer decisions 1, 7 and 8; "What 10b must do" 1–2.)
+
+**Decision.**
+- **Families** (`src/chaos/families.ts`, reviewer decision 7). Each states the final states it allows, and
+  the judge (`judgeFamily`) fails a run on anything else, whatever the oracle says:
+
+  | Family | Faults | Allowed final states |
+  | --- | --- | --- |
+  | `standard` | a kill every 5–15 s, one 45 s `docker pause` | `succeeded` (`success` / `already_done`); `failed` only when kills alone used up the attempts (`lease_expired`: T6.2; `not_committed_attempts_exhausted`: a last-attempt `[0, 0]`). **No `needs_human` at all**, a reconcile's flag included |
+  | `bank-fault-only` (`--bank-fault --no-kills`) | the bank down 30 s and slow (2 s per request) 60 s; no kills, no pause | `succeeded` only: 0 failed, 0 needs_human |
+  | `bank-fault-kills` (`--bank-fault`) | both of the above at once | `succeeded` only: 0 failed, 0 needs_human |
+
+  Every family also requires the oracle's PASS (0 DUPLICATE, 0 LOST, 0 UNRECORDED_COMMIT, 0 MISMATCH, 0
+  ORPHAN), every job **settled**, no credential in any output and no OOM kill. A bank family also requires
+  that all four bank controls were applied and that the outage hit work (a requeue after a failure, or a
+  deferral); otherwise it fails as **vacuous**. The zombie window is not a chaos family (a pause cannot be
+  aimed between the intent and the click): it is `verify-scenarios --family zombie` (D52), whose judge states
+  its one expected duplicate and its detection.
+- **Bank faults** (`buildBankFaults`, plan section 4): `/control/errors/on` for 30 s and
+  `/control/latency/2000` for 60 s, in disjoint halves of the window, the order and offsets seeded from a
+  separate stream (`seed xor 0x9e3779b9`), so a seed's kills and pause are identical with or without them.
+  They need a window of at least 150 s. The harness clears the bank's knobs at the start and the end.
+- **Drain until settled** (D50, D55): the drain waits until every job is `jobSettled` (terminal, and its
+  reconcile done if one was due), not just terminal; a job still not settled after the drain fails the run.
+- **The snapshot fix** (REPO_NOTES Step 8): around each kill or pause the harness reads the victim's held
+  jobs before the Docker call AND again right after it returns; `orphanedBy` uses the second read (a dead or
+  frozen container cannot move its rows, and recovery needs a full lease). Both reads are in `events.jsonl`;
+  `check.txt` counts the events where they differ.
+- **`summary.json`** per run (`SeedSummary`, `src/chaos/tally.ts`): the code version (`git rev-parse`), the
+  timings, the oracle's counts, the final states, needs_human and failed jobs (with their attempts), the
+  recovery kinds (decision 8, counted from the rows by `recoveryKinds`), the worker protections, the family
+  judge's problems. Written last, also when the run throws (`completed: false`).
+- **`scripts/chaos-seeds.ts`** (`npm run chaos-seeds -- --seeds 20 --jobs 500`, reviewer decision 1): draws
+  every seed up front into `<out>/seeds.json`; runs each as its own child process (`chaos.ts`, the standard
+  family, `--gzip-logs`) into `<out>/seed-NN-<seed>/`; skips a seed whose folder has a `summary.json` (resume);
+  sets aside, never deletes, a folder without one (`.interrupted-<time>`); rewrites `tally.md` / `tally.json`
+  after every seed; never runs the test suite (a guard test reads its source); stops the whole stack at the end
+  and on Ctrl-C (unpausing first). A larger `--seeds` later keeps the saved seeds and appends new ones, so the
+  2 seeds of this step are seeds 1–2 of the builder's 20; a different `--jobs` / `--workers` / `--duration` /
+  `--drain-timeout` is refused (one tally, one configuration). `--rerun <i>` re-runs one investigated seed.
+- **Size**: 500 jobs, 4 workers, a schedule of 1.6 s per job (800 s: about 80 kills and the 45 s pause), a
+  15-minute drain timeout. **Evidence size**: `compose-logs.txt.gz` (gzip) for the batch's seeds.
+
+**Measured** (a 100-job smoke run before the commit, not kept as evidence): 1.44 s per job with kills, so 1.6 s per job keeps the kills going until the work is done; one kill in 15 already showed the pre-kill read one step behind (`running` before, `committing` after: the job wrote its intent in between). The committed runs are listed in `docs/plans/step-10.md` "Built: Step 10b".
+
+**Alternatives considered.**
+- One judge for every family (the oracle + "no needs_human"): the bank families' "0 failed" and the
+  standard family's tolerated kill-caused failures could not both be stated.
+- Bank events on the main PRNG stream: every committed seed's kills would move.
+- The batch inside one process: one seed's crash or leak would take the batch down; a child per seed also
+  releases its memory.
+- Deleting an interrupted seed's partial folder: evidence is never deleted; it is set aside and listed.
+- Uncompressed compose logs: about 12 MB per 500-job seed, 240 MB for 20.
+
+**Why.** "0 duplicates, 0 lost" over 20 seeds is only worth something if a seed can fail for the right
+reason, be found, and be re-run unchanged; and if each scenario says in advance what it expects.
+
+**Date.** 2026-11-17

@@ -19,6 +19,14 @@ export interface ChaosConfig {
   seed: number;
   /** Worker replicas, addressed by index 1..workers (Compose names them rote-worker-<i>). */
   workers: number;
+  /** Kill workers (default true). false: the bank-fault-only family (no kills; set pauseMs 0 for no pause). */
+  kills?: boolean;
+  /**
+   * Step 10b (plan section 4): seeded bank events -- the bank DOWN for 30 s (/control/errors/on: its 503 on
+   * every page but /login) and SLOW for 60 s (/control/latency/2000) -- in disjoint halves of the window,
+   * drawn from their own PRNG stream so a seed's kills and pause are the same with or without them.
+   */
+  bankFaults?: boolean;
   /** Kills happen in [0, durationMs) after the schedule clock starts (the first enqueue). */
   durationMs: number;
   /** Gap between consecutive kills, uniform in [minGapMs, maxGapMs]. Brief: 5-15 s. */
@@ -39,20 +47,61 @@ export const DEFAULT_CHAOS: Omit<ChaosConfig, "seed"> = {
   restartDelayMs: 2_000,
 };
 
+/** A mock-bank control the harness GETs (/control/<control>): its 503 mode, or its latency. */
+export type BankControl = "errors/on" | "errors/off" | `latency/${number}`;
+
 export type ChaosAction =
   | { atMs: number; kind: "kill"; replica: number; redirectedFrom?: number }
   | { atMs: number; kind: "start"; replica: number }
   | { atMs: number; kind: "pause"; replica: number }
-  | { atMs: number; kind: "unpause"; replica: number };
+  | { atMs: number; kind: "unpause"; replica: number }
+  | { atMs: number; kind: "bank"; control: BankControl };
+
+/** The brief's bank-slow / bank-down row (plan section 4): down 30 s, slow (2 s per request) 60 s. */
+export const BANK_OUTAGE_MS = 30_000;
+export const BANK_SLOW_MS = 60_000;
+export const BANK_LATENCY_MS = 2_000;
+/** Bank faults need a window this long: each half must hold the 60 s slow period plus a 10 s lead. */
+export const BANK_FAULT_MIN_DURATION_MS = 150_000;
+
+export interface BankFaultPlan {
+  outage: { fromMs: number; toMs: number };
+  slow: { fromMs: number; toMs: number; latencyMs: number };
+}
 
 export interface ChaosSchedule {
   config: ChaosConfig;
   pause: { replica: number; fromMs: number; toMs: number } | null;
-  /** Sorted by atMs (ties: unpause, start, pause, kill). */
+  /** The bank events (bankFaults only). */
+  bank: BankFaultPlan | null;
+  /** Sorted by atMs (ties: bank, unpause, start, pause, kill). */
   actions: ChaosAction[];
 }
 
-const ORDER: Record<ChaosAction["kind"], number> = { unpause: 0, start: 1, pause: 2, kill: 3 };
+const ORDER: Record<ChaosAction["kind"], number> = { bank: 0, unpause: 1, start: 2, pause: 3, kill: 4 };
+
+/**
+ * The bank events: a separate stream (the seed xor a constant), so adding them never moves a kill or the
+ * pause. The window splits into halves [10 s, D/2) and [D/2, D - 10 s); a coin decides which half is down
+ * (30 s) and which is slow (60 s); each starts uniformly where it still fits in its half.
+ */
+export function buildBankFaults(seed: number, durationMs: number): BankFaultPlan {
+  if (durationMs < BANK_FAULT_MIN_DURATION_MS) throw new Error(`bank faults need --duration >= ${BANK_FAULT_MIN_DURATION_MS / 1000} s (got ${durationMs / 1000} s)`);
+  const rand = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+  const half = Math.floor(durationMs / 2);
+  const halves = [
+    { from: 10_000, to: half },
+    { from: half, to: durationMs - 10_000 },
+  ];
+  const outageFirst = rand() < 0.5;
+  const place = (h: { from: number; to: number }, len: number) => {
+    const fromMs = Math.round(h.from + rand() * (h.to - len - h.from));
+    return { fromMs, toMs: fromMs + len };
+  };
+  const outage = place(halves[outageFirst ? 0 : 1]!, BANK_OUTAGE_MS);
+  const slow = place(halves[outageFirst ? 1 : 0]!, BANK_SLOW_MS);
+  return { outage, slow: { ...slow, latencyMs: BANK_LATENCY_MS } };
+}
 
 /**
  * The whole schedule from the seed. Draw order is fixed (pause first, then kills), so adding a kill
@@ -83,6 +132,7 @@ export function buildSchedule(config: ChaosConfig): ChaosSchedule {
   const downUntil = new Map<number, number>();
   let t = 0;
   for (;;) {
+    if (config.kills === false) break;
     t += Math.round(config.minGapMs + rand() * (config.maxGapMs - config.minGapMs));
     if (t >= config.durationMs) break;
     const drawn = pick();
@@ -98,8 +148,15 @@ export function buildSchedule(config: ChaosConfig): ChaosSchedule {
     actions.push({ atMs: t + config.restartDelayMs, kind: "start", replica });
     downUntil.set(replica, t + config.restartDelayMs);
   }
+  const bank = config.bankFaults ? buildBankFaults(config.seed, config.durationMs) : null;
+  if (bank) {
+    actions.push({ atMs: bank.outage.fromMs, kind: "bank", control: "errors/on" });
+    actions.push({ atMs: bank.outage.toMs, kind: "bank", control: "errors/off" });
+    actions.push({ atMs: bank.slow.fromMs, kind: "bank", control: `latency/${bank.slow.latencyMs}` });
+    actions.push({ atMs: bank.slow.toMs, kind: "bank", control: "latency/0" });
+  }
   actions.sort((a, b) => a.atMs - b.atMs || ORDER[a.kind] - ORDER[b.kind]);
-  return { config, pause, actions };
+  return { config, pause, bank, actions };
 }
 
 /** A fresh seed when none is given (printed and saved by the harness). */

@@ -23,6 +23,7 @@
     "jobs": "tsx src/cli/index.ts jobs",
     "reconcile": "tsx src/cli/index.ts reconcile",
     "chaos": "tsx scripts/chaos.ts",
+    "chaos-seeds": "tsx scripts/chaos-seeds.ts",
     "crash-matrix": "tsx scripts/crash-matrix.ts",
     "verify-scenarios": "tsx scripts/verify-scenarios.ts",
     "mutation-check": "tsx scripts/mutation-check.ts",

@@ -1,7 +1,7 @@
 // The chaos schedule (D33): a seed reproduces it exactly; kills are 5-15 s apart inside the window;
 // the pause fits; no kill hits the paused replica around its pause or a replica that is still down.
 import { describe, expect, it } from "vitest";
-import { buildSchedule, DEFAULT_CHAOS, mulberry32, type ChaosConfig } from "./schedule.js";
+import { BANK_LATENCY_MS, BANK_OUTAGE_MS, BANK_SLOW_MS, buildBankFaults, buildSchedule, DEFAULT_CHAOS, mulberry32, type ChaosConfig } from "./schedule.js";
 
 const cfg = (seed: number, over: Partial<ChaosConfig> = {}): ChaosConfig => ({ ...DEFAULT_CHAOS, seed, ...over });
 
@@ -71,5 +71,58 @@ describe("buildSchedule", () => {
     expect(buildSchedule(cfg(1, { pauseMs: 0 })).pause).toBeNull();
     expect(() => buildSchedule(cfg(1, { workers: 1 }))).toThrow(/at least 2 workers/);
     expect(() => buildSchedule(cfg(1, { minGapMs: 10, maxGapMs: 5 }))).toThrow(/minGapMs/);
+  });
+});
+
+describe("bank faults (Step 10b, plan section 4): the bank down 30 s and slow 60 s, seeded", () => {
+  it("adding them never moves a kill or the pause (their own PRNG stream); without them there are none", () => {
+    for (const seed of [1, 7, 848183018, 14449393]) {
+      const plain = buildSchedule(cfg(seed));
+      const withBank = buildSchedule(cfg(seed, { bankFaults: true }));
+      expect(withBank.actions.filter((a) => a.kind !== "bank")).toEqual(plain.actions);
+      expect(withBank.pause).toEqual(plain.pause);
+      expect(plain.bank).toBeNull();
+      expect(plain.actions.some((a) => a.kind === "bank")).toBe(false);
+    }
+  });
+
+  for (const [seed, durationMs] of [[1, 150_000], [2, 150_000], [99, 800_000], [2 ** 31 - 1, 300_000]] as const) {
+    it(`seed ${seed}, ${durationMs / 1000} s: down exactly 30 s and slow (2000 ms) exactly 60 s, in disjoint halves, inside the window; on, then off`, () => {
+      const s = buildSchedule(cfg(seed, { bankFaults: true, durationMs }));
+      const b = s.bank!;
+      expect(b.outage.toMs - b.outage.fromMs).toBe(BANK_OUTAGE_MS);
+      expect(b.slow.toMs - b.slow.fromMs).toBe(BANK_SLOW_MS);
+      expect(b.slow.latencyMs).toBe(BANK_LATENCY_MS);
+      for (const w of [b.outage, b.slow]) {
+        expect(w.fromMs).toBeGreaterThanOrEqual(10_000);
+        expect(w.toMs).toBeLessThanOrEqual(durationMs - 10_000);
+      }
+      expect(b.outage.toMs <= b.slow.fromMs || b.slow.toMs <= b.outage.fromMs).toBe(true); // never overlap
+      const bank = s.actions.filter((a) => a.kind === "bank");
+      expect(bank).toEqual(
+        [
+          { atMs: b.outage.fromMs, kind: "bank", control: "errors/on" },
+          { atMs: b.outage.toMs, kind: "bank", control: "errors/off" },
+          { atMs: b.slow.fromMs, kind: "bank", control: "latency/2000" },
+          { atMs: b.slow.toMs, kind: "bank", control: "latency/0" },
+        ].sort((x, y) => x.atMs - y.atMs),
+      );
+      expect(buildBankFaults(seed, durationMs)).toEqual(b); // deterministic
+    });
+  }
+
+  it("either fault can come first (the seed decides), and both need a window of at least 150 s", () => {
+    const firsts = new Set(Array.from({ length: 40 }, (_, seed) => {
+      const b = buildBankFaults(seed, 150_000);
+      return b.outage.fromMs < b.slow.fromMs ? "down first" : "slow first";
+    }));
+    expect([...firsts].sort()).toEqual(["down first", "slow first"]);
+    expect(() => buildBankFaults(1, 149_000)).toThrow(/bank faults need --duration >= 150 s/);
+  });
+
+  it("kills: false (the bank-fault-only family) schedules no kill and no start", () => {
+    const s = buildSchedule(cfg(5, { kills: false, pauseMs: 0, bankFaults: true }));
+    expect(s.actions.map((a) => a.kind)).toEqual(["bank", "bank", "bank", "bank"]);
+    expect(s.pause).toBeNull();
   });
 });
