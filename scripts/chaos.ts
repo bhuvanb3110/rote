@@ -386,7 +386,9 @@ async function main(): Promise<void> {
   const oom = inspect.filter((c) => c.State.OOMKilled).map((c) => c.Name.replace(/^\//, ""));
   log(`worker containers at the end: ${inspect.map((c) => `${c.Name.replace(/^\//, "")}:${c.State.Status}${c.State.OOMKilled ? ":OOM" : ""}`).join(", ")}`);
   if (oom.length) log(`OOM-killed (not a chaos kill, D9): ${oom.join(", ")}`);
-  const composeLogs = await docker(["compose", "logs", "--no-color", "--timestamps"]);
+  // This run's logs only: Compose reuses the containers between runs (same image), and `compose logs` would
+  // otherwise return every earlier run's lines too (their protections and flags counted as this run's).
+  const composeLogs = await docker(["compose", "logs", "--no-color", "--timestamps", "--since", started.toISOString()]);
   const logLines = composeLogs.split("\n");
   const count = (re: RegExp) => logLines.filter((l) => re.test(l)).length;
   const workerProtections = {
