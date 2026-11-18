@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "job_id": "b48e52b2-62c3-4f34-9761-754f56810a56",
+    "fencing_token": 2,
+    "worker_id": "fault-verify-after-login",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-18T23:14:09.358Z",
+    "ended_at": "2026-11-18T23:14:39.716Z",
+    "lookups": null,
+    "decision": "crashed",
+    "error": "lease expired in verifying; recovered by clean-after-submit>verify-after-login (T6.5 verify)"
+  },
+  {
+    "id": 2,
+    "job_id": "b48e52b2-62c3-4f34-9761-754f56810a56",
+    "fencing_token": 3,
+    "worker_id": "clean-after-submit>verify-after-login",
+    "reason": "lease_expired_in_verifying",
+    "prior_status": null,
+    "started_at": "2026-11-18T23:14:39.716Z",
+    "ended_at": "2026-11-18T23:14:40.757Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  }
+]
