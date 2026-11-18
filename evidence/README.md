@@ -44,9 +44,19 @@ several runs — can't be told from a single `run.jsonl`.
 | [`step-09/`](step-09/) | Fleet Step 9: every full `npm test` log (raw, exit code and wall time) and the property tests' mutation check. | `mutation-check-property-tests.txt`: four planted bugs, each caught by the property tests, each reverted. |
 | [`step-10/`](step-10/) | Fleet Step 10a: every full `npm test` log (raw, exit code and wall time), the slow-project A/B and timelines (`slow-project/`), and `flakes.md`. | `slow-project/README.md`: overlapping the slow files with unit-db was no faster (mean 185.2 s both ways) and failed 6 tests under load, so they share the browser pool in one longest-first queue (D48). `flakes.md`: two load flakes, each rerun and fixed at its cause. |
 | [`zombie-window-limit/`](zombie-window-limit/) | Step 10a (D52): a worker frozen after its intent (the `stall-after-intent` fault, heartbeat suspended) wakes after another worker verified `[0, 0]`, resubmitted and succeeded. | `summary.md`: **RESULT: PASS (the duplicate happened, and it was detected)**. From the zombie's intent: verify `[0, 0]` → resubmitted +14.3 s, attempt 2's row +16.0 s, the zombie's row +30.1 s (2 rows, DUPLICATE), the reconcile at +36.5 s reads 2 → `needs_human` / `duplicate_suspected`, `duplicates_detected_total = 1`. README: the window is not closed, it is made loud; the limit that remains. |
-| [`mutation-check/`](mutation-check/) | Step 10a (D54): `npm run mutation-check`, eight planted bugs (Steps 8–10) as patches in `scripts/mutations/`. | `report.md`: **8/8 caught**, `RESULT: PASS`, every revert clean; the failing tests are named per mutant in `check.txt`. `ci-linux/`: the same 8/8 in CI. |
+| [`mutation-check/`](mutation-check/) | Step 10a (D54), extended in 10b: `npm run mutation-check`, twelve planted bugs (Steps 8–10b) as patches in `scripts/mutations/`; re-run on the final Step 10b code. | `report.md`: **12/12 caught**, `RESULT: PASS`, every revert clean; the failing tests are named per mutant in `check.txt`. `ci-linux/`: the 10a run in CI (8/8); CI runs all twelve on every push. |
 | [`crash-matrix/step-10a/`](crash-matrix/step-10a/) | Step 10a: the crash-point matrix at 5 s / 2 s against `--expect step-10` (Step 9's outcomes, drained until settled, the resubmit paths reconciled). | `matrix.md`: **23/23**, `RESULT: PASS`, 1 row everywhere; `before-submit` and the three `before-submit>verify-*` scenarios: resubmitted `[0, 0]` → attempt 2 → `reconcile:reconciled[1]`; no other reconcile due. `../ci-linux-step-10a/`: the same 23/23 in CI with a real `signal SIGKILL` at every fault. |
 | [`step-10/verify-scenarios/`](step-10/verify-scenarios/) | Step 10a: `verify-scenarios --family lag` and `--family outage` re-run on the 10a code (drained until settled). | `lag/summary.md` and `outage/summary.md`: both **RESULT: PASS**. Lag: the same verify outcomes as Step 9, and the three `[0, 0]` duplicates now end `needs_human` / `duplicate_suspected` (the reconcile pass, D47's backstop). Outage: every verify deferred 3 times and decided after the outage; the two resubmitted jobs reconciled `[1]`; oracle ok=4. |
+| [`chaos/bank-fault-only-seed-2130356189/`](chaos/bank-fault-only-seed-2130356189/) | Step 10b (D56): the `bank-fault-only` family, seed 2130356189: 100 jobs, the bank down 30 s and slow (2 s per request) 60 s, no kills. On `3c2426e`, before D57. | `check.txt`: **RESULT: PASS**, 100/100 succeeded, 0 failed; 110 attempts requeued with the backoff; one verify deferred through the outage, resubmitted, reconciled `[1]`. |
+| [`chaos/bank-fault-kills-seed-41379566/`](chaos/bank-fault-kills-seed-41379566/) | **Expected to fail, kept as it finished.** Step 10b: the `bank-fault-kills` family, seed 41379566: the outage and the slow period plus 16 kills and the 45 s pause, on `3c2426e`. | `check.txt`: **RESULT: FAIL**: 0 duplicates, 0 lost, 0 needs_human, but **2 jobs failed** with 0 rows: kills and one outage failure used up their 3 attempts. `README.md`: why, what changed (D57), and the before / after. |
+| [`chaos/bank-fault-kills-seed-41379566-after-d57/`](chaos/bank-fault-kills-seed-41379566-after-d57/) | The same seed (the same schedule) on the D57 code `90009c0`: crashes stop using attempts. | `check.txt`: **RESULT: PASS**, 100/100 succeeded, 0 failed, 0 duplicates, 0 lost; `crash budget (D57)`: 15 crashes on 12 jobs, 3 jobs leased past `max_attempts`, two with exactly the histories that failed before (now `4:success`). |
+| [`chaos/bank-fault-only-seed-2130356189-after-d57/`](chaos/bank-fault-only-seed-2130356189-after-d57/) | The same `bank-fault-only` seed on `90009c0`. | `check.txt`: **RESULT: PASS**, 100/100, 0 crashes (no kills: D57 changes nothing here). |
+| [`chaos/day2-exit/`](chaos/day2-exit/) | **Expected to fail, kept as it finished.** Step 10b (reviewer decision 1): `npm run chaos-seeds -- --seeds 2 --jobs 500` on `0a30ac0`: the standard family (kills every 5–15 s, a 45 s pause), 4 workers, drained until settled. | `tally.md`: **RESULT: FAIL (1 of 2)**. Seed 2 PASS; seed 1 ok=500, 0 duplicates, 0 lost, but 1 job `needs_human` / `verify_exhausted`: its worker and all 3 of its verifiers were killed (D45's cap of 3). `README.md`: the trace and the exposure (~1% of verify cycles). |
+| [`chaos/day2-exit-after-d58/`](chaos/day2-exit-after-d58/) | The same 2 seeds on `d84b556`: D58, one crash budget per job (every worker death counts; no separate verify cap). | `tally.md`: **RESULT: PASS (2/2)**, 1000/1000 ok, 0 duplicates, 0 lost, 0 `needs_human`; 3 dead verifiers re-claimed and decided `already_done`; 2 jobs leased past `max_attempts` (D57). `README.md`: same schedule, not the same interleaving; the escalated job's own history is replayed in the property tests. |
+| [`chaos/day2-exit-final/`](chaos/day2-exit-final/) | **To be run** (the builder's overnight batch): `npm run chaos-seeds -- --seeds 20 --jobs 500 --out evidence/chaos/day2-exit-final`, one commit for all 20 seeds (D60). Its `seeds.json` starts with the same 2 seeds. | `README.md`: no seed has run yet. Then `tally.md`. |
+| [`crash-matrix/step-10b-final-5-2/`](crash-matrix/step-10b-final-5-2/) | Step 10b: the 5 s / 2 s matrix re-run on the Step 10b code (clean `b3892d4`: D55, D57, D58, D59), `--expect step-10`. | `matrix.md`: **23/23**, `RESULT: PASS`, 1 row everywhere; the pre-intent points requeued without using an attempt; `before-submit` and its 3 variants resubmitted `[0, 0]` and reconciled `[1]`. |
+| [`crash-matrix/step-10-production-30-10/`](crash-matrix/step-10-production-30-10/) | Step 10b: the crash-point matrix at the production lease 30 s / heartbeat 10 s, `--expect step-10`, on `255f92f`. | `matrix.md`: **23/23**, `RESULT: PASS`, 1 row everywhere, the same outcomes as at 5 s / 2 s; every killed verifier re-claimed (T6.5) and decided. `README.md`: the earlier attempt before D58, stopped and not kept. |
+| [`step-10b/`](step-10b/) | Fleet Step 10b: every full `npm test` log (raw, exit code and wall time; one per code commit, then the final ×3) and the mutation check's stdout per change. | `npm-test-final-x3-run{1,2,3}.txt`: 3 back-to-back runs on the final code, each **66 files, 723 tests passed**, 0 failed, 0 skipped, no flake (223 s, 197.5 s, 204.8 s). `mutation-check-final-stdout.txt`: 12/12. |
 
 ## Day 2, Step 8: before / after
 
@@ -102,6 +112,28 @@ the resubmit paths reconciled); the verify scenarios drain until settled.
 
 **Still open after 10a (Step 10b):** chaos at 500 jobs × 20 seeds (the builder runs the batch), the bank-fault
 chaos runs, the matrix at the production 30 / 10, the README case study.
+
+## Day 2, Step 10b: before / after
+
+Step 10b adds chaos at scale and the bank-fault families (D56), and changes how a worker's death is charged:
+- D57: deaths before the intent use no attempt;
+- D58: every death counts against ONE crash budget per job, and no separate verify cap;
+- D59: a reconciler's deaths are counted apart;
+- D60: one batch, one commit.
+
+Each "before" is a real run, kept as it finished, and each "after" is the same seed on the new code.
+
+| Judge | Before | After |
+| --- | --- | --- |
+| The bank down 30 s and slow 60 s, plus 16 kills and the pause (seed 41379566) | `chaos/bank-fault-kills-seed-41379566/`: **FAIL**, 2 jobs failed with 0 rows: their kills used up the attempts meant for the outage | `…-after-d57/`: **PASS**, 100/100, 0 failed, 0 duplicates; 3 jobs ran a 4th lease because their crashes used no attempt |
+| The bank down and slow, no kills (seed 2130356189) | `chaos/bank-fault-only-seed-2130356189/`: PASS (before D57) | `…-after-d57/`: **PASS**, unchanged (no kills, no crashes) |
+| Chaos at scale, 500 jobs, 4 workers, the standard family (seeds 2080386450, 1980443797) | `chaos/day2-exit/`: **FAIL (1 of 2)**, 1 job `needs_human` after its worker and its 3 verifiers were killed | `chaos/day2-exit-after-d58/`: **PASS (2/2)**, 1000/1000 ok, 0 duplicates, 0 lost, 0 `needs_human` |
+| Crash-point matrix, 5 s / 2 s | 23/23 at 10a (`crash-matrix/step-10a/`) | **23/23** on the 10b code (`crash-matrix/step-10b-final-5-2/`) |
+| Crash-point matrix, production 30 s / 10 s | not run before | **23/23** (`crash-matrix/step-10-production-30-10/`) |
+| Planted bugs | 8/8 at 10a | **12/12** on the final code (`mutation-check/`): 09–10 (D55), 11 (D57), 12 (D58) |
+
+**Still open after 10b:** the 20-seed batch (`chaos/day2-exit-final/`, the builder's overnight run), and the
+clean-clone check (plan section 10, item 4).
 
 ## Provenance
 

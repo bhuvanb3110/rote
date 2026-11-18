@@ -99,6 +99,63 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
+## Fleet Step 10b: reconcile every terminal job, chaos at scale, one crash budget (2026-11-17/18)
+
+- **Eight migrations now** (tests that list them name all eight): `0005_reconcile_terminal.sql` (D55: the
+  reconcile pass covers `succeeded`, `failed` and `business_outcome`; the decision `unrecorded_commit_suspected`),
+  `0006_crash_budget.sql` (D57: `jobs.crashes`, `jobs.max_crashes` default 5, `jobs_queued_under_crash_cap`),
+  `0007_one_crash_budget.sql` (D58: `jobs.lease_crashes`; `jobs_queued_has_attempts_left` is `attempt −
+  lease_crashes < max_attempts`) and `0008_reconcile_abandoned.sql` (D59: `jobs.reconcile_crashes`,
+  `jobs.reconcile_abandoned_at`, and the due index skips abandoned jobs).
+- **One crash budget, two counters** (D57, D58). `jobs.attempt` still counts every lease. `jobs.crashes` counts
+  every worker death on the job (T6.1 / T6.2 in `running`, T6.4 in `committing`, T6.5 / T6.6 for a dead
+  verifier; T6.7 is not a death). `jobs.lease_crashes` counts only the deaths before the intent. The job's own
+  attempts are `ownAttempts(attempt, lease_crashes)`: anything that decides "attempts left" uses it (T4's
+  `jobOutcomeFor`, verify's `verifyDecision`, the backoff's key; each takes `leaseCrashes`). At `max_crashes`
+  the outcome is **`crash_limit`**: `failed` before any intent (T6.2), `needs_human` after one (T6.6, which can
+  be reverified). `MAX_VERIFY_PHASES` and `verify_exhausted` are gone (older rows may still carry the
+  outcome). `lease_expired` is no longer produced. A test that wants the cap enqueues with a small `maxCrashes`
+  (`EnqueueInput.maxCrashes`), not `maxAttempts: 1`. The model throws `ModelCheckViolation` where Postgres
+  would refuse a T6 write.
+- **A reconciler's deaths** (D59) are not in `jobs.crashes`. The claim that closes a dead reconcile phase
+  `crashed` adds 1 to `jobs.reconcile_crashes`. At `max_crashes` the workers' pass abandons the job (R3,
+  `RECONCILE_ABANDON_SQL`: token + 1, the lease released, the state kept), logs "reconcile: ABANDONED", counts
+  `reconcile_abandoned_total`, and never claims it again. `rote reconcile --since` still does. An abandoned
+  job is **settled** (`jobSettled`). `GET /jobs/:id` adds `reconcile` (`none` / `pending` / `reconciled` /
+  `flagged` / `abandoned`, from `reconcileStatus`), `leaseCrashes`, `reconcileCrashes` and
+  `reconcileAbandonedAt`. `claimReconcile` takes `log` / `metrics` / `onAbandoned`, and
+  `createRecoverySweep` takes `metrics`.
+- **Chaos** (D56, D58, D59): three families (`standard`, `--bank-fault` = `bank-fault-kills`, `--bank-fault
+  --no-kills` = `bank-fault-only`), each judged on its own allowed final states (`src/chaos/families.ts`), and
+  drained until every job is settled. The post-kill snapshot is re-read, each run writes `summary.json`, and
+  logs come from `docker compose logs --since <run start>`. The standard family accepts a `needs_human` /
+  `crash_limit` job only when `src/chaos/attribution.ts` matches every death to a scheduled kill or pause of
+  that worker and the ledger has at most 1 row. Such a seed is "PASS with N escalated by crash cap
+  (attributed)", exit 3, never a plain pass. Every family fails on a reconcile the pass abandoned.
+  `npm run chaos-seeds -- --seeds N --jobs 500 --out <dir>` is the unattended, resumable batch (`seeds.json`,
+  `tally.md`). **`--out` is required, and a folder holds one commit's seeds** (D60). It refuses, before writing
+  anything, a folder whose finished seeds carry another stamp (`scripts/lib/git.ts`: the short HEAD, plus
+  `+dirty`). So resume on the same commit, and commit a batch folder only after the batch has finished. To
+  re-run the same seeds on new code, copy `seeds.json` into a new folder. It never runs the suite and stops the
+  whole stack when done: run `docker compose up -d postgres` again before `npm test`. **Never edit a tracked
+  file during a chaos or matrix run.** Each seed stamps the commit, and the crash matrix runs its workers and
+  its migrations straight from the working tree.
+- **Coverage counts in the test log** (D60, `src/testing/coverage.ts`): the property tests' coverage test,
+  property 12 and model vs real print how often each path was reached, plus the watched paths NOT reached.
+  They write to stdout directly, because vitest's default reporter hides a passing test's `console.log`. The
+  property tests' random sequences never reach the reconcile cap ("NOT reached: reconcile:abandoned"). That's
+  expected: property 12 has its own scenarios for it.
+- **The mutation check has 12 mutants** (09, 10: D55; 11: D57, now on `leaseCrash`; 12: D58). When a change
+  moves a mutant's context, regenerate the patch in the same commit (`git apply --check` in the script fails
+  otherwise). On Windows, `git apply -R` can leave a reverted file with CRLF endings: `git status` shows it
+  modified with an empty `git diff`, and `git checkout -- <file>` clears it. The default `--out
+  evidence/mutation-check` deletes the folder first, so restore `ci-linux/` with `git checkout` afterwards.
+- **The suite:** 66 files, 723 tests; about 205 s on this laptop.
+- **PowerShell 5.1's `Set-Content -Encoding utf8` writes a BOM**, and a later Write-tool overwrite of the same
+  file keeps it. A commit message from such a file starts with `ef bb bf`. Write message files fresh with the
+  Write tool, and check with `git cat-file -p HEAD | sed -n '/^$/{n;p;q}' | head -c 3 | od -An -tx1` (in Bash:
+  PowerShell's decoding can hide a leading BOM).
+
 ## Fleet Step 10a: backoff, reconcile, the zombie window, crash tests in CI (2026-11-14)
 
 - **Migration `0004_day2_exit.sql`** (forward-only; ALL of Step 10's schema): `jobs.not_before` (+ CHECK

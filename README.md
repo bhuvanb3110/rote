@@ -62,7 +62,7 @@ run), **unit-node25** (the pure unit tests on Node 25), **docker** (builds the f
 pushed, with the Actions cache), **crash-matrix** (the crash-point matrix on Linux with real signals,
 `--expect step-10`; since Step 10a no longer report-only: a red matrix fails the workflow; the report is
 uploaded as the `crash-matrix-report` artifact and shown in the job summary) and **mutation-check**
-(eight planted bugs must each turn their tests red, D54). Every action is pinned by commit SHA.
+(twelve planted bugs must each turn their tests red, D54). Every action is pinned by commit SHA.
 Not in CI: the Day-1 exit and chaos; they need the Compose stack and minutes of wall time and run as
 scripts with committed evidence (next section).
 
@@ -251,14 +251,15 @@ curl "http://127.0.0.1:8080/jobs/<jobId>?tenant=tenant-a"
 - A job ends `succeeded`, `business_outcome` (the bank refused: final, never retried), `failed`, or
   `needs_human`. ~~`outcome: "commit_uncertain"` means the Submit may have gone through: it is never
   retried, and someone must check the bank's history for the `memoKey`.~~ **Since Step 9** a job whose
-  Submit may have gone through is **verified** in the bank's history by its `memoKey` (see "Day 2,
-  Step 9" below), and it ends `succeeded` / `already_done`, resubmitted, or `business_outcome`.
-  `needs_human` now means verify could not decide: `ambiguous` (2+ matches), `unreadable`,
-  `verify_unavailable` (the bank stayed down past the budget) or `verify_exhausted`. A job parked by
-  Steps 6–8 can be handed to verify with `npm run jobs -- reverify <jobId>`.
+  Submit may have gone through is **verified** in the bank's history by its `memoKey` (see "Fleet
+  (Day 2): crash safety" below), and it ends `succeeded` / `already_done`, resubmitted, or
+  `business_outcome`. `needs_human` now means verify could not decide: `ambiguous` (2+ matches),
+  `unreadable` or `verify_unavailable` (the bank stayed down past the budget). Or the job hit its crash
+  cap after the intent: `crash_limit` (`verify_exhausted` before D58). A job parked by Steps 6–8 can be
+  handed to verify with `npm run jobs -- reverify <jobId>`.
 - ~~**Day-1 limits, on purpose:** leases are taken but not heartbeated, and nothing recovers a dead
   worker's job yet.~~ **Since Step 8:** a 30 s lease with a 10 s heartbeat, the fenced commit intent,
-  and recovery before every dequeue (see "Day 2, Step 8" below). A worker killed with SIGKILL (or OOM)
+  and recovery before every dequeue (see "Fleet (Day 2): crash safety" below). A worker killed with SIGKILL (or OOM)
   stops heartbeating. Within lease + one poll, another worker requeues its job if it died before the
   intent. If it died after, Step 8 parked the job `needs_human`; since Step 9 the recovering worker
   verifies it. `docker compose stop` is graceful: the in-flight job gets 30 s, then is aborted and
@@ -295,8 +296,8 @@ npm run verify-scenarios -- --family lag|outage   # verify vs a lagging history 
   `ROTE_FAULT=<point> ROTE_FAULT_ENABLE=1` that SIGKILLs itself there, then a clean worker and the
   oracle. The fault flag is refused without the enable flag, so it can never fire by accident.
 
-**Today these fail, on purpose, and the failures are the "before" evidence** (the brief: write them
-now, even though they will fail):
+**Before Day 2 these failed, on purpose, and those failures are the "before" evidence** (the brief:
+write them first, even though they will fail):
 
 | Judge | Result (Step 7) | Why |
 | --- | --- | --- |
@@ -304,101 +305,163 @@ now, even though they will fail):
 | `evidence/crash-matrix/before-day2/` | **1/16 green**: LOST at every point but `after-complete`; 1 ledger row from `after-submit` on | the lease expires (30 s, the drain was 40 s) but nothing recovers it |
 
 **0 duplicates here proves nothing.** A duplicate needs a second runner of the same job, and before Day
-2 nothing ever re-runs a dead worker's job. Day 2 (docs/plans/step-08.md: heartbeat, the fenced commit
-intent, recovery, verify through the history page) is what these same scripts must then judge green.
+2 nothing ever re-runs a dead worker's job. Day 2 (heartbeat, the fenced commit intent, recovery, verify
+through the history page, the reconcile pass) is what these same scripts then judged green: below.
 
-### Day 2, Step 8: leases that mean something
+## Fleet (Day 2): crash safety
 
-A worker holds a job by a **30 s lease** that its **heartbeat** extends every 10 s on the database's
-clock, never reviving one that already expired (D36). Right before the Submit it writes a **fenced
-commit intent** (D37): only if that commits does the click happen. Every worker **recovers expired
-leases** before each dequeue (D38): a dead worker's job is requeued if it died before its intent, and
-parked as `needs_human` / `commit_uncertain` if it died after (until Step 9's verify reads the bank's
-history). Every decision is a pure function, property-tested on a model that a second test checks
-against the real SQL (D39).
+### The problem
 
-| Judge | Step 7 | Step 8 |
+A transfer is one click on the bank's Submit button, and the bank's form has no idempotency key. The fleet
+runs that click from worker processes that can be killed (`SIGKILL`, OOM) or frozen (`docker pause`) at any
+point, and the bank cannot tell a retry from a second transfer. The fleet must still deliver: **every job
+ends, and no transfer happens twice**. When it cannot know whether a click went through, it must find out
+from the bank, never guess, and never leave it silent.
+
+### The design
+
+- **Leases, heartbeat and fencing** (D36, D22). A worker holds a job by a 30 s lease on the database's clock,
+  extended every 10 s by its heartbeat, never revived once expired. Every lease bumps the job's fencing
+  token, and every write a worker makes is fenced on it, so a worker that lost its job cannot change it.
+- **The commit intent** (D37). Right before Submit the worker writes a fenced intent; only if that commits
+  does the click happen. Before the intent nothing irreversible has happened and the job can simply run
+  again. After it, the job is **never retried blindly**.
+- **Recovery** (D38) runs before every dequeue. Every expired lease is a worker **death**, and every death counts
+  against the job's one **crash budget** (5, D58): before the intent, in the middle of a verify, anywhere. A
+  death before the intent requeues the job at once and uses **none** of its attempts (D57). A death after the
+  intent is **verified**. The death that reaches the cap ends the job as `crash_limit`: `failed` before any
+  intent (nothing irreversible happened), `needs_human` after one (the Submit may have committed).
+- **Verify** (D42–D47) searches the bank's own transfer history for the job's `memoKey`. If it counts 0, it
+  waits the settle period and looks again. `[1]` or `[0, 1]`: the transfer happened, so `succeeded` /
+  `already_done`. `[0, 0]`: it did not, so it is resubmitted (the only retry after an intent) or, if the bank
+  had refused after Submit, the refusal stands. 2+ matches or an unreadable page: `needs_human`. The bank
+  unavailable: the verify defers and resumes with a backoff, for up to 10 minutes.
+- **Two budgets** (D49, D57, D58). *Attempts* (3) are the job's own failures, retried with a backoff of 10 s,
+  then 30 s (jittered), so a 30 s bank outage fails no job. *Crashes* (5) are every worker death on the job, so
+  a poison job (one that kills every worker that runs or verifies it) ends visibly instead of looping.
+- **The reconcile pass** (D50, D55). A job that ended after a `[0, 0]` verify is the only kind a frozen
+  worker's late click can still land on. It is re-read once, lease + settle + margin later: the count must
+  match what the job says (1 row for `succeeded`, 0 for `failed` / `business_outcome`). Anything else moves
+  it to `needs_human` / `duplicate_suspected` or `unrecorded_commit_suspected`, with a metric and an
+  error-level log line. `npm run reconcile -- --since 24h` re-reads the whole window at the end of the day
+  (D51). A reconciler's deaths are not the job's crashes. They are counted apart, and after `max_crashes` of
+  them the pass **abandons** the job's reconcile: it keeps its state, gets `reconcile: "abandoned"`, and the
+  pass logs it and counts it (`reconcile_abandoned_total`). The end-of-day batch still re-reads it (D59).
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued
+    queued --> running: dequeue (lease, token + 1)
+    running --> queued: T4 failed before the intent (an attempt, backoff) or T6.1 crash (no attempt)
+    running --> failed: T4 attempts used up or T6.2 crash cap before the intent (crash_limit)
+    running --> succeeded: T4
+    running --> business_outcome: T4 (the bank refused)
+    running --> committing: T3 commit intent, then Submit
+    running --> verifying: T5 the run may have committed
+    committing --> succeeded: T4 confirmed
+    committing --> verifying: T5, or T6.4 lease expired
+    verifying --> verifying: T8 defer, T6.7 resume, T6.5 re-claim
+    verifying --> succeeded: T7 [1] / [0, 1] already_done
+    verifying --> queued: T7 [0, 0] resubmitted
+    verifying --> failed: T7 [0, 0] attempts used up
+    verifying --> business_outcome: T7 [0, 0] the refusal stands
+    verifying --> needs_human: T7 ambiguous / unreadable / unavailable or T6.6 crash cap (crash_limit)
+    committing --> needs_human: T6.6 crash cap after the intent (crash_limit)
+    succeeded --> needs_human: R2 reconcile 2+ rows
+    failed --> needs_human: R2 reconcile 1+ rows
+    business_outcome --> needs_human: R2 reconcile 1+ rows
+    needs_human --> verifying: rote jobs reverify
+```
+
+Every decision above is a pure function in `src/fleet/stateMachine.ts`. The SQL only executes it and repeats
+its guards. A model of the `jobs` table (`src/fleet/model.ts`) mirrors each statement. Property tests drive
+the model with crashing, freezing workers and a lagging, failing bank, 10 000 sequences per property. A
+model-vs-real test runs the same random commands against the real SQL and compares every row after every
+command. The mutation check plants 12 known bugs and requires each to turn its tests red.
+
+### What is guaranteed, and the one window
+
+The property tests state the guarantees (`src/fleet/stateMachine.property.test.ts`):
+- **No blind retry after the intent** (property 5): every requeue past an intent went through a verify that
+  looked twice and saw 0.
+- **No duplicate** unless a worker clicked with a lease that was no longer valid, or the bank's history lags
+  more than the settle period (property 1). Both conditions are shown to be necessary.
+- **No lost job** (property 3): after the faults stop, every job reaches a terminal state and is settled.
+- **A job is never failed or escalated by worker deaths before 5 of them**, never failed by fewer than 3 of its
+  own failures, and never failed past its intent (property 11).
+- **No duplicate or unrecorded commit stays silent** after the reconcile pass, unless the row appeared after
+  the pass read the history or the pass abandoned the job (properties 8, 10), and **none at all** after the
+  end-of-day batch (property 9).
+- **A reconciler's deaths never touch the job's own crash budget**, and the pass abandons a reconcile only
+  after 5 of them (property 12).
+
+The randomized tests print how often each path was reached, so a path they never exercise shows up in every
+test log.
+
+**The one window:** a worker frozen after its intent, past its lease plus the settle period, can wake and click
+after another worker verified `[0, 0]` and resubmitted. The bank has no lease to check, so no client can close
+this window. It is **made loud** instead: the reconcile pass finds the second row and flags the job
+(`evidence/zombie-window-limit/` stages it and shows the duplicate AND its detection).
+
+### Results
+
+| Judge | Evidence | Result |
 | --- | --- | --- |
-| Crash-point matrix (lease 5 s, heartbeat 2 s; a point passes only if it ends as expected, D40) | 1/16 | **16/16** (`evidence/crash-matrix/step-08/`) |
-| Chaos (100 jobs, 4 workers, kills + a 45 s pause) | FAIL: 39 LOST | **PASS**: 100 ok, 0 LOST, 0 duplicates; 10 jobs re-run after their worker died; the frozen worker stopped by its heartbeat on waking (`evidence/chaos/step-08-seed-848183018/`) |
+| Chaos at scale: 500 jobs, 4 workers, kills every 5–15 s, a 45 s pause (standard family), 2 seeds | [`chaos/day2-exit/`](evidence/chaos/day2-exit/README.md) (before D58) and [`…-after-d58/`](evidence/chaos/day2-exit-after-d58/README.md) | **FAIL before D58** (1 of 2): one job went to `needs_human` after its worker and all 3 of its verifiers were killed. **PASS after**, on the same 2 seeds: 1000/1000 ok, 0 duplicates, 0 lost, 0 `needs_human`; 3 dead verifiers re-claimed and decided. The 20-seed batch (the same first 2 seeds, one commit) goes to [`chaos/day2-exit-final/`](evidence/chaos/day2-exit-final/README.md) |
+| The bank down 30 s and slow 60 s, no kills | [`chaos/bank-fault-only-seed-2130356189-after-d57/`](evidence/chaos/bank-fault-only-seed-2130356189-after-d57/) | **PASS**: 100/100 succeeded, 0 failed, 0 duplicates, 0 lost; 101 attempts requeued with the backoff |
+| The bank down and slow, plus 16 kills and the pause | [`chaos/bank-fault-kills-seed-41379566/`](evidence/chaos/bank-fault-kills-seed-41379566/README.md) (before) and [`…-after-d57/`](evidence/chaos/bank-fault-kills-seed-41379566-after-d57/) | **FAIL before D57**: 2 jobs failed, their attempts used up by kills. **PASS after**, on the same seed: 100/100 succeeded, 0 failed, 0 duplicates, 0 lost; 3 jobs ran a 4th time because their crashes used no attempt |
+| Crash-point matrix, production timing (lease 30 s, heartbeat 10 s): a kill at each of 16 transfer boundaries + 7 two-fault recovery scenarios | [`crash-matrix/step-10-production-30-10/`](evidence/crash-matrix/step-10-production-30-10/README.md) | **PASS, 23/23**, 1 ledger row in every scenario: the pre-intent points requeued without using an attempt; `before-submit` resubmitted `[0, 0]` and reconciled `[1]`; the post-click points `already_done`; every killed verifier re-claimed and decided |
+| The same matrix at 5 s / 2 s on the Step 10b code | [`crash-matrix/step-10b-final-5-2/`](evidence/crash-matrix/step-10b-final-5-2/README.md) | **PASS, 23/23**, 1 ledger row in every scenario: the pre-intent points requeued without using an attempt; `before-submit` and its variants resubmitted `[0, 0]` and reconciled `[1]`; the post-click points `already_done` |
+| A crash right before / after Submit, in `npm test` and CI (real SIGKILL on Linux) | `src/worker/crashSubmit.db.test.ts`; the CI `crash-matrix` job | exactly 1 ledger row each: resubmitted on attempt 2 / `already_done` on attempt 1 |
+| The zombie window | [`zombie-window-limit/`](evidence/zombie-window-limit/) | **PASS**: the duplicate happens (2 rows) and is flagged `needs_human` / `duplicate_suspected` |
+| The history lagging past the settle period; a 30 s outage during verifies | [`step-10/verify-scenarios/`](evidence/step-10/verify-scenarios/) | **PASS**: the lag's `[0, 0]` duplicates are flagged by the reconcile pass; every deferred verify decided after the outage |
+| Planted bugs | [`mutation-check/`](evidence/mutation-check/report.md) | **12/12** caught on the final code, each by its named tests; in CI on every push |
 
-Not done until Step 9: jobs that died after their intent wait for a human; verify will decide them from
-the bank's history. The zombie frozen between the intent and the click is the one case no client can
-close; Step 10 measures it and adds a pass that detects it (docs/plans/step-08.md sections 6 and 9a).
+The full before / after, step by step, is in the [evidence index](evidence/README.md).
 
-### Day 2, Step 9: verify
+### Operating it
 
-After a commit intent, a job is never retried blindly. Instead it is **verified**: someone searches the
-bank's own transfer history for the job's `memoKey` (lookup 1.2.0, which also reads the first match's
-Reference, D42).
-- **Who verifies:** the worker whose run may have committed does it at once (T5). If that worker died,
-  a recovering worker claims the job when its lease expires and verifies it (T6.4–T6.7, D45).
-- **The procedure** (D43): look up; on 0 matches, wait the **settle period** and look again.
-  - `[1]` or `[0, 1]`: the transfer happened → `succeeded` / `already_done`, `confirmationRef` = the
-    bank's row.
-  - `[0, 0]`: it did not happen → requeued for another attempt. This is the only retry after an intent.
-    If the bank refused after Submit, the refusal stands instead.
-  - 2+ matches, or a page that cannot be read → `needs_human` at once.
-  - **The bank unavailable is not ambiguous** (D44): the verify **defers** and resumes after a backoff
-    (5 s doubling, cap 60 s), for up to 10 minutes, before asking a human.
-- A verifier that keeps dying is escalated after 3 dead phases (`verify_exhausted`).
-- `npm run jobs -- reverify <jobId>` hands one parked job back to verify (D46).
+- **`settled` and `reconcile`.** `GET /jobs/:id` returns `settled: true` once the job is terminal and no
+  automatic reconcile is still to run. A `succeeded`, `failed` or `business_outcome` job that is not yet
+  settled can still change to `needs_human`. Treat the state as final only when `settled` is true. `reconcile`
+  says which kind of settled it is: `none` (the job never needed one), `pending` (not settled yet),
+  `reconciled` (the bank's history agreed with the job), `flagged` (it moved the job to `needs_human`), or
+  **`abandoned`**. **Settled with `reconcile: "abandoned"` means no automatic check will run again, but the
+  end-of-day `rote reconcile --since` still can.** Such a job is settled without having been confirmed
+  duplicate-free. The job also shows `notBefore` (its backoff), `crashes`, `leaseCrashes`, `maxCrashes`,
+  `reconcileCrashes` and `reconcileAbandonedAt`.
+- **`needs_human` says why** in `outcome`: `ambiguous`, `unreadable`, `verify_unavailable`, `crash_limit` (the
+  crash cap after the intent), `duplicate_suspected`, `unrecorded_commit_suspected`, `reconcile_unreadable`
+  (`verify_exhausted` on jobs escalated before D58). `npm run jobs -- reverify <jobId>` hands a "could not
+  tell" `needs_human` job back to verify (never `ambiguous`; a `failed` / `crash_limit` job, which never
+  reached its intent, is refused).
+- **`ROTE_VERIFY_SETTLE_MS` (default 5000) must exceed the bank's history visibility delay** (D47); otherwise
+  `[0, 0]` can be wrong (`evidence/settle-vs-history-lag/`). Also `ROTE_VERIFY_DEFER_BACKOFF_SECONDS` (5),
+  `ROTE_VERIFY_DEFER_BUDGET_SECONDS` (600) and `ROTE_RECONCILE_MARGIN_SECONDS` (25: the reconcile runs 60 s
+  after the job ends).
+- **One command per judge:** `npm run chaos -- --seed <n> [--bank-fault [--no-kills]]` (one seeded run of 100
+  jobs, its evidence in `evidence/chaos/`); `npm run chaos-seeds -- --seeds 20 --jobs 500 --out
+  evidence/chaos/day2-exit-final` (the unattended batch. `--out` is required, and a folder holds one commit's
+  seeds: the runner refuses to mix commits, D60. Rerun the same command on the same commit to resume. The tally
+  is `tally.md` in that folder); `npm run crash-matrix -- --lease-seconds 30 --heartbeat-seconds 10 --expect
+  step-10`; `npm run mutation-check`.
 
-**Deployment requirement: `ROTE_VERIFY_SETTLE_MS` (default 5000) must exceed the bank's history
-visibility delay** (D47). If the bank shows a transfer in its history later than verify's second look,
-`[0, 0]` resubmits a transfer that happened. `evidence/settle-vs-history-lag/` shows it: an 8 s lag with
-a 5 s settle produced a duplicate when the verify started at once. The reconcile pass (Step 10a, D50) is
-the backstop: it flags such a duplicate `needs_human` / `duplicate_suspected` (re-run on the 10a code in
-`evidence/step-10/verify-scenarios/lag/`). The other settings are `ROTE_VERIFY_DEFER_BACKOFF_SECONDS` (5) and
-`ROTE_VERIFY_DEFER_BUDGET_SECONDS` (600).
+### Honest limits
 
-| Judge | Step 8 | Step 9 |
-| --- | --- | --- |
-| Crash-point matrix (lease 5 s, heartbeat 2 s) | 16/16 against the interim (`needs_human` after the intent) | **23/23** (`evidence/crash-matrix/step-09/`): every after-intent point verified, `[0, 0]` → resubmitted or `[1]` → `already_done`; 7 two-fault scenarios (a worker dies inside recovery or verify), all 1 row |
-| Chaos (100 jobs, 4 workers, kills + a 45 s pause) | PASS, 1 job parked `needs_human` | **PASS** (`evidence/chaos/step-09-seed-14449393/`): 100 ok, 0 LOST, 0 duplicates, **0 `needs_human`**; 3 jobs killed after their intent verified `[1]` → `already_done`; 9 requeued; the frozen worker stopped by its heartbeat on waking |
-| History lag vs settle | – | **PASS** (`evidence/settle-vs-history-lag/`): `[0, 1]` rescued by the settle; a lag past lookup #2 → DUPLICATE, as the rule says |
-| A 30 s bank outage during verifies | – | **PASS** (`evidence/verify-bank-outage-30s/`): every verify deferred and completed afterwards; none escalated; 1 row per job |
-
-
-### Day 2, Step 10a: retries back off, the reconcile pass, the zombie window made loud
-
-- **Retries back off** (D49). A failure before the commit intent is requeued with `not_before` = now +
-  10 s × 3^(attempt − 1), jittered × [0.8, 1.2], capped at 120 s (database clock); no worker takes the job
-  before then. With 3 attempts the third cannot run sooner than 32 s after the first failure, so the
-  brief's 30 s bank outage fails no job. A crash requeue and a verified resubmit are not delayed.
-  `GET /jobs/:id` shows `notBefore`. Longer outages are Day 4's circuit breaker.
-- **The reconcile pass** (D50). A job that succeeded **after a resubmit** is the only kind that can carry
-  a frozen worker's late second transfer, so it is re-read in the bank's history once, lease + settle +
-  margin after it succeeded (`ROTE_RECONCILE_MARGIN_SECONDS`, default 25: 60 s in production). 1 match:
-  `reconciled`. **2+ matches: the job moves to `needs_human` / `duplicate_suspected`**, with the count
-  and references in `result.reconcile`, `duplicates_detected_total` + 1 and an error-level log line. 0
-  matches or an unreadable page: `needs_human` / `reconcile_unreadable`. The bank down: deferred with
-  verify's backoff and budget.
-- **`settled`.** `GET /jobs/:id` returns `settled: true` once the job is terminal and no reconcile is due.
-  **A `succeeded` job that is not yet settled can still change to `needs_human`** (it succeeded after a
-  resubmit and its reconcile has not run). Treat `succeeded` as final only when `settled` is true.
-- **End-of-day reconciliation** (D51): `npm run reconcile -- --since 24h` re-reads every job in the window
-  that succeeded after a resubmit, whether or not the workers' pass already reconciled it, and flags 2+
-  matches the same way. Read-only toward the bank. Exit 0: nothing flagged; 1: something flagged or left
-  undecided; 2: it could not run. It needs the same `ROTE_CRED_*` variables as a worker.
-- **The zombie window is not closed; it is made loud** (D52). A worker frozen after its intent, past its
-  lease, can wake and click after another worker verified `[0, 0]` and resubmitted; the bank has no lease
-  to check. `npm run verify-scenarios -- --family zombie` stages exactly that (`stall-after-intent`, a test-
-  only fault that freezes the worker with its heartbeat suspended): `evidence/zombie-window-limit/` shows the
-  duplicate AND its detection. The limit that remains: a zombie frozen longer than the reconcile delay that
-  also beats its own heartbeat on waking clicks after the pass read the history; the end-of-day batch is
-  what finds that one.
-- **Crash right before / after Submit run in `npm test`** (`src/worker/crashSubmit.db.test.ts`, D53): real
-  worker processes, a real SIGKILL on Linux CI, exactly 1 ledger row each.
-- **`npm run mutation-check`** (D54): eight planted bugs (Steps 8–10), each a patch in `scripts/mutations/`,
-  must each turn their tests red; a CI job runs it, and the crash matrix is no longer report-only.
-
-| Judge | Step 10a |
-| --- | --- |
-| Crash-point matrix (lease 5 s, heartbeat 2 s, `--expect step-10`) | **23/23** (`evidence/crash-matrix/step-10a/`, and in CI on Linux with real signals): the resubmit paths reconciled `[1]`, 1 row everywhere |
-| The zombie window | **PASS** (`evidence/zombie-window-limit/`): the duplicate happens (2 rows) and is flagged `duplicate_suspected` |
-| History lag vs settle, a 30 s outage during verifies (re-run on 10a) | **PASS** (`evidence/step-10/verify-scenarios/`): the lag duplicates are now flagged by the reconcile pass |
-| Mutation check | **8/8** caught (`evidence/mutation-check/`) |
+- **The zombie window is detected, not closed** (above). The reconcile pass has its own limit: a zombie
+  frozen longer than the reconcile delay that also beats its heartbeat on waking clicks after the pass read the
+  history; the end-of-day batch is what finds that one (D51).
+- **An abandoned reconcile is settled, not confirmed.** If 5 reconcilers die on one job, no automatic check
+  re-reads it again; only the end-of-day batch can still find a late duplicate on it (`reconcile: "abandoned"`
+  says so, D59).
+- **The settle period must exceed the history lag**, a deployment setting the fleet cannot check by itself.
+- **The verify lookup reads only the first match's reference**: a `duplicate_suspected` job carries the count
+  and the first reference; the other is in the reconcile's screenshot and the ledger. Reading every match is
+  lookup 1.3.0, deferred to Day 4.
+- **A single machine**, Docker Compose, one Postgres; **a mock bank** with fake data; no authentication (by
+  scope). Multi-machine stays design-only (REPORT.md).
+- **Longer bank outages** than the backoff schedule (about 32 s) can still fail jobs; that is Day 4's
+  circuit breaker.
 
 ## Saved demonstration runs
 

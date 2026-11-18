@@ -240,13 +240,13 @@ Output: `evidence/mutation-check/`. A required CI job `mutation-check` (ubuntu, 
 
 | Criterion | Source | Closed by |
 | --- | --- | --- |
-| Random kills: 0 duplicates, 0 lost, across 20+ seeds, 4 workers | brief Day-2 exit; amendments 2–3 | `evidence/chaos/day2-exit/tally.md` RESULT: PASS |
+| Random kills: 0 duplicates, 0 lost, across 20+ seeds, 4 workers | brief Day-2 exit; amendments 2–3 | `evidence/chaos/day2-exit-final/tally.md` RESULT: PASS (20 seeds on one commit, D60; the builder's overnight run. Its first 2 seeds already PASS on `d84b556` in `day2-exit-after-d58/`; the failing run before D58 is `day2-exit/`) |
 | Crash right after Submit: the worst case tested every time | brief scenario table | matrix `after-submit` (5/2 and 30/10) + `crashSubmit.db.test.ts` in CI |
 | Crash right before Submit: recovery retries safely | brief scenario table | matrix `before-submit` + `crashSubmit.db.test.ts` in CI |
 | Paused (zombie) worker: fencing stops a stale worker | brief scenario table | the pause in every chaos seed; `evidence/zombie-window-limit/` (the honest limit, detected) |
 | Bank slow or down 30 s: retries back off, nothing duplicates | brief scenario table | `evidence/chaos/bank-fault-*` (0 failed, 0 duplicates) |
 | Crash-before/after tests run in CI; all existing tests pass | brief deliverables | CI run on the head, `npm test` ×3 logs |
-| Crash-point matrix | amendment 3 | `crash-matrix/step-09/` (done) + `step-10-production-30-10/`; required CI job |
+| Crash-point matrix | amendment 3 | `crash-matrix/step-09/` (done) + `step-10b-final-5-2/` and `step-10-production-30-10/` (both 23/23 on the 10b code); required CI job |
 | fast-check property tests | amendment 3 | in `npm test`; `mutation-check` CI job |
 | CI on every push: unit + crash integration against Postgres | amendment 3 | `ci.yml`: test, unit-node25, docker, crash-matrix, mutation-check, all required |
 | `needs_human` listed with its reason; 0 or 1 transfers, never 2 | brief oracle | the oracle (D32); `duplicate_suspected` is the one deliberate 2-row `needs_human`, in its own folder |
@@ -664,3 +664,56 @@ Built as **D60**. How the build reads it:
   2 seeds); all 20 seeds run on one commit.
 - Both optional counts were built. Their first print showed that the property tests' random sequences never
   reach the reconcile cap, so D59 also gets property 12 with its own scenarios.
+
+## Built: Step 10b (2026-11-17/18)
+
+What 10b built, in order (commits in the handoff):
+
+1. **Chaos at scale** (D56): the snapshot re-read fix, `--bank-fault` (the seeded 30 s outage and 60 s slow
+   period), three families with explicit expectations (`src/chaos/families.ts`), a drain until settled, and
+   `scripts/chaos-seeds.ts` (unattended, resumable, seeds drawn once into `seeds.json`, the tally counting each
+   recovery kind). The `--since` fix for the container logs.
+2. **Two budgets** (D57, the reviewer decision of 2026-11-17): a worker's death before the intent uses no
+   attempt; the crash cap (5) ends a poison job as `crash_limit`. The failing bank-fault+kills seed is kept,
+   and the same seed passes after.
+3. **One crash budget** (D58, the reviewer decision of 2026-11-18): every worker death counts (T6.1 / T6.2,
+   T6.4, T6.5 / T6.6); at the cap `failed` before an intent, `needs_human` after one; `lease_crashes` keeps own
+   attempts right; the standard family accepts an escalation by crash cap only when every death is attributed
+   to the schedule. The failing 2-seed run is kept, and the same 2 seeds pass after.
+4. **A reconciler's deaths** (D59, the reviewer's confirmation of the D58 readings): counted apart
+   (`reconcile_crashes`), the pass abandons at `max_crashes`, `GET /jobs/:id` returns `reconcile`.
+   **One batch, one commit** (D60): `chaos-seeds --out` is required and refuses to mix commits; the randomized
+   tests print their coverage counts, and property 12 covers D59.
+5. **The matrices on the final code**: 5 s / 2 s and the production 30 s / 10 s.
+6. **Docs**: the README case study "Fleet (Day 2): crash safety" (replacing the Step 8 / 9 / 10a subsections),
+   D55–D59, REPO_NOTES, the evidence index with the 10b before / after.
+
+### Section 10 checklist
+
+| # | Item | Status |
+| --- | --- | --- |
+| 1 | Every row of section 9 green, with committed, script-checked evidence | Green: the matrix at 5 s / 2 s and 30 s / 10 s (23/23 each, `after-submit` and `before-submit` included); `crashSubmit.db.test.ts` in `npm test` and CI; the pause in every chaos seed and `zombie-window-limit/`; the bank-fault families after D57 (0 failed, 0 duplicates); the property tests and the mutation check (12/12); the oracle's `needs_human` listing. **Open: the 20-seed batch** (the builder's overnight run into `evidence/chaos/day2-exit-final/`, one commit, D60; its first 2 seeds already PASS on `d84b556` in `day2-exit-after-d58/`) |
+| 2 | CI green on the head, `crash-matrix` and `mutation-check` required | Required on `main` since 2026-11-18 (with `test` and `docker`; below). The 10b head's CI run is recorded in the commit after this one |
+| 3 | `npm test` ×3 locally, logs unfiltered, no unexplained flake | **Done**: `evidence/step-10b/npm-test-final-x3-run{1,2,3}.txt`, each 66 files, 723 passed, 0 failed, 0 skipped, no flake (223 s, 197.5 s, 204.8 s) |
+| 4 | `docker compose up -d --build` from a clean clone, then the one-command chaos run | **Open.** Every chaos run in 10b ran `docker compose up -d --build` itself, but from this working tree (clean at the commit each seed stamps), not from a fresh clone. To do before the PR |
+| 5 | DECISIONS, REPO_NOTES, README, evidence index current; this "Built" section approved, no open questions | Written; **awaiting the reviewer's approval** |
+| 6 | Known follow-ups listed in the PR description | For the PR: the `npm audit` upgrades (step-08 A5), lookup 1.3.0 (Day 4), Days 3–4 |
+| 7 | PR description, evidence links, honest limits; history kept; opened on the reviewer's go-ahead | Not opened (the reviewer's go-ahead) |
+
+**Branch protection on `main`** (the reviewer's request in 10b, applied 2026-11-18 after the reviewer's
+"approved").
+- The required checks are `test`, `docker`, `crash-matrix` and `mutation-check`, matched against the job names
+  of CI run `43621384853`.
+- `strict: true` (a PR branch must be up to date with `main`).
+- Changes only through a pull request (`required_approving_review_count: 0`).
+- `enforce_admins: true`: the rules bind the admin too.
+- No force-push and no deletion. `fleet/day-1` is unprotected.
+
+Read back with `gh api repos/bhuvanb3110/rote/branches/main/protection`:
+
+```json
+{"allow_deletions":false,"allow_force_pushes":false,"enforce_admins":true,
+ "required_pull_request_reviews":{"dismiss_stale_reviews":false,"require_code_owner_reviews":false,"required_approving_review_count":0},
+ "required_status_checks":{"contexts":["test","docker","crash-matrix","mutation-check"],"strict":true},
+ "restrictions":null}
+```
