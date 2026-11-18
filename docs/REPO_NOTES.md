@@ -136,7 +136,9 @@ Recorded as found; each names its planned fix or the step that owns it.
   `tally.md`). **`--out` is required, and a folder holds one commit's seeds** (D60). It refuses, before writing
   anything, a folder whose finished seeds carry another stamp (`scripts/lib/git.ts`: the short HEAD, plus
   `+dirty`). So resume on the same commit, and commit a batch folder only after the batch has finished. To
-  re-run the same seeds on new code, copy `seeds.json` into a new folder. It never runs the suite and stops the
+  re-run the same seeds on new code, copy `seeds.json` into a new folder. **A batch folder committed before its
+  run must already hold every seed in `seeds.json`.** If the runner extends it (a larger `--seeds`), it
+  rewrites a tracked file, and every seed is stamped `+dirty`. `evidence/chaos/day2-exit-final/` holds all 20. It never runs the suite and stops the
   whole stack when done: run `docker compose up -d postgres` again before `npm test`. **Never edit a tracked
   file during a chaos or matrix run.** Each seed stamps the commit, and the crash matrix runs its workers and
   its migrations straight from the working tree.
