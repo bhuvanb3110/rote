@@ -55,8 +55,44 @@ Built in `04ee739` as **D57** (`docs/DECISIONS.md`):
 Under D57 the two jobs above would have gone on: `076e7ccd` after its third lease had used 1 of its 3 attempts,
 `93c77857` after its third lease had used 1.
 
-## After
+## After: the same seeds on the D57 code
 
-The re-runs on the D57 code are in `../bank-fault-kills-seed-41379566-after-d57/` (the same seed, so the same
-kills, pause and bank events) and `../bank-fault-only-seed-2130356189-after-d57/`. The before / after table is
-added below once they have run.
+Re-run on `90009c0` (2026-11-18), 100 jobs each, into `../bank-fault-kills-seed-41379566-after-d57/` and
+`../bank-fault-only-seed-2130356189-after-d57/`. The same seed means the same schedule: the same 16 kills (times
+and victims), the same 45 s pause of replica 2, the same outage (91.9–121.9 s into the schedule) and slow period.
+Which job a kill lands on differs (job ids are new each run, and timing moves).
+
+| | bank-fault-kills 41379566, **before** (`3c2426e`) | bank-fault-kills 41379566, **after** (`90009c0`) | bank-fault-only 2130356189, before | bank-fault-only 2130356189, after |
+| --- | --- | --- | --- | --- |
+| **RESULT** | **FAIL** | **PASS** | PASS | PASS |
+| succeeded | 98 | **100** | 100 | 100 |
+| **failed** | **2** (`failure`, `lease_expired`) | **0** | 0 | 0 |
+| needs_human | 0 | 0 | 0 | 0 |
+| oracle: DUPLICATE / LOST / UNRECORDED_COMMIT | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
+| ledger rows | 98 | 100 | 100 | 100 |
+| kills / restarts / bank controls applied | 16 / 16 / 4 of 4 | 16 / 16 / 4 of 4 | 0 / 0 / 4 of 4 | 0 / 0 / 4 of 4 |
+| crash requeues (T6.1) / failed by recovery (T6.2) | 6 / **1** (`lease_expired`) | 14 (15: see below) / 0 | 0 / 0 | 0 / 0 |
+| requeued after a failure, with the backoff (T4) | 54 | 65 | 110 | 101 |
+| jobs leased past `max_attempts` | 0 (impossible before D57) | **3** | 0 | 0 |
+| crash budget (`check.txt`, from `jobs`) | n/a | 15 crashes on 12 jobs, at most 2 on one; 0 at the cap | n/a | 0 crashes |
+| verify phases + reconciles (`job_verifications`) | 11 + 2 (T6.4 x3; already_done x2, resubmitted x2, each reconciled) | 0 + 0 | 4 + 1 (one job's verify deferred through the outage, resubmitted, reconciled) | 0 + 0 |
+| settled / drain | 100/100, 89 s | 100/100, 37 s | 100/100, 37 s | 100/100, 45 s |
+
+**The two histories that failed before succeed now.** The three jobs the after-run leased past `max_attempts`
+(`attempts.json`):
+
+| job | attempts | ended |
+| --- | --- | --- |
+| `d87af936` | 1:crashed 2:crashed 3:failure **4:success** | succeeded: the history of `076e7ccd`, which failed before |
+| `5397e46f` | 1:crashed 2:failure 3:crashed **4:success** | succeeded: the history of `93c77857`, which failed / `lease_expired` before |
+| `fd8fae4f` | 1:crashed 2:failure 3:failure **4:success** | succeeded: two own failures (the outage) and one crash; Step 8's rule failed it at attempt 3 |
+
+**15 crashes, 14 T6.1 rows.** `jobs.crashes` sums to 15, the tally's "requeued after a crash" says 14: one crash is
+the paused replica's job (`ab54dcc5`). T6.1 recovered it (and counted the crash); when the replica was unpaused its
+worker's heartbeat found the lease gone and re-labelled its own attempt `lease_lost`, keeping recovery's note
+(`[recovery had recorded: ... (T6.1 requeue)]`). The tally counted only `crashed` rows; that is fixed in the
+commit after this evidence (it now also counts a `lease_lost` row that recovery requeued).
+
+**What this run did not exercise.** No kill landed after a commit intent in the after-run (the before-run had
+three), so it says nothing new about verify; that path is covered by the crash matrix, `crashSubmit.db.test.ts`
+and `verify-scenarios` (D52), and D57 does not change it.
