@@ -575,6 +575,36 @@ Options:
 
 Option 1 and 2 can be combined (the cap of 5, and the judge's attributed escalation for the rare residue).
 
+### Reviewer decision during 10b: one crash budget, and the attributed escalation (2026-11-18)
+
+**Both**, with these details:
+1. **One crash budget per job**: every worker death counts, before the intent (T6.1) and during verify (dead
+   verify phases, T6.5). The cap is `max_crashes` (default 5). There is no separate cap of 3 for verify phases;
+   T6.6 uses the shared counter.
+2. **Hitting the cap**: before any intent → `failed` / `crash_limit` (as D57). After an intent (`committing` or
+   `verifying`) → **`needs_human` / `crash_limit`**: money may have moved, so it is never `failed`.
+3. **The judge's exception, standard family only**: a `needs_human` / `crash_limit` job is accepted ONLY if every
+   death in its history matches a scheduled chaos kill or pause of that worker in `events.jsonl`, AND the ledger
+   shows at most 1 row for its `memo_key`. Any other `needs_human` still fails the run. The tally lists each
+   accepted job separately as **"escalated by crash cap (attributed)"**, with its job id and kill timestamps. It
+   is never counted as a plain pass.
+4. The model, the property tests (**property 11 extended: a job is never escalated or failed by worker deaths
+   before `max_crashes`**), the model-vs-real test; a mutant (**verify-phase deaths use a separate low cap
+   again**); amend D45 / D57.
+5. The failing 2-seed run stays committed as evidence with a README; then re-run the 5 / 2 matrix and the same 2
+   seeds on the new code.
+
+How the build reads it (flagged in the handoff):
+- "Every worker death" includes the death of the attempt's own worker after its intent (T6.4: the lease
+  expired in `committing`). Decision 2 names `committing` as a state the cap can be hit in, so that death counts.
+  A reconciler's death on a terminal job (R1 re-claim) is not counted: the budget guards active work, and
+  decision 2 defines no consequence for a terminal job.
+- `jobs.crashes` becomes the one budget (every death). Own attempts stay `attempt` minus the deaths **before the
+  intent**, so those get their own column (`lease_crashes`, 0007): a verifier's death is not one of the job's
+  leases.
+- `needs_human` / `crash_limit` is reverifiable (`rote jobs reverify`), as `verify_exhausted` was: it is a
+  "could not tell" outcome.
+
 ### Follow-ups
 
 - **Lookup 1.3.0** (read every matching transfer's Reference, so a `duplicate_suspected` job carries both
