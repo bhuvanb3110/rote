@@ -29,6 +29,7 @@
 // shrunk command sequence (each command's toString), e.g. `dequeue(wA), tick(31), recover(wB), ...`.
 import fc from "fast-check";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { printCoverage } from "../testing/coverage.js";
 import type { Capability } from "../artifact/index.js";
 import { dequeue, enqueue, sqlState, type Pool } from "../queue/index.js";
 import { createTestSchema, resetQueueTables, type TestSchema } from "../queue/testDb.js";
@@ -781,7 +782,7 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
     );
     // Every Step 9 and Step 10 path was exercised, recorded AND fenced, not just generated (all three tests together).
     const seen = JSON.stringify(Object.fromEntries(hits));
-    for (const key of [
+    const required = [
       "T5:recorded", "T5:fenced", "T5:illegal_transition",
       "T7:already_done:recorded", "T7:resubmitted:recorded", "T7:exhausted:recorded", "T7:not_committed_final:recorded", "T7:escalated:recorded",
       "T7:resubmitted:check_violation",
@@ -795,7 +796,10 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
       "R2:reconciled:recorded", "R2:duplicate_suspected:recorded", "R2:reconcile_unreadable:recorded", "R2:reconcile_deferred:recorded",
       "R2:unrecorded_commit_suspected:recorded", "R2:wrong_state:illegal_transition",
       "reverify:moved", "reverify:refused",
-    ]) {
+    ];
+    // Printed first, so the counts are in the log even when a required path below was never reached.
+    printCoverage(`model vs real, ${RUNS} + ${VERIFY_RUNS} + ${RECONCILE_RUNS} sequences (the three families)`, hits, required);
+    for (const key of required) {
       expect(hits.get(key) ?? 0, `never happened: ${key}; seen ${seen}`).toBeGreaterThan(0);
     }
     const t7Any = (suffix: string) => [...hits.keys()].some((k) => k.startsWith("T7:") && k.endsWith(suffix));

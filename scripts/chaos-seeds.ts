@@ -1,9 +1,11 @@
 // Chaos at scale, unattended (step-10 reviewer decision 1; docs/plans/step-10.md section 5; D56).
 //
-//   npm run chaos-seeds -- --seeds 20 --jobs 500 [--out evidence/chaos/day2-exit] [--workers 4]
+//   npm run chaos-seeds -- --seeds 20 --jobs 500 --out <dir> [--workers 4]
 //                          [--duration <auto: 1.6 s per job>] [--drain-timeout 15m] [--rerun <index>]
 //
 // One command for the overnight batch. It:
+//   - needs --out (no default) and refuses, before writing anything, a folder whose finished seeds were stamped
+//     with another commit than this tree's (src/chaos/batchCommit.ts): one batch, one commit;
 //   - draws the seeds UP FRONT and saves them (<out>/seeds.json) before running any; a seed is never
 //     re-drawn or dropped. A later run with a larger --seeds keeps the saved seeds and appends new ones;
 //   - runs each seed as its own child process (scripts/chaos.ts, the standard family, --gzip-logs) into
@@ -28,13 +30,25 @@ import { createWriteStream, existsSync } from "node:fs";
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { batchCommitConflict, finishedSeedCommits, requireOut } from "../src/chaos/batchCommit.js";
 import { drawSeed } from "../src/chaos/schedule.js";
 import { buildTally, dirName, type SeedSummary } from "../src/chaos/tally.js";
 import { argValue, createDocker, dockerEnv, parseDuration } from "./lib/compose.js";
+import { gitCommitStamp } from "./lib/git.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const OUT = path.resolve(ROOT, argValue("out") ?? path.join("evidence", "chaos", "day2-exit"));
+const OUT = path.resolve(ROOT, outArg());
 const OUT_REL = path.relative(ROOT, OUT).split(path.sep).join("/");
+
+/** --out is required (no default folder; src/chaos/batchCommit.ts). */
+function outArg(): string {
+  try {
+    return requireOut(argValue("out"));
+  } catch (err) {
+    console.error(`chaos-seeds: ${(err as Error).message}`);
+    process.exit(2);
+  }
+}
 /** The schedule for N jobs: measured about 1.75 s per job with kills (100 jobs, Step 9); kills cover all but the tail. */
 const SECONDS_PER_JOB = 1.6;
 
@@ -209,6 +223,11 @@ function runSeed(batch: BatchConfig, index: number, seed: number, dir: string): 
 }
 
 async function main(): Promise<void> {
+  // One batch, one commit: refuse before anything is written (seeds.json, the tally, a seed folder).
+  const head = await gitCommitStamp(ROOT);
+  const conflict = batchCommitConflict(await finishedSeedCommits(OUT), head, OUT_REL);
+  if (conflict) fail(conflict);
+  log(`${OUT_REL}: this tree is ${head}; every finished seed here (if any) was too`);
   const batch = await loadOrCreateBatch();
   const rerun = argValue("rerun") !== undefined ? Number(argValue("rerun")) : null;
   if (rerun !== null && !(Number.isInteger(rerun) && rerun >= 1 && rerun <= batch.seeds.length)) fail(`--rerun must be a seed index in 1..${batch.seeds.length}`);

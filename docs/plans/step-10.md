@@ -645,3 +645,22 @@ How the build reads it (flagged in the handoff):
    a job was settled WITHOUT being confirmed duplicate-free. The README says that settled + `reconcile:
    "abandoned"` means "no automatic check will run again; the end-of-day `rote reconcile --since` still can".
    Every chaos family failing on an abandoned job: **approved**.
+
+### Reviewer decision: chaos-seeds, one batch per commit (2026-11-18)
+
+The model-vs-real coverage fix and the two rebuilt unpushed commits: approved. Then:
+
+1. `chaos-seeds`: `--out` is **required** (no default), and it refuses a folder whose existing seeds were produced
+   by a different git commit than HEAD, printing both commits, so the overnight run can never mix into
+   `day2-exit` or into an older run. With a small test.
+2. Optional, if cheap: the property and model-vs-real tests print how many times each transition was reached.
+
+Built as **D60**. How the build reads it:
+- "Produced by a commit" is each finished seed's `summary.json` `commit` stamp (the short HEAD, plus `+dirty`),
+  compared whole with this tree's stamp.
+- **The overnight run cannot go into `day2-exit-after-d58`**: its 2 seeds were finished on `d84b556`, and HEAD
+  has moved since (D59, D60). Under the rule that folder is an older run. The batch goes to
+  `evidence/chaos/day2-exit-final/` instead, starting from `day2-exit-after-d58`'s `seeds.json` (the same first
+  2 seeds); all 20 seeds run on one commit.
+- Both optional counts were built. Their first print showed that the property tests' random sequences never
+  reach the reconcile cap, so D59 also gets property 12 with its own scenarios.

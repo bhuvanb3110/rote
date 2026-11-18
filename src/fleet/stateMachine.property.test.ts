@@ -51,10 +51,16 @@
 //   property 11 a job is never failed or escalated by worker deaths before max_crashes of them, and never failed
 //               by fewer than max_attempts of its own failures (leases that were not lease crashes); a job past
 //               its intent is never failed by the cap, only escalated
+//   property 12 (D59) a reconciler's deaths never touch a terminal job's crash counts; the pass abandons a
+//               reconcile only after max_crashes of them; the end-of-day batch still flags what it would have
+//               (its own scenarios: dead reconcilers under caps of 1-5)
+// The randomized tests print how often each path was reached (src/testing/coverage.ts), so a path the
+// generator rarely or never reaches shows up in every run's log.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import type { ReplayResult } from "../artifact/index.js";
 import { checkLedger, type LedgerRow } from "../oracle/index.js";
+import { printCoverage } from "../testing/coverage.js";
 import {
   isActive,
   isTerminal,
@@ -1148,19 +1154,26 @@ describe("the two budgets (Step 10b, D57, D58): crashes stop using attempts; one
 
 describe("the simulation reaches the interesting states (so the properties are not vacuous)", () => {
   it("over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate", () => {
-    const seen = new Set<string>();
+    // Counted, not just seen: the counts are printed, so a path reached rarely or never (like the reconcile cap
+    // was in model vs real before D59's prefix) shows up in the log on its own.
+    const counts = new Map<string, number>();
+    const seen = { add: (k: string) => void counts.set(k, (counts.get(k) ?? 0) + 1), has: (k: string) => counts.has(k) };
     fc.assert(
       fc.property(scenarioArb, (s) => {
         const { world } = simulate(s);
         for (const t of world.transitions) seen.add(`${t.from.state}->${t.to.state}`);
         for (const d of world.decisions) seen.add(`decision:${d.replace(/:\[.*$/, "")}`);
         for (const d of world.decisions) if (d.endsWith("[0,1]")) seen.add("lookups:[0,1]");
-        for (const p of job(world).phases) if (p.decision === "crashed") seen.add("phase:crashed");
+        for (const p of job(world).phases) if (p.decision === "crashed") seen.add(p.reason === "reconcile" ? "phase:reconcile-crashed" : "phase:crashed");
+        if (job(world).reconcileAbandonedAt !== null) seen.add("reconcile:abandoned"); // D59
         seen.add(`final:${job(world).state}${job(world).outcome ? `/${job(world).outcome}` : ""}`);
         seen.add(`rows:${Math.min(world.ledger.length, 2)}`);
       }),
       { numRuns: 4000, seed: SEED },
     );
+    // Watched, not required: scenarioArb reaches the reconcile cap rarely or never ("NOT reached" in the log);
+    // property 12 below has its own scenarios for it and requires it.
+    printCoverage("property tests, 4000 sequences", counts, ["phase:reconcile-crashed", "reconcile:abandoned", "final:failed/crash_limit"]);
     for (const expected of [
       "running->queued",
       "running->failed",
@@ -1199,8 +1212,75 @@ describe("the simulation reaches the interesting states (so the properties are n
       "rows:1",
       "rows:2", // the zombie window or a lag over the settle period: real in the model, as it is in life
     ]) {
-      expect(seen, `never reached: ${expected}; reached: ${[...seen].sort().join(", ")}`).toContain(expected);
+      expect(seen.has(expected), `never reached: ${expected}; reached: ${[...counts.keys()].sort().join(", ")}`).toBe(true);
     }
+  }, PROPERTY_TIMEOUT_MS);
+});
+
+describe("property 12 (D59): a reconciler's deaths, under small crash caps", () => {
+  // The coverage counts above showed the random sequences never reach the reconcile cap (reconcilers die a few
+  // times in 4000 sequences, never max_crashes times on one job). So D59 gets its own scenarios, which leave
+  // scenarioArb (every other property's samples) untouched: a job that ends after a [0, 0] verify -- resubmitted
+  // and succeeded, a zombie's duplicate, or ended failed / business_outcome with a zombie's late row (D55) --
+  // then 0-5 reconcilers that each claim it and die, under a crash cap of 1-5.
+  const resubmittedThenSucceeded: Ev[] = [
+    { k: "dequeue", w: 0 },
+    { k: "intent", w: 0 },
+    { k: "crash", w: 0 },
+    { k: "tick", dt: 31 },
+    { k: "dequeue", w: 1 },
+    { k: "lookup", w: 1 },
+    { k: "tick", dt: 5 },
+    { k: "lookup", w: 1 },
+    { k: "decide", w: 1 },
+    { k: "dequeue", w: 2 },
+    { k: "intent", w: 2 },
+    { k: "click", w: 2, commits: true },
+    { k: "finish", w: 2, how: "ok" },
+  ];
+  const reconcilerDeathsArb: fc.Arbitrary<Scenario> = fc.record({
+    maxAttempts: fc.integer({ min: 2, max: 3 }),
+    maxCrashes: fc.integer({ min: 1, max: 5 }),
+    lag: fc.constant(0),
+    events: fc
+      .record({ base: fc.oneof({ weight: 2, arbitrary: fc.constant(resubmittedThenSucceeded) }, { weight: 1, arbitrary: zombieArb }, { weight: 1, arbitrary: zombieThenNotSucceededArb }), deaths: fc.integer({ min: 0, max: 5 }) })
+      .map(({ base, deaths }): Ev[] => [
+        ...base,
+        { k: "tick", dt: 61 }, // past the reconcile delay
+        ...Array.from({ length: deaths }, (_, i): Ev[] => [{ k: "restart", w: i % 3 }, { k: "dequeue", w: i % 3 }, { k: "crash", w: i % 3 }, { k: "tick", dt: 31 }]).flat(),
+      ]),
+  });
+
+  it("an abandonment follows max_crashes dead reconcilers; a terminal job's own crash counts never change; no duplicate or unrecorded commit stays silent but an abandoned one, and none at all after the end-of-day batch", () => {
+    const counts = new Map<string, number>();
+    const count = (k: string) => void counts.set(k, (counts.get(k) ?? 0) + 1);
+    fc.assert(
+      fc.property(reconcilerDeathsArb, (s) => {
+        const { world, found } = simulate(s);
+        const j = job(world);
+        expect(abandonedOnlyAtTheCap(world)).toEqual([]);
+        expect(found.terminalMoved).toEqual([]);
+        // A reconciler's death is never one of the job's crashes (D59): no counter moves once the job is terminal.
+        for (const t of world.transitions.filter((t) => isTerminal(t.from.state))) {
+          expect({ crashes: t.to.crashes, leaseCrashes: t.to.leaseCrashes }, `${t.from.state} -> ${t.to.state}`).toEqual({ crashes: t.from.crashes, leaseCrashes: t.from.leaseCrashes });
+        }
+        expect(modelSettled(j), "settled").toBe(true);
+        expect(silentDuplicate(world), "property 8").toBe(false);
+        expect(silentUnrecorded(world), "property 10").toBe(false);
+        count(`reconcilerDeaths:${j.reconcileCrashes}`);
+        if (passAbandoned(world)) {
+          count("reconcile:abandoned");
+          if (world.ledger.length >= 2 || unrecordedCommit(world)) count("reconcile:abandoned-while-wrong"); // only the batch can flag it now
+        } else if (j.reconcileCrashes > 0) count("reconcile:decided-after-deaths");
+        endOfDayBatch(world);
+        expect(job(world).state === "succeeded" && world.ledger.length >= 2, "property 9: a duplicate stays succeeded").toBe(false);
+        expect(unrecordedCommit(world), "property 9: an unrecorded commit stays failed / business_outcome").toBe(false);
+      }),
+      { numRuns: 2000, seed: SEED + 12 },
+    );
+    printCoverage("property 12 (D59), 2000 sequences", counts, ["reconcile:abandoned", "reconcile:decided-after-deaths", "reconcile:abandoned-while-wrong"]);
+    expect(counts.get("reconcile:abandoned") ?? 0, "the pass never abandoned a reconcile: property 12 would be vacuous").toBeGreaterThan(0);
+    expect(counts.get("reconcile:decided-after-deaths") ?? 0, "no reconcile was decided after a dead reconciler").toBeGreaterThan(0);
   }, PROPERTY_TIMEOUT_MS);
 });
 

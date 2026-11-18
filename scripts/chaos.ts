@@ -33,10 +33,8 @@
 // intent is verified in the bank's history. Step 10a: backoff (D49), the reconcile pass (D50). Step 10b:
 // families, bank faults, drain until settled, the reconcile of failed / business_outcome jobs (D55).
 import "dotenv/config";
-import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import { gzipSync } from "node:zlib";
 import {
   describeAttributed,
@@ -52,6 +50,7 @@ import { jobSettled } from "../src/fleet/stateMachine.js";
 import { checkLedger, fetchLedger, readJobs } from "../src/oracle/index.js";
 import { createPool, databaseUrlFromEnv, redactDatabaseUrl } from "../src/queue/index.js";
 import { argFlag, argValue, createDocker, dockerEnv, FAKE_CREDS, http, parseDuration, toMiB } from "./lib/compose.js";
+import { gitCommitStamp } from "./lib/git.js";
 
 const API = "http://127.0.0.1:8080";
 const BANK = "http://127.0.0.1:4100";
@@ -95,16 +94,8 @@ function event(e: Record<string, unknown>): void {
 
 const replicaName = (i: number) => `rote-worker-${i}`;
 
-async function gitCommit(): Promise<string> {
-  const run = promisify(execFile);
-  try {
-    const head = (await run("git", ["rev-parse", "--short", "HEAD"])).stdout.trim();
-    const dirty = (await run("git", ["status", "--porcelain", "--untracked-files=no"])).stdout.trim() !== "";
-    return dirty ? `${head}+dirty` : head;
-  } catch {
-    return "unknown";
-  }
-}
+/** The commit this run is stamped with (scripts/lib/git.ts; chaos-seeds compares the same stamp). */
+const gitCommit = (): Promise<string> => gitCommitStamp();
 
 async function bankControl(control: string): Promise<string> {
   const res = await fetch(`${BANK}/control/${control}`);

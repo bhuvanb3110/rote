@@ -1947,6 +1947,8 @@ reason, be found, and be re-run unchanged; and if each scenario says in advance 
 
 **Date.** 2026-11-17
 
+**Amended by D60** (2026-11-18): `chaos-seeds` has no default `--out` and refuses a folder whose finished seeds carry another commit's stamp: one batch, one commit.
+
 ## D57: Two budgets: attempts are the job's own failures, crashes are worker deaths before the intent (capped, `crash_limit`) (amends D21, D49, D55, D56)
 
 (Step 10b; the reviewer decision during 10b on the bank-fault+kills failure, 2026-11-17: option 1.)
@@ -2185,5 +2187,55 @@ batch reconciles it.
 **Why.** A reconcile that keeps dying is a fleet problem, not the job's, so it must not touch the job's state or
 budget. It must also not loop silently: the pass stops, says so in a log line and a metric, and leaves the job to
 the end-of-day batch, which exists for exactly the jobs the pass could not decide.
+
+**Date.** 2026-11-18
+
+## D60: One batch, one commit: `chaos-seeds` needs `--out` and refuses a folder whose finished seeds carry another commit; the randomized tests print how often each path was reached (amends D56)
+
+(Step 10b; the reviewer's change to chaos-seeds, 2026-11-18, and the optional coverage counts.)
+
+**Context.** `chaos-seeds` defaulted to `evidence/chaos/day2-exit`, the folder that holds the run that failed
+before D58, and it resumed any folder whatever code had produced its seeds. An overnight run could therefore mix
+into the failing run or into an older one, giving one tally over several versions of the code. Separately, model
+vs real had never reached the reconcile cap until D59 added dead reconcilers to its prefix, and nothing in the
+log would have shown it.
+
+**Decision.**
+- **`--out` is required** (`requireOut`, `src/chaos/batchCommit.ts`). There is no default folder, and a flag in
+  its place is refused.
+- **One batch, one commit.** Before it writes anything, `chaos-seeds` reads the stamp of every finished seed in
+  the folder (`seed-NN-<seed>/summary.json` `commit`). If any differs from this tree's stamp, it prints both and
+  exits 2 (`batchCommitConflict`). Set-aside folders and an interrupted seed with no summary are not read. The
+  stamp is one definition, `scripts/lib/git.ts` (`gitCommitStamp`, used by `chaos.ts` too): the short HEAD, plus
+  `+dirty` when a tracked file differs. Stamps are compared whole, so a dirty tree never resumes a clean batch.
+- **The consequence for the overnight batch.** `evidence/chaos/day2-exit-after-d58/` holds seeds finished on
+  `d84b556`, so the rule refuses it on any later commit, which is the rule working. The 20-seed batch goes to a
+  new folder, `evidence/chaos/day2-exit-final/`, which starts with `day2-exit-after-d58`'s `seeds.json`: seeds
+  1–2 are the same seeds, and all 20 run on one commit. Resuming needs the same commit, so the folder is
+  committed only after the batch has finished.
+- **Coverage counts** (`src/testing/coverage.ts`). The property tests' coverage test and model vs real print
+  how often each path was reached, then name the watched paths that were not reached. The counts go straight to
+  stdout, because vitest's default reporter hides a passing test's console output, and so they are in every
+  `npm test` log. The first print found the same kind of gap again: the property tests' 4000 random sequences
+  never reach the reconcile cap. **Property 12** (D59) gets its own scenarios: a job that ended after a
+  `[0, 0]` verify, then 0–5 dead reconcilers under caps of 1–5, 2000 runs. It requires an abandonment
+  (403 in 2000), a reconcile decided after deaths (407), and checks that a terminal job's own crash counts never
+  move. It also checks that an abandoned duplicate or unrecorded commit (35) is flagged by the end-of-day batch.
+
+**Tests.** `src/chaos/batchCommit.test.ts`: `requireOut`; the conflict (none, a resume, another commit naming
+its seeds, dirty versus clean); `finishedSeedCommits` on a temp folder (skipping set-aside and interrupted
+seeds). The real script is run twice and must exit 2 without writing: once without `--out`, and once on a
+folder with a seed from another commit (`seeds.json` not extended, no tally or runner log written).
+`src/testing/coverage.test.ts`: the format.
+
+**Alternatives considered.**
+- **Compare only the commit hash, ignoring `+dirty`**: a dirty tree is not the code the commit names.
+- **Allow mixing, with the commit per seed in the tally** (as before): visible, but one tally should judge one
+  version of the code.
+- **Coverage counts in a file**: only someone who opens it sees them. Printing puts them in the log that is
+  read anyway.
+
+**Why.** A tally is a claim about one version of the code. The runner now makes that claim checkable instead of
+trusting the operator to pick a fresh folder, and the randomized tests now say what they actually exercised.
 
 **Date.** 2026-11-18
