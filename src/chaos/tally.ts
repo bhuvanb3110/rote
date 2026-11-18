@@ -133,6 +133,8 @@ export interface SeedSummary {
   failed: Array<{ id: string; outcome: string | null; attempts: string[] }>;
   notSettled: number;
   recoveries: RecoveryKinds;
+  /** The two budgets (D57), from jobs; absent in summaries written before D57. */
+  crashBudget?: { jobsWithCrashes: number; totalCrashes: number; maxCrashesOnOneJob: number; jobsLeasedPastMaxAttempts: number; crashLimit: number };
   workerProtections: Record<string, number>;
   leaks: string[];
   oom: string[];

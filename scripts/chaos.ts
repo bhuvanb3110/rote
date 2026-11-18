@@ -368,6 +368,20 @@ async function main(): Promise<void> {
   const notSettled = jobs.filter((j) => !jobSettled(j)).length;
   log(`needs_human jobs: ${needsHuman.length}${needsHuman.length ? ` (${needsHuman.map((j) => `${j.id} ${j.outcome}`).join(", ")})` : ""} (the ${family} family allows none)`);
   log(`failed jobs: ${failed.length}${failed.length ? ` (${failed.map((j) => `${j.id} ${j.outcome} attempts ${attemptsOf(j.id).join(" ")}`).join("; ")})` : ""}`);
+  // The two budgets (D57), read from jobs: how many jobs a worker died under before the intent, and how many
+  // were leased past max_attempts -- possible only because those deaths did not use attempts.
+  const budgetRows = (await pool.query<{ attempt: number; max_attempts: number; crashes: number; max_crashes: number }>("SELECT attempt, max_attempts, crashes, max_crashes FROM jobs")).rows;
+  const crashBudget = {
+    jobsWithCrashes: budgetRows.filter((r) => r.crashes > 0).length,
+    totalCrashes: budgetRows.reduce((n, r) => n + r.crashes, 0),
+    maxCrashesOnOneJob: budgetRows.reduce((n, r) => Math.max(n, r.crashes), 0),
+    jobsLeasedPastMaxAttempts: budgetRows.filter((r) => r.attempt > r.max_attempts).length,
+    crashLimit: budgetRows.filter((r) => r.crashes >= r.max_crashes).length,
+  };
+  log(
+    `crash budget (D57): ${crashBudget.totalCrashes} crash(es) on ${crashBudget.jobsWithCrashes} job(s), at most ${crashBudget.maxCrashesOnOneJob} on one job; ` +
+      `${crashBudget.jobsLeasedPastMaxAttempts} job(s) leased past max_attempts (crashes used no attempt); ${crashBudget.crashLimit} at the crash cap`,
+  );
   log(`attempt outcomes: ${[...attemptOutcomes].sort().map(([k, n]) => `${k} x${n}`).join(", ")}`);
   log(`final job states: ${Object.entries(finals).sort().map(([k, n]) => `${k} x${n}`).join(", ")}`);
   log(`settled: ${jobs.length - notSettled}/${jobs.length}; drain ${Math.round((Date.now() - drainStart) / 1000)} s${drainTimedOut ? " (TIMED OUT)" : ""}`);
@@ -460,6 +474,7 @@ async function main(): Promise<void> {
     failed: failed.map((j) => ({ id: j.id, outcome: j.outcome, attempts: attemptsOf(j.id) })),
     notSettled,
     recoveries,
+    crashBudget,
     workerProtections,
     leaks,
     oom,
