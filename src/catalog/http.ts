@@ -32,7 +32,7 @@ import {
   type Pool,
 } from "../queue/index.js";
 import { isTransientDbError } from "../queue/index.js";
-import { jobSettled } from "../fleet/stateMachine.js";
+import { jobSettled, reconcileStatus } from "../fleet/stateMachine.js";
 import { DEFAULT_ARTIFACTS_DIR, findCapability, listCapabilities } from "./registry.js";
 import { invokeCapability } from "./invoke.js";
 
@@ -84,10 +84,12 @@ export function jobView(job: JobRow) {
     attempt: job.attempt,
     maxAttempts: job.max_attempts,
     /**
-     * Worker deaths before the intent (D57): they do not use an attempt, so the job's own attempts are
-     * attempt - crashes. At maxCrashes the job fails / crash_limit.
+     * Every worker death on the job, before or after its intent (D58): one budget. At maxCrashes the job ends
+     * crash_limit: failed before any intent, needs_human after one.
      */
     crashes: job.crashes,
+    /** The deaths before the intent (D57, D58): they used no attempt, so the job's own attempts are attempt - leaseCrashes. */
+    leaseCrashes: job.lease_crashes,
     maxCrashes: job.max_crashes,
     outcome: job.outcome,
     error: job.error,
@@ -103,6 +105,15 @@ export function jobView(job: JobRow) {
      * unrecorded_commit_suspected / reconcile_unreadable).
      */
     settled: jobSettled(job),
+    /**
+     * Which kind of settled (D59): none (never needed), pending (not settled yet), reconciled (the history
+     * agreed), flagged (moved to needs_human), or abandoned: settled WITHOUT being confirmed duplicate-free --
+     * no automatic check runs again, but the end-of-day `rote reconcile --since` still can.
+     */
+    reconcile: reconcileStatus(job),
+    /** Reconcilers that died on the job (D59), counted apart from `crashes`; at maxCrashes the pass abandons it. */
+    reconcileCrashes: job.reconcile_crashes,
+    reconcileAbandonedAt: job.reconcile_abandoned_at?.toISOString() ?? null,
     createdAt: job.created_at.toISOString(),
     updatedAt: job.updated_at.toISOString(),
   };

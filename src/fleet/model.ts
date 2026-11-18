@@ -13,8 +13,9 @@
 //   modelRecover            src/worker/recover.ts    T6  CLAIM_EXPIRED_SQL + VERIFY_CYCLE_SQL + the action per recoveryAction
 //   modelReverify           src/worker/verifySql.ts  REVERIFY_SQL (rote jobs reverify)
 //   modelVerifyCycle        src/worker/verifySql.ts  VERIFY_CYCLE_SQL (derived from the job's verify phases)
-//   modelReconcileClaim     src/worker/reconcile.ts  R1  RECONCILE_CLAIM_SQL + its dead-row close + its phase row (D50)
-//   modelReconcileClaimJob  src/worker/reconcile.ts  RECONCILE_CLAIM_JOB_SQL (rote reconcile --since, D51)
+//   modelReconcileClaim     src/worker/reconcile.ts  R1  RECONCILE_CLAIM_SQL + its dead-row close + its phase row (D50);
+//                                                        R3  RECONCILE_ABANDON_SQL at the reconcile cap, then the next due job (D59)
+//   modelReconcileClaimJob  src/worker/reconcile.ts  RECONCILE_CLAIM_JOB_SQL (rote reconcile --since, D51; never abandons)
 //   modelReconcileResult    src/worker/reconcile.ts  R2  RECONCILE_RESULT_SQL + the run's decision
 //   modelReconcileCycle     src/worker/reconcile.ts  RECONCILE_CYCLE_SQL (deferrals)
 //   modelTick               the database clock moving forward
@@ -40,12 +41,14 @@ import {
   isReconcilable,
   ownAttempts,
   RECONCILE_TRIGGERS,
+  reconcileClaimAction,
   recoveryAction,
   REVERIFIABLE_OUTCOMES,
   type CompletionTarget,
   type PhaseDecision,
   type PhaseReason,
   type PriorStatus,
+  type ReconcileClaimer,
   type ReconcileDecision,
   type RecoverableState,
   type RecoveryAction,
@@ -81,6 +84,10 @@ export interface ModelJob {
   readonly reconcileAfter: number | null;
   /** When the reconcile pass decided (every decision but a deferral). */
   readonly reconciledAt: number | null;
+  /** Reconcilers that died on the job, as jobs.reconcile_crashes (0008, D59): never part of `crashes`. */
+  readonly reconcileCrashes: number;
+  /** When the workers' pass abandoned the job's reconcile at the cap (R3, D59); null = it has not. */
+  readonly reconcileAbandonedAt: number | null;
   readonly commitIntentAt: number | null;
   readonly outcome: string | null;
   /** What T4 wrote (the ReplayResult); the oracle reads result.outputs.confirmationRef. */
@@ -134,6 +141,8 @@ export function newJob(fields: { id: string; tenant: string; seq: number; maxAtt
     notBefore: null,
     reconcileAfter: null,
     reconciledAt: null,
+    reconcileCrashes: 0,
+    reconcileAbandonedAt: null,
     commitIntentAt: null,
     outcome: null,
     result: null,
@@ -536,42 +545,73 @@ export function modelReconcileCycle(job: ModelJob, now: number): { deferrals: nu
 /** The reconcile lease is free: none, or expired (`lease_expires_at IS NULL OR lease_expires_at < now()`). */
 const reconcileLeaseFree = (job: ModelJob, now: number) => job.leaseExpiresAt === null || job.leaseExpiresAt < now;
 
-function claimForReconcile(db: ModelDb, job: ModelJob, owner: string, leaseSeconds: number): { db: ModelDb; claimed: { jobId: string; token: number } } {
+/**
+ * leaseFor: a dead reconciler's open phase (its lease expired) is closed `crashed` and counted in
+ * reconcileCrashes (D59); then R1 (lease it) or, for the workers' pass at the cap, R3 (abandon:
+ * RECONCILE_ABANDON_SQL: token + 1, no owner or lease, reconcileAbandonedAt = now, the state kept).
+ */
+function claimForReconcile(
+  db: ModelDb,
+  job: ModelJob,
+  owner: string,
+  leaseSeconds: number,
+  by: ReconcileClaimer,
+): { db: ModelDb; claimed: { jobId: string; token: number } | null } {
+  if (!isReconcilable(job.state)) throw new Error(`model: a reconcile claimed a ${job.state} job`);
+  const dead = job.phases.some((p) => p.token === job.token && p.decision === null);
+  const action = reconcileClaimAction({ state: job.state, reconcileCrashes: job.reconcileCrashes, deadReconciler: dead, maxCrashes: job.maxCrashes, by });
+  const closed = job.phases.map((p) => (p.token === job.token && p.decision === null ? { ...p, decision: "crashed" as const, endedAt: db.now } : p));
   const token = job.token + 1;
+  if (action.kind === "abandon") {
+    const next: ModelJob = { ...job, phases: closed, token, owner: null, leaseExpiresAt: null, reconcileCrashes: action.reconcileCrashes, reconcileAbandonedAt: db.now };
+    return { db: replace(db, next), claimed: null };
+  }
   const next: ModelJob = {
     ...job,
-    // A dead reconciler's open phase (its lease expired) is closed `crashed`.
-    phases: [
-      ...job.phases.map((p) => (p.token === job.token && p.decision === null ? { ...p, decision: "crashed" as const, endedAt: db.now } : p)),
-      { token, owner, reason: "reconcile" as const, priorStatus: null, decision: null, endedAt: null, lookups: null },
-    ],
+    phases: [...closed, { token, owner, reason: "reconcile" as const, priorStatus: null, decision: null, endedAt: null, lookups: null }],
     token,
     owner,
     leaseExpiresAt: db.now + leaseSeconds,
+    reconcileCrashes: action.reconcileCrashes,
   };
   return { db: replace(db, next), claimed: { jobId: job.id, token } };
 }
 
 /**
  * R1 (RECONCILE_CLAIM_SQL): the terminal (succeeded / failed / business_outcome) job with the earliest due
- * reconcile_after, not yet reconciled, whose reconcile lease is free (Postgres breaks ties by id; the model
- * by creation order). The job stays in its state; token + 1; owner and lease; a new reconcile phase.
+ * reconcile_after, not yet reconciled nor abandoned, whose reconcile lease is free (Postgres breaks ties by
+ * id; the model by creation order). The job stays in its state; token + 1; owner and lease; a new reconcile
+ * phase. A due job at the reconcile cap is abandoned on the way (R3, D59) and the claim moves on.
  */
-export function modelReconcileClaim(db: ModelDb, owner: string, leaseSeconds: number): { db: ModelDb; claimed: { jobId: string; token: number } | null } {
-  const job = db.jobs
-    .filter((j) => isReconcilable(j.state) && j.reconciledAt === null && j.reconcileAfter !== null && j.reconcileAfter <= db.now && reconcileLeaseFree(j, db.now))
-    .sort((a, b) => a.reconcileAfter! - b.reconcileAfter! || a.seq - b.seq)[0];
-  return job ? claimForReconcile(db, job, owner, leaseSeconds) : { db, claimed: null };
+export function modelReconcileClaim(
+  db: ModelDb,
+  owner: string,
+  leaseSeconds: number,
+): { db: ModelDb; claimed: { jobId: string; token: number } | null; abandoned: string[] } {
+  let current = db;
+  const abandoned: string[] = [];
+  for (;;) {
+    const now = current.now;
+    const job = current.jobs
+      .filter((j) => isReconcilable(j.state) && j.reconciledAt === null && j.reconcileAbandonedAt === null && j.reconcileAfter !== null && j.reconcileAfter <= now && reconcileLeaseFree(j, now))
+      .sort((a, b) => a.reconcileAfter! - b.reconcileAfter! || a.seq - b.seq)[0];
+    if (!job) return { db: current, claimed: null, abandoned };
+    const r = claimForReconcile(current, job, owner, leaseSeconds, "pass");
+    current = r.db;
+    if (r.claimed) return { db: current, claimed: r.claimed, abandoned };
+    abandoned.push(job.id);
+  }
 }
 
 /**
  * The batch's claim of one job (RECONCILE_CLAIM_JOB_SQL, rote reconcile --since): terminal after a [0, 0]
- * verify (reconcile_after set), reconcile lease free, REGARDLESS of reconciled_at.
+ * verify (reconcile_after set), reconcile lease free, REGARDLESS of reconciled_at and reconcileAbandonedAt.
+ * It counts a dead reconciler and never abandons (D59).
  */
 export function modelReconcileClaimJob(db: ModelDb, jobId: string, owner: string, leaseSeconds: number): { db: ModelDb; claimed: { jobId: string; token: number } | null } {
   const job = find(db, jobId);
   if (!(isReconcilable(job.state) && job.reconcileAfter !== null && reconcileLeaseFree(job, db.now))) return { db, claimed: null };
-  return claimForReconcile(db, job, owner, leaseSeconds);
+  return claimForReconcile(db, job, owner, leaseSeconds, "batch");
 }
 
 /**
@@ -612,8 +652,9 @@ export function modelReconcileResult(
   return { db: replace(db, next), result: "recorded" };
 }
 
-/** Settled (jobSettled): terminal, and no reconcile due -- none was ever set, or the pass decided. */
-export const modelSettled = (job: ModelJob): boolean => isTerminal(job.state) && (job.reconcileAfter === null || job.reconciledAt !== null);
+/** Settled (jobSettled): terminal, and no automatic reconcile still to run -- none was ever set, the pass decided, or it abandoned the job (D59). */
+export const modelSettled = (job: ModelJob): boolean =>
+  isTerminal(job.state) && (job.reconcileAfter === null || job.reconciledAt !== null || job.reconcileAbandonedAt !== null);
 
 export function modelTick(db: ModelDb, seconds: number): ModelDb {
   if (!(seconds >= 0)) throw new RangeError(`model: time only moves forward (got ${seconds})`);

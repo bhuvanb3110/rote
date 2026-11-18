@@ -15,6 +15,9 @@
 //   unrecorded_commits_detected_total
 //                               a reconcile found 1+ transfers for a job that ended failed / business_outcome
 //                               (unrecorded_commit_suspected, D55). Its error-level log line carries the total
+//   reconcile_abandoned_total   the workers' reconcile pass gave up on a job after max_crashes dead reconcilers
+//                               (R3, D59): it stays in its state and only `rote reconcile --since` re-reads it.
+//                               Its error-level log line carries the total
 //
 // Labels are a small fixed set per counter (the decision name), never a job id.
 export type WorkerCounter =
@@ -22,7 +25,8 @@ export type WorkerCounter =
   | "verify_decisions_total"
   | "reconcile_decisions_total"
   | "duplicates_detected_total"
-  | "unrecorded_commits_detected_total";
+  | "unrecorded_commits_detected_total"
+  | "reconcile_abandoned_total";
 
 export interface WorkerMetrics {
   inc(name: WorkerCounter, labels?: Record<string, string>): void;

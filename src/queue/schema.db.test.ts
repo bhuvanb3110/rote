@@ -291,7 +291,23 @@ describe("0004_day2_exit: the requeue backoff and the reconcile pass (D49, D50)"
       expect(job).toMatchObject({ state, lease_owner: "reconciler", reconciled_at: null });
     }
     const idx = await pool.query<{ def: string }>("SELECT pg_get_indexdef(indexrelid) AS def FROM pg_index WHERE indexrelid = 'jobs_reconcile_due'::regclass");
-    expect(idx.rows[0]!.def).toMatch(/WHERE \(\(state = ANY \(ARRAY\['succeeded'::text, 'failed'::text, 'business_outcome'::text\]\)\) AND \(reconcile_after IS NOT NULL\) AND \(reconciled_at IS NULL\)\)/);
+    // 0008 (D59) rebuilt it to skip an abandoned reconcile, as RECONCILE_CLAIM_SQL does.
+    expect(idx.rows[0]!.def).toMatch(
+      /WHERE \(\(state = ANY \(ARRAY\['succeeded'::text, 'failed'::text, 'business_outcome'::text\]\)\) AND \(reconcile_after IS NOT NULL\) AND \(reconciled_at IS NULL\) AND \(reconcile_abandoned_at IS NULL\)\)/,
+    );
+  });
+
+  it("0008 (D59): reconcile_crashes >= 0; reconcile_abandoned_at only at the cap (reconcile_crashes >= max_crashes) and only on a job marked for reconcile", async () => {
+    const job = await insertJob({ state: "succeeded", reconcile_after: new Date(), reconcile_crashes: 5, reconcile_abandoned_at: new Date() });
+    expect(job).toMatchObject({ state: "succeeded", reconcile_crashes: 5, max_crashes: 5 });
+    expect(await rejection(insertJob({ state: "succeeded", reconcile_after: new Date(), reconcile_crashes: 4, reconcile_abandoned_at: new Date() }))).toEqual({
+      code: "23514",
+      constraint: "jobs_reconcile_abandoned_at_cap",
+    });
+    expect(await rejection(insertJob({ state: "succeeded", reconcile_crashes: 5, reconcile_abandoned_at: new Date() }))).toEqual({ code: "23514", constraint: "jobs_reconcile_abandoned_was_marked" });
+    expect((await rejection(insertJob({ state: "succeeded", reconcile_crashes: -1 }))).code).toBe("23514");
+    // A smaller cap: abandoned at 1 of 1.
+    expect(await insertJob({ state: "failed", reconcile_after: new Date(), max_crashes: 1, reconcile_crashes: 1, reconcile_abandoned_at: new Date() })).toMatchObject({ reconcile_crashes: 1 });
   });
 
   it("job_verifications: reason 'reconcile' and its five decisions (unrecorded_commit_suspected: 0005, D55)", async () => {

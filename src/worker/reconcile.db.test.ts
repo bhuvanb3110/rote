@@ -4,7 +4,7 @@
 // lookup against the real bank is in reconcileBank.db.test.ts.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Capability, ReplayResult } from "../artifact/index.js";
-import { jobOutcomeFor, jobSettled, type JobOutcome, type LookupEnd, type VerifyDecision } from "../fleet/stateMachine.js";
+import { jobOutcomeFor, jobSettled, reconcileStatus, type JobOutcome, type LookupEnd, type VerifyDecision } from "../fleet/stateMachine.js";
 import { dequeue, enqueue, JobRowSchema, type JobRow, type Pool } from "../queue/index.js";
 import { createTestSchema, resetQueueTables, type TestSchema } from "../queue/testDb.js";
 import { createRedactor, loadTenantCredentials } from "./credentials.js";
@@ -277,8 +277,107 @@ describe("R1 (the claim) and R2 (the result)", () => {
     const decision = { decision: "reconciled" as const, to: "succeeded" as const, outcome: null, matches: 1 as const, firstMatchRef: "TXN-000002", error: null };
     const late = await writeReconcileResult(pool, { jobId: j.id, fencingToken: dead.fencingToken, workerId: "dead", decision, lookups: [1], evidenceRefs: ["e"], patch: {} });
     expect(late).toMatchObject({ recorded: false, reason: "lease_lost" });
-    expect(await row(j.id)).toMatchObject({ lease_owner: "alive", reconciled_at: null }); // untouched
+    expect(await row(j.id)).toMatchObject({ lease_owner: "alive", reconciled_at: null, reconcile_crashes: 1 }); // untouched; the death counted (D59)
   });
+});
+
+describe("a reconciler's deaths (D59): counted apart from the job's crash budget; at max_crashes the workers' pass abandons the reconcile (R3); rote reconcile --since still covers it", () => {
+  /** A reconcile claim whose reconciler then dies: its lease is made to expire with its phase still open. */
+  async function claimAndDie(workerId: string): Promise<ReconcileClaim> {
+    const claim = await claimReconcile(pool, { workerId, leaseSeconds: LEASE });
+    if (!claim) throw new Error(`${workerId}: nothing claimed`);
+    await pool.query("UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", [claim.job.id]);
+    return claim;
+  }
+  function recordingLog() {
+    const lines: Array<{ level: string; obj: Record<string, unknown>; msg: string }> = [];
+    const at = (level: string) => (obj: Record<string, unknown>, msg: string) => void lines.push({ level, obj, msg });
+    return { log: { info: at("info"), warn: at("warn"), error: at("error") }, lines };
+  }
+
+  it("5 reconcilers die: counted in reconcile_crashes, never in crashes; the pass's 6th claim abandons it (state kept, token + 1, lease released, settled, reconcile_abandoned_total + an error line), never claims it again; the last dead one's R2 is fenced; the batch still reconciles it", async () => {
+    const j = await succeededAfterResubmit();
+    const crashesBefore = j.crashes;
+    await makeDue(j.id);
+    let last: ReconcileClaim | null = null;
+    for (let i = 1; i <= 5; i += 1) {
+      last = await claimAndDie(`dead-${i}`);
+      expect(await row(j.id), `after claim ${i}`).toMatchObject({ reconcile_crashes: i - 1, reconcile_abandoned_at: null, crashes: crashesBefore });
+    }
+    // The 6th claim closes the 5th death: 5 of max_crashes 5 -> R3, and nothing else is due.
+    const metrics = new InMemoryCounters();
+    const { log, lines } = recordingLog();
+    const abandoned: string[] = [];
+    expect(await claimReconcile(pool, { workerId: "alive", leaseSeconds: LEASE, log, metrics, onAbandoned: (a) => abandoned.push(a.job.id) })).toBeNull();
+    expect(abandoned).toEqual([j.id]);
+    const after = await row(j.id);
+    expect(after).toMatchObject({
+      state: "succeeded", // kept, with its outcome and result
+      outcome: "success",
+      reconcile_crashes: 5,
+      crashes: crashesBefore, // the job's own crash budget never sees a reconciler's death
+      fencing_token: last!.fencingToken + 1,
+      lease_owner: null,
+      lease_expires_at: null,
+      reconciled_at: null,
+    });
+    expect(after.reconcile_abandoned_at).toBeInstanceOf(Date);
+    expect((after.result as { outputs: { confirmationRef: string } }).outputs.confirmationRef).toBe("TXN-000002");
+    expect(jobSettled(after)).toBe(true);
+    expect(reconcileStatus(after)).toBe("abandoned");
+    expect(metrics.get("reconcile_abandoned_total")).toBe(1);
+    expect(lines).toEqual([
+      expect.objectContaining({
+        level: "error",
+        msg: "reconcile: ABANDONED after 5 dead reconcilers: the job stays succeeded; only `rote reconcile --since` re-reads it now",
+        obj: expect.objectContaining({ jobId: j.id, label: "R3", reconcileCrashes: 5, maxCrashes: 5, reconcile_abandoned_total: 1 }),
+      }),
+    ]);
+    const reconcilePhases = (await phases(j.id)).filter((p) => p.reason === "reconcile");
+    expect(reconcilePhases.map((p) => [p.worker_id, p.decision])).toEqual([1, 2, 3, 4, 5].map((i) => [`dead-${i}`, "crashed"]));
+    expect(reconcilePhases.at(-1)!.error).toMatch(/the pass abandoned the job's reconcile \(R3, alive\)/);
+    // The pass never claims it again, however long it waits.
+    await makeDue(j.id);
+    expect(await claimReconcile(pool, { workerId: "alive", leaseSeconds: LEASE })).toBeNull();
+    // The 5th reconciler, only paused, wakes and writes R2: fenced out as lease_lost (the token moved), not illegal.
+    const decision = { decision: "reconciled" as const, to: "succeeded" as const, outcome: null, matches: 1 as const, firstMatchRef: "TXN-000002", error: null };
+    expect(await writeReconcileResult(pool, { jobId: j.id, fencingToken: last!.fencingToken, workerId: "dead-5", decision, lookups: [1], evidenceRefs: ["e"], patch: {} })).toMatchObject({
+      recorded: false,
+      reason: "lease_lost",
+    });
+    // The end-of-day batch still re-reads it, and decides: reconciled. The abandonment stays as the record.
+    const report = await reconcileWindow(ctx([count(1, "TXN-000002")]), { sinceSeconds: 3600 });
+    expect(report.rows).toEqual([expect.objectContaining({ jobId: j.id, result: "reconciled", matches: 1, wasAbandonedAt: after.reconcile_abandoned_at })]);
+    const batched = await row(j.id);
+    expect(batched).toMatchObject({ state: "succeeded", reconcile_crashes: 5, crashes: crashesBefore });
+    expect(batched.reconciled_at).toBeInstanceOf(Date);
+    expect(batched.reconcile_abandoned_at).toEqual(after.reconcile_abandoned_at);
+    expect(reconcileStatus(batched)).toBe("reconciled");
+  });
+
+  it("the cap is the job's max_crashes; the pass moves on to the next due job in the same claim; the batch counts a death it finds and never abandons", async () => {
+    // Job A: max_crashes 1 -- its first dead reconciler is the cap. Job B: due after A.
+    const a = await endedAfterResubmit("failed");
+    await pool.query("UPDATE jobs SET max_crashes = 1, reconcile_after = now() - interval '2 seconds' WHERE id = $1", [a.id]);
+    const b = await succeededAfterResubmit("TXN-000009");
+    await makeDue(b.id);
+    await claimAndDie("dead-a"); // takes A (due first)
+    const claim = (await claimReconcile(pool, { workerId: "next", leaseSeconds: LEASE }))!;
+    expect(claim.job.id).toBe(b.id); // A abandoned on the way, B claimed
+    expect(await row(a.id)).toMatchObject({ state: "failed", reconcile_crashes: 1, crashes: a.crashes, lease_owner: null });
+    expect(reconcileStatus(await row(a.id))).toBe("abandoned");
+    // The batch's claim of B, after B's reconciler dies too: counted (1), and B is leased, never abandoned,
+    // although B's max_crashes is lowered to 1 here.
+    await pool.query("UPDATE jobs SET lease_expires_at = now() - interval '1 second', max_crashes = 1 WHERE id = $1", [b.id]);
+    const byBatch = (await claimReconcileJob(pool, { jobId: b.id, workerId: "batch", leaseSeconds: LEASE }))!;
+    expect(byBatch).toMatchObject({ label: "R1", job: { id: b.id } });
+    expect(await row(b.id)).toMatchObject({ reconcile_crashes: 1, reconcile_abandoned_at: null, lease_owner: "batch" });
+    // A is still claimable by id (the batch covers it).
+    expect(await claimReconcileJob(pool, { jobId: a.id, workerId: "batch", leaseSeconds: LEASE })).toMatchObject({ label: "R1", state: "failed" });
+  });
+});
+
+describe("R1 (the claim) and R2 (the result): R2 per decision", () => {
 
   it("1 match -> reconciled: stays succeeded, reconciled_at set, lease released, settled; the phase says so", async () => {
     const j = await succeededAfterResubmit();

@@ -530,7 +530,12 @@ program
         },
         { sinceSeconds, tenant: opts.tenant },
       );
-      for (const r of report.rows) logger.info({ jobId: r.jobId, tenant: r.tenant, state: r.state, result: r.result, matches: r.matches, detail: r.detail }, "reconcile: job");
+      for (const r of report.rows) {
+        logger.info(
+          { jobId: r.jobId, tenant: r.tenant, state: r.state, result: r.result, matches: r.matches, detail: r.detail, wasAbandonedAt: r.wasAbandonedAt?.toISOString() ?? null },
+          r.wasAbandonedAt ? "reconcile: job (the workers' pass had abandoned it, D59)" : "reconcile: job",
+        );
+      }
       logger.info(
         {
           since: opts.since,

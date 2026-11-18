@@ -1642,6 +1642,8 @@ read per job that could possibly be affected.
 
 **Date.** 2026-11-14
 
+**Amended by D59** (2026-11-18): a reconciler's deaths are counted on the job (`reconcile_crashes`), apart from its crash budget. At `max_crashes` of them the workers' pass abandons the job's reconcile (R3): the job keeps its state and is settled, but with `reconcile: "abandoned"` on `GET /jobs/:id` (none / pending / reconciled / flagged / abandoned).
+
 ## D51: `rote reconcile --since <duration>`: end-of-day reconciliation re-reads every job that succeeded after a resubmit, regardless of `reconciled_at`
 
 (Step 10, reviewer decision 5.)
@@ -1694,6 +1696,8 @@ operator, closes it the way back offices already do, with the same decision tabl
 thing whoever raised it.
 
 **Date.** 2026-11-14
+
+**Amended by D59** (2026-11-18): the batch also re-reads a job whose reconcile the workers' pass abandoned (`reconcile_abandoned_at`; its log line shows `wasAbandonedAt`). It counts a dead reconciler it finds and never abandons.
 
 ## D52: The zombie window, measured and made loud: the `stall-after-intent` fault (heartbeat suspended) and `evidence/zombie-window-limit/`
 
@@ -2105,5 +2109,81 @@ chaos replay and the unit rows. Mutant 11 now plants its bug in `leaseCrash`; 01
 `crash_limit` (with the job's state saying whether money may have moved) are simpler to operate and to reason
 about. The judge's exception keeps the standard family strict: only deaths the schedule itself caused may send a
 job to a human, and each such job is named.
+
+**Date.** 2026-11-18
+
+**Amended by D59** (2026-11-18): the reviewer confirmed the three readings above. A reconciler's death stays out of `jobs.crashes`, but is counted apart (`jobs.reconcile_crashes`) and capped.
+
+## D59: A reconciler's deaths are counted apart from the job's crash budget; at the cap the workers' pass abandons the reconcile (`reconcile_abandoned`), and `rote reconcile --since` still covers it (amends D50, D51, D58)
+
+(Step 10b; the reviewer's confirmation of the D58 readings, 2026-11-18, reading 2; then the reviewer's decision on
+its two judgement calls: both approved, with the `reconcile` status added.)
+
+**Context.** D58 counts every worker death against the job's one crash budget, but not a reconciler's: the
+job's own work is over, and a reconcile only reads the bank's history. The reviewer confirmed that reading and
+added that a reconciler's deaths must still be counted, so a job whose reconcilers keep dying cannot loop
+forever.
+
+**Decision.**
+- **A separate counter**: `jobs.reconcile_crashes` (migration `0008_reconcile_abandoned.sql`). A reconciler's
+  death is its reconcile phase left open with its lease expired. The claim that closes that phase `crashed` (the
+  workers' pass, R1, or the batch's claim by id) adds 1. `jobs.crashes` is never touched by a reconcile.
+- **The cap is the job's `max_crashes`** (default 5): the same number as the job's crash budget, counted apart.
+- **R3, abandon** (the pure `reconcileClaimAction`): when the workers' pass claims a due job whose
+  `reconcile_crashes` (with the death this claim closes) has reached `max_crashes`, it does not lease it. It sets
+  `reconcile_abandoned_at`, bumps the fencing token (so a paused reconciler's late R2 is fenced out as
+  `lease_lost`, never mistaken for an illegal transition) and releases the lease. The job's state, outcome,
+  result and error are kept. The worker logs it at error level ("reconcile: ABANDONED ...") and counts it
+  (`reconcile_abandoned_total`), then takes the next due job in the same transaction.
+- **The pass never claims an abandoned job again** (`RECONCILE_CLAIM_SQL`: `reconcile_abandoned_at IS NULL`; the
+  due index says so too).
+- **The batch still covers it**: `rote reconcile --since` claims by id regardless of `reconciled_at` and of
+  `reconcile_abandoned_at`. It counts any death it finds but never abandons. Its R2 decides as usual
+  (`reconciled_at` set, or a flag to `needs_human`); `reconcile_abandoned_at` stays as the record. The batch's
+  log line shows `wasAbandonedAt`.
+- **Settled**: an abandoned job is settled (`jobSettled`). The pass is done with it, and only an operator's
+  batch can still flag it. Otherwise `GET /jobs/:id` would say `settled: false` forever and a polling client
+  would spin.
+- **`GET /jobs/:id` says which kind of settled** (the reviewer's addition): `reconcile` is `none` (never
+  marked), `pending` (marked, not decided yet), `reconciled` (the history agreed with the job's state),
+  `flagged` (a reconcile moved it to `needs_human`: `duplicate_suspected`, `unrecorded_commit_suspected`,
+  `reconcile_unreadable`) or `abandoned` (the pass gave up; nothing decided yet). This is the pure
+  `reconcileStatus`; a decision by the batch after an abandonment wins. A client can then tell `settled` and
+  confirmed from `settled` and `abandoned`, which means **no automatic check will run again, but the
+  end-of-day `rote reconcile --since` still can**. The view also gains `reconcileCrashes`,
+  `reconcileAbandonedAt` and `leaseCrashes` (missing since D58).
+- **0008's CHECKs**: `reconcile_abandoned_at` only at the cap (`reconcile_crashes >= max_crashes`) and only on a
+  job the pass was marked for (`reconcile_after IS NOT NULL`).
+- **Chaos**: an abandoned job fails every family. The zombie check did not run on it; `check.txt` names it and
+  says to run the batch.
+
+**Tests.** Unit: `reconcileClaimAction` (below the cap, at it, the batch never abandons, a death only when a
+phase was open), `jobSettled` with `reconcile_abandoned_at`, and `reconcileStatus` for each of its five values.
+API: `GET /jobs/:id` returns `reconcile` and the new counts. DB: five reconciler deaths are counted on the job
+and not in `crashes`. At the fifth, the pass abandons: the state is kept, the token is bumped, the lease is
+released, the metric and the error log fire. The pass never claims the job again, the last dead reconciler's
+late R2 is fenced (`lease_lost`), and the batch still reconciles it. Also: the batch counts a death it finds and
+does not abandon, and 0008's CHECKs and index. Model: `modelReconcileClaim` / `modelReconcileClaimJob` mirror it.
+Model vs real: the reconcile family draws `max_crashes` from 1, 2 and 5, and its prefix adds up to two dead
+reconcilers. Without them 160 random sequences never reached the cap. It compares `reconcile_crashes` and the
+mark after every command, checks that the pass abandoned the same jobs on its way, and requires `R1:abandoned`. Properties 8 and 10 exempt a job whose pass was abandoned, and property 8 also checks
+that an abandonment only ever follows `max_crashes` dead reconcile phases, with `reconcile_crashes` equal to
+them. Property 9 (the batch) holds without that exemption. Reading 3 is pinned too: reverify moves
+`needs_human` / `crash_limit` and refuses `failed` / `crash_limit`. A deterministic run: a reconciler dies twice under a cap of 2, the drain's pass
+abandons the job, which stays `succeeded` and settled with its own crash count unchanged, and the end-of-day
+batch reconciles it.
+
+**Alternatives considered.**
+- **Count reconciler deaths in `jobs.crashes`**: rejected by the reviewer. The job's budget guards its own work,
+  which is over.
+- **A separate fixed cap of 5, or a new `max_reconcile_crashes` column**: one more knob. Reusing `max_crashes`
+  keeps "how many deaths before we stop" one number per job, and lets the tests reach the cap with small caps.
+- **Abandoned = not settled**: the chaos drain and the crash matrix would wait for their timeouts, and API
+  clients polling `settled` would spin. The mark plus the judge's check says it plainly instead.
+- **Abandon in the batch too**: the batch is the operator's explicit request; it must still re-read the job.
+
+**Why.** A reconcile that keeps dying is a fleet problem, not the job's, so it must not touch the job's state or
+budget. It must also not loop silently: the pass stops, says so in a log line and a metric, and leaves the job to
+the end-of-day batch, which exists for exactly the jobs the pass could not decide.
 
 **Date.** 2026-11-18

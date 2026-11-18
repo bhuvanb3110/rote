@@ -39,6 +39,7 @@ import {
 } from "../fleet/stateMachine.js";
 import { DEFAULT_RECONCILE_DUE_SECONDS, RECONCILABLE_STATES_SQL, RECONCILE_TRIGGERED_SQL } from "./complete.js";
 import type { WorkerLogger } from "./loop.js";
+import type { WorkerMetrics } from "./metrics.js";
 import { claimReconcile, type ReconcileClaim } from "./reconcile.js";
 import { INSERT_PHASE_SQL, readVerifyCycle } from "./verifySql.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
@@ -272,6 +273,8 @@ export function createRecoverySweep(options: {
   reconcile?: boolean;
   /** T6.2's reconcile mark (D55): lease + settle + margin. Default 60. */
   reconcileDueSeconds?: number;
+  /** reconcile_abandoned_total (R3, D59). */
+  metrics?: WorkerMetrics;
 }): () => Promise<VerifyClaim | ReconcileClaim | null> {
   return async () => {
     try {
@@ -302,7 +305,8 @@ export function createRecoverySweep(options: {
         },
       });
       if (claim || !options.reconcile) return claim;
-      const due = await claimReconcile(options.pool, { workerId: options.workerId, leaseSeconds: options.leaseSeconds });
+      // A due job at the reconcile cap is abandoned on the way, logged and counted (R3, D59).
+      const due = await claimReconcile(options.pool, { workerId: options.workerId, leaseSeconds: options.leaseSeconds, log: options.log, metrics: options.metrics });
       if (due) options.log?.info({ workerId: options.workerId, jobId: due.job.id, fencingToken: due.fencingToken }, "worker: a terminal job a verify once read [0, 0] on is due; reconciling it (R1)");
       return due;
     } catch (err) {

@@ -33,10 +33,13 @@
 // loop, one `lookup`, `decide` = R2); the drain runs past the reconcile delay, so:
 //   property 4  terminal states are final, with ONE exception: a reconcile's flag (terminal -> needs_human)
 //   property 8  a duplicate never stays silently `succeeded`, unless a row became visible in the history
-//               only after the reconcile's read (the zombie that clicks after the pass: the honest limit)
+//               only after the reconcile's read (the zombie that clicks after the pass: the honest limit), or
+//               the pass abandoned the job's reconcile after max_crashes dead reconcilers (D59: settled, but
+//               `reconcile: "abandoned"`)
 //   property 10 an unrecorded commit (a row against a job that ended failed / business_outcome) never stays
-//               silent either, with the same exemption (D55)
-//   property 9  with the end-of-day batch (rote reconcile --since, D51) after the drain: neither, ever
+//               silent either, with the same exemptions (D55)
+//   property 9  with the end-of-day batch (rote reconcile --since, D51) after the drain: neither, ever (the
+//               batch also covers an abandoned reconcile, D59)
 //
 // Step 10b (D57, D58, the reviewer decisions during 10b): crashes stop using attempts, and every worker death
 // counts against ONE crash budget. A lease that dies before its intent (T6.1) is a lease crash; a lease that dies
@@ -895,12 +898,26 @@ function oracleFor(world: World) {
 
 /** A row the reconcile's history read did not see: it was written, or became visible, only after the read (a late zombie). */
 const lateRow = (world: World) => world.lastReconciledSeen !== null && world.ledger.some((r) => !world.lastReconciledSeen!.includes(r.id));
-/** Property 8: a succeeded job with 2+ rows, and no row that became visible only after the reconcile's read. */
-const silentDuplicate = (world: World) => job(world).state === "succeeded" && world.ledger.length >= 2 && !lateRow(world);
+/** The workers' pass gave up on the job's reconcile after max_crashes dead reconcilers (R3, D59): only the batch re-reads it. */
+const passAbandoned = (world: World) => job(world).reconcileAbandonedAt !== null && job(world).reconciledAt === null;
+/** Property 8: a succeeded job with 2+ rows, no row that became visible only after the reconcile's read, and a pass that did not give up. */
+const silentDuplicate = (world: World) => job(world).state === "succeeded" && world.ledger.length >= 2 && !lateRow(world) && !passAbandoned(world);
 /** A job that says no money moved (failed / business_outcome) with a ledger row: the oracle's UNRECORDED_COMMIT. */
 const unrecordedCommit = (world: World) => (job(world).state === "failed" || job(world).state === "business_outcome") && world.ledger.length >= 1;
-/** Property 10 (D55): an unrecorded commit, and no row that became visible only after the reconcile's read. */
-const silentUnrecorded = (world: World) => unrecordedCommit(world) && !lateRow(world);
+/** Property 10 (D55): an unrecorded commit, with property 8's exemptions. */
+const silentUnrecorded = (world: World) => unrecordedCommit(world) && !lateRow(world) && !passAbandoned(world);
+/** D59: an abandoned reconcile follows max_crashes dead reconcile phases, on a job that kept its terminal state. */
+function abandonedOnlyAtTheCap(world: World): string[] {
+  const j = job(world);
+  if (j.reconcileAbandonedAt === null) return [];
+  // A dead reconciler's phase is closed `crashed`; its late R2, fenced, relabels it `lease_lost`: one death either way.
+  const dead = j.phases.filter((p) => p.reason === "reconcile" && (p.decision === "crashed" || p.decision === "lease_lost")).length;
+  const problems: string[] = [];
+  if (dead < j.maxCrashes) problems.push(`abandoned after ${dead} dead reconcile phase(s), cap ${j.maxCrashes}`);
+  if (j.reconcileCrashes !== dead) problems.push(`reconcileCrashes ${j.reconcileCrashes} but ${dead} dead reconcile phase(s)`);
+  if (!isReconcilable(j.state) && j.state !== "needs_human") problems.push(`abandoned in state ${j.state}`);
+  return problems;
+}
 
 /** Property 1's precondition: no zombie click, and the settle period covers the history lag. */
 const p1Holds = (world: World) => !world.zombieClick && world.lag <= SETTLE;
@@ -1000,17 +1017,18 @@ describe("fleet state machine, pure model (Step 9: verify, settle, history lag, 
     );
   }, PROPERTY_TIMEOUT_MS);
 
-  it("property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50)", () => {
+  it("property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50) or the pass abandoned the reconcile at max_crashes dead reconcilers (D59), which only ever happens at that cap", () => {
     fc.assert(
       fc.property(scenarioArb, (s) => {
         const { world } = simulate(s);
+        expect(abandonedOnlyAtTheCap(world)).toEqual([]);
         expect(silentDuplicate(world), `${world.ledger.length} rows, job ${job(world).state}/${job(world).outcome}, last reconciled read at ${world.lastReconciledRead} saw ${JSON.stringify(world.lastReconciledSeen)}, rows ${JSON.stringify(world.ledger.map((r) => [r.id, r.visibleAt]))}`).toBe(false);
       }),
       params,
     );
   }, PROPERTY_TIMEOUT_MS);
 
-  it("property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read", () => {
+  it("property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read, or the pass abandoned the reconcile (D59)", () => {
     fc.assert(
       fc.property(scenarioArb, (s) => {
         const { world } = simulate(s);
@@ -1360,6 +1378,47 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
     expect(job(world).reconciledAt).not.toBeNull();
     expect(rows(world)).toBe(1);
     expect(Object.values(found).flat()).toEqual([]);
+  });
+
+  it("D59: the same job, then BOTH its reconcilers die (cap 2): the deaths count apart from its crashes; the drain's pass abandons the reconcile (settled, `abandoned`, still succeeded); the end-of-day batch reconciles it", () => {
+    const { world, found } = run(
+      [
+        { k: "dequeue", w: 0 },
+        { k: "intent", w: 0 },
+        { k: "crash", w: 0 }, // a death after the intent: crash 1 of 2 (T6.4)
+        { k: "tick", dt: 31 },
+        { k: "dequeue", w: 1 },
+        { k: "lookup", w: 1 },
+        { k: "tick", dt: 5 },
+        { k: "lookup", w: 1 },
+        { k: "decide", w: 1 }, // [0, 0] -> resubmitted
+        { k: "dequeue", w: 2 },
+        { k: "intent", w: 2 },
+        { k: "click", w: 2, commits: true },
+        { k: "finish", w: 2, how: "ok" }, // succeeded; the reconcile is due in 60 s
+        { k: "tick", dt: 61 },
+        { k: "dequeue", w: 1 }, // R1: w1 reconciles ...
+        { k: "crash", w: 1 }, // ... and dies before its lookup
+        { k: "tick", dt: 31 },
+        { k: "dequeue", w: 2 }, // R1: w2 closes w1's phase (reconciler death 1) and reconciles ...
+        { k: "crash", w: 2 }, // ... and dies too
+        { k: "tick", dt: 31 },
+      ],
+      { maxCrashes: 2 },
+    );
+    // The drain's clean worker closes w2's phase: reconciler death 2 of 2 -> R3, no lease, no lookup.
+    expect(world.decisions).toEqual(["resubmitted:[0,0]"]);
+    expect(job(world)).toMatchObject({ state: "succeeded", outcome: "success", attempt: 2, crashes: 1, reconcileCrashes: 2, reconciledAt: null, owner: null });
+    expect(job(world).reconcileAbandonedAt).not.toBeNull();
+    expect(modelSettled(job(world))).toBe(true);
+    expect(abandonedOnlyAtTheCap(world)).toEqual([]);
+    expect(rows(world)).toBe(1);
+    expect(Object.values(found).flat()).toEqual([]);
+    // The end-of-day batch still covers it: one lookup, 1 row, reconciled.
+    endOfDayBatch(world);
+    expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:[1]"]);
+    expect(job(world)).toMatchObject({ state: "succeeded", reconcileCrashes: 2, crashes: 1 });
+    expect(job(world).reconciledAt).not.toBeNull();
   });
 
   it("the settle period: a second lookup before SETTLE seconds have passed is not taken", () => {

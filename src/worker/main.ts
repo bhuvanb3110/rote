@@ -205,7 +205,7 @@ async function main(): Promise<void> {
     // Seam 4: every loop iteration recovers up to 10 expired leases before it dequeues (T6, D38); a
     // claim to verify (T6.4/T6.5/T6.7) is the iteration's work; otherwise at most one due reconcile is
     // (R1, D50). T6.2 marks a resubmitted job it fails for the reconcile pass (D55).
-    beforeDequeue: createRecoverySweep({ pool, workerId, leaseSeconds, log, fault, reconcile: true, reconcileDueSeconds: reconcileDue }),
+    beforeDequeue: createRecoverySweep({ pool, workerId, leaseSeconds, log, fault, reconcile: true, reconcileDueSeconds: reconcileDue, metrics }),
     onTick: healthFile
       ? () => {
           writeFile(healthFile, new Date().toISOString()).catch(() => undefined);

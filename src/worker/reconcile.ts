@@ -18,11 +18,17 @@
 //   R2  write it (RECONCILE_RESULT_SQL), fenced on (id, token, owner, the claimed state): reconciled (stays),
 //       duplicate_suspected / unrecorded_commit_suspected / reconcile_unreadable (needs_human, result.reconcile
 //       kept), or reconcile_deferred (reconcile_after moves by D44's backoff). 0 rows -> readFence (D41).
+//   R3  abandon (Step 10b, D59; the pure reconcileClaimAction): a dead reconciler's death is counted on the
+//       job apart from its crash budget (reconcile_crashes, by whichever claim closes the phase). When the
+//       workers' pass claims a job whose reconcile_crashes has reached max_crashes, it does not lease it:
+//       RECONCILE_ABANDON_SQL marks reconcile_abandoned_at, bumps the token, releases the lease and keeps the
+//       job's state; an error-level log line and reconcile_abandoned_total; then the next due job. The pass
+//       never claims it again (RECONCILE_CLAIM_SQL); the batch below still does, and never abandons.
 //
 // The end-of-day batch (reviewer decision 5, D51): `rote reconcile --since <duration>` runs the same phase
-// for every such job in the window, regardless of reconciled_at (RECONCILE_CLAIM_JOB_SQL claims one job by
-// id), so a zombie that clicked after the pass ran is still found. Read-only toward the bank: only the
-// lookup, never approveRisky.
+// for every such job in the window, regardless of reconciled_at and of reconcile_abandoned_at
+// (RECONCILE_CLAIM_JOB_SQL claims one job by id), so a zombie that clicked after the pass ran is still found.
+// Read-only toward the bank: only the lookup, never approveRisky.
 import type { JobRow, Pool, Queryable } from "../queue/index.js";
 import { withTransaction } from "../queue/index.js";
 import {
@@ -30,44 +36,65 @@ import {
   isReconcilable,
   lookupsColumn,
   RECONCILE_FLAGS,
+  reconcileClaimAction,
   reconcileDecision,
   reconcileResultPatch,
   type LookupReading,
   type ReconcilableState,
+  type ReconcileClaimer,
   type ReconcileDecision,
 } from "../fleet/stateMachine.js";
 import { RECONCILABLE_STATES_SQL, retryTransient, type FencedOutReason } from "./complete.js";
-import { NO_METRICS } from "./metrics.js";
+import type { WorkerLogger } from "./loop.js";
+import { NO_METRICS, type WorkerMetrics } from "./metrics.js";
 import { createLookup, type VerifyContext } from "./verify.js";
 import { END_PHASE_SQL, fencedOutPhase, type FencedWrite } from "./verifySql.js";
 
-/** R1, the worker's claim: the due job with the earliest reconcile_after that nobody holds. */
+const CLAIM_COLUMNS = "id, state, fencing_token, tenant_id, params, memo_key, attempt, max_attempts, result, reconcile_crashes, max_crashes";
+
+/** R1, the worker's claim: the due job with the earliest reconcile_after that nobody holds and the pass has not abandoned (D59). */
 export const RECONCILE_CLAIM_SQL = `
-SELECT id, state, fencing_token, tenant_id, params, memo_key, attempt, max_attempts, result
+SELECT ${CLAIM_COLUMNS}
 FROM jobs
-WHERE state IN (${RECONCILABLE_STATES_SQL}) AND reconciled_at IS NULL AND reconcile_after <= now()
+WHERE state IN (${RECONCILABLE_STATES_SQL}) AND reconciled_at IS NULL AND reconcile_abandoned_at IS NULL AND reconcile_after <= now()
   AND (lease_expires_at IS NULL OR lease_expires_at < now())
 ORDER BY reconcile_after, id
 LIMIT 1
 FOR UPDATE SKIP LOCKED`;
 
-/** The batch's claim of one job (rote reconcile --since): regardless of reconciled_at. */
+/** The batch's claim of one job (rote reconcile --since): regardless of reconciled_at and reconcile_abandoned_at. */
 export const RECONCILE_CLAIM_JOB_SQL = `
-SELECT id, state, fencing_token, tenant_id, params, memo_key, attempt, max_attempts, result
+SELECT ${CLAIM_COLUMNS}
 FROM jobs
 WHERE id = $1 AND state IN (${RECONCILABLE_STATES_SQL}) AND reconcile_after IS NOT NULL
   AND (lease_expires_at IS NULL OR lease_expires_at < now())
 FOR UPDATE SKIP LOCKED`;
+
+/** Whether a reconciler died: its phase (the job's current token) is still open although its lease expired. */
+export const OPEN_RECONCILE_PHASE_SQL = `
+SELECT count(*)::int AS n FROM job_verifications WHERE job_id = $1 AND fencing_token = $2 AND ended_at IS NULL`;
 
 /** A dead reconciler's phase (its lease expired with the row still open). */
 export const CLOSE_DEAD_RECONCILE_SQL = `
 UPDATE job_verifications SET ended_at = now(), decision = 'crashed', error = $3
 WHERE job_id = $1 AND fencing_token = $2 AND ended_at IS NULL`;
 
+/** R1's lease. $5 = reconcile_crashes, with the death this claim closed (D59). */
 export const RECONCILE_LEASE_SQL = `
 UPDATE jobs SET fencing_token = fencing_token + 1, lease_owner = $3,
-       lease_expires_at = now() + make_interval(secs => $4), updated_at = now()
+       lease_expires_at = now() + make_interval(secs => $4), reconcile_crashes = $5, updated_at = now()
 WHERE id = $1 AND fencing_token = $2 AND state IN (${RECONCILABLE_STATES_SQL})
+RETURNING fencing_token`;
+
+/**
+ * R3 (D59): the workers' pass abandons the job's reconcile at the cap. No lease: token + 1 (a paused
+ * reconciler's late R2 is fenced out as lease_lost), the lease released, reconcile_crashes ($3) recorded,
+ * reconcile_abandoned_at = now(). The state, outcome, result and error are kept.
+ */
+export const RECONCILE_ABANDON_SQL = `
+UPDATE jobs SET fencing_token = fencing_token + 1, lease_owner = NULL, lease_expires_at = NULL,
+       reconcile_crashes = $3, reconcile_abandoned_at = now(), updated_at = now()
+WHERE id = $1 AND fencing_token = $2 AND state IN (${RECONCILABLE_STATES_SQL}) AND reconciled_at IS NULL AND reconcile_abandoned_at IS NULL
 RETURNING fencing_token`;
 
 export const INSERT_RECONCILE_PHASE_SQL = `
@@ -109,6 +136,19 @@ export interface ReconcileClaim {
   confirmationRef: string | null;
 }
 
+/** R3 (D59): the workers' pass gave up on this job's reconcile at the cap; it stays in `state`. */
+export interface ReconcileAbandoned {
+  label: "R3";
+  job: Pick<JobRow, "id" | "tenant_id">;
+  state: ReconcilableState;
+  /** The token after the bump (the dead reconciler's is now stale). */
+  fencingToken: number;
+  /** Reconcilers that died on the job, with the one this claim closed (if any). */
+  reconcileCrashes: number;
+  maxCrashes: number;
+  error: string;
+}
+
 type ClaimRow = {
   id: string;
   state: string;
@@ -119,6 +159,8 @@ type ClaimRow = {
   attempt: number;
   max_attempts: number;
   result: unknown;
+  reconcile_crashes: number;
+  max_crashes: number;
 };
 
 function confirmationRefOf(result: unknown): string | null {
@@ -126,11 +168,28 @@ function confirmationRefOf(result: unknown): string | null {
   return typeof ref === "string" ? ref : null;
 }
 
-async function leaseFor(client: Queryable, row: ClaimRow, workerId: string, leaseSeconds: number): Promise<ReconcileClaim> {
+/** R1 or, for the workers' pass at the cap, R3 (reconcileClaimAction), on a row this transaction locked. */
+async function leaseFor(client: Queryable, row: ClaimRow, workerId: string, leaseSeconds: number, by: ReconcileClaimer): Promise<ReconcileClaim | ReconcileAbandoned> {
   if (!isReconcilable(row.state)) throw new Error(`reconcile: job ${row.id} claimed in state ${row.state}`);
   const state = row.state;
-  await client.query(CLOSE_DEAD_RECONCILE_SQL, [row.id, row.fencing_token, `reconcile lease expired; re-claimed by ${workerId}`]);
-  const updated = await client.query<{ fencing_token: number }>(RECONCILE_LEASE_SQL, [row.id, row.fencing_token, workerId, leaseSeconds]);
+  const open = (await client.query<{ n: number }>(OPEN_RECONCILE_PHASE_SQL, [row.id, row.fencing_token])).rows[0]!.n;
+  const action = reconcileClaimAction({ state, reconcileCrashes: row.reconcile_crashes, deadReconciler: open > 0, maxCrashes: row.max_crashes, by });
+  const note = action.kind === "abandon" ? `reconcile lease expired; the pass abandoned the job's reconcile (R3, ${workerId})` : `reconcile lease expired; re-claimed by ${workerId}`;
+  await client.query(CLOSE_DEAD_RECONCILE_SQL, [row.id, row.fencing_token, note]);
+  if (action.kind === "abandon") {
+    const abandoned = await client.query<{ fencing_token: number }>(RECONCILE_ABANDON_SQL, [row.id, row.fencing_token, action.reconcileCrashes]);
+    if (abandoned.rowCount !== 1) throw new Error(`reconcile: job ${row.id} changed under its row lock (token ${row.fencing_token})`);
+    return {
+      label: "R3",
+      job: { id: row.id, tenant_id: row.tenant_id },
+      state,
+      fencingToken: abandoned.rows[0]!.fencing_token,
+      reconcileCrashes: action.reconcileCrashes,
+      maxCrashes: row.max_crashes,
+      error: action.error,
+    };
+  }
+  const updated = await client.query<{ fencing_token: number }>(RECONCILE_LEASE_SQL, [row.id, row.fencing_token, workerId, leaseSeconds, action.reconcileCrashes]);
   if (updated.rowCount !== 1) throw new Error(`reconcile: job ${row.id} changed under its row lock (token ${row.fencing_token})`);
   const token = updated.rows[0]!.fencing_token;
   await client.query(INSERT_RECONCILE_PHASE_SQL, [row.id, token, workerId]);
@@ -143,19 +202,59 @@ async function leaseFor(client: Queryable, row: ClaimRow, workerId: string, leas
   };
 }
 
-/** R1: claims the earliest due job nobody holds; null when none is due. */
-export async function claimReconcile(pool: Pool, input: { workerId: string; leaseSeconds: number }): Promise<ReconcileClaim | null> {
-  return withTransaction(pool, async (client) => {
-    const row = (await client.query<ClaimRow>(RECONCILE_CLAIM_SQL)).rows[0];
-    return row ? leaseFor(client, row, input.workerId, input.leaseSeconds) : null;
+/**
+ * R1: claims the earliest due job nobody holds; null when none is due. A due job at the reconcile cap is
+ * abandoned on the way (R3, D59): logged at error level, counted (reconcile_abandoned_total), passed to
+ * onAbandoned, and the claim moves on to the next due job in the same transaction.
+ */
+export async function claimReconcile(
+  pool: Pool,
+  input: { workerId: string; leaseSeconds: number; log?: WorkerLogger; metrics?: WorkerMetrics; onAbandoned?: (a: ReconcileAbandoned) => void },
+): Promise<ReconcileClaim | null> {
+  const { claim, abandoned } = await withTransaction(pool, async (client) => {
+    const abandoned: ReconcileAbandoned[] = [];
+    for (;;) {
+      const row = (await client.query<ClaimRow>(RECONCILE_CLAIM_SQL)).rows[0];
+      if (!row) return { claim: null, abandoned };
+      const got = await leaseFor(client, row, input.workerId, input.leaseSeconds, "pass");
+      if (got.label === "R1") return { claim: got, abandoned };
+      abandoned.push(got); // marked abandoned: RECONCILE_CLAIM_SQL no longer selects it
+    }
   });
+  const metrics = input.metrics ?? NO_METRICS;
+  for (const a of abandoned) {
+    metrics.inc("reconcile_abandoned_total");
+    input.log?.error(
+      {
+        workerId: input.workerId,
+        jobId: a.job.id,
+        tenant: a.job.tenant_id,
+        label: a.label,
+        jobState: a.state,
+        reconcileCrashes: a.reconcileCrashes,
+        maxCrashes: a.maxCrashes,
+        fencingToken: a.fencingToken,
+        reconcile_abandoned_total: metrics.value?.("reconcile_abandoned_total") ?? null,
+        error: a.error,
+      },
+      `reconcile: ABANDONED after ${a.reconcileCrashes} dead reconcilers: the job stays ${a.state}; only \`rote reconcile --since\` re-reads it now`,
+    );
+    input.onAbandoned?.(a);
+  }
+  return claim;
 }
 
-/** The batch's claim of ONE job by id, regardless of reconciled_at; null if it is no longer reconcilable or someone holds it. */
+/**
+ * The batch's claim of ONE job by id, regardless of reconciled_at and reconcile_abandoned_at; null if it is
+ * no longer reconcilable or someone holds it. It counts a dead reconciler it finds, and never abandons.
+ */
 export async function claimReconcileJob(pool: Pool, input: { jobId: string; workerId: string; leaseSeconds: number }): Promise<ReconcileClaim | null> {
   return withTransaction(pool, async (client) => {
     const row = (await client.query<ClaimRow>(RECONCILE_CLAIM_JOB_SQL, [input.jobId])).rows[0];
-    return row ? leaseFor(client, row, input.workerId, input.leaseSeconds) : null;
+    if (!row) return null;
+    const got = await leaseFor(client, row, input.workerId, input.leaseSeconds, "batch");
+    if (got.label !== "R1") throw new Error(`reconcile: the batch's claim of ${row.id} abandoned it (a bug: the batch never abandons)`);
+    return got;
   });
 }
 
@@ -210,7 +309,7 @@ export interface ReconcilePhaseOutcome {
  * is read-only).
  */
 export const RECONCILE_WINDOW_SQL = `
-SELECT id, tenant_id, state, reconcile_after, reconciled_at, (reconciled_at IS NULL AND reconcile_after > now()) AS not_due
+SELECT id, tenant_id, state, reconcile_after, reconciled_at, reconcile_abandoned_at, (reconciled_at IS NULL AND reconcile_after > now()) AS not_due
 FROM jobs
 WHERE state IN (${RECONCILABLE_STATES_SQL}) AND reconcile_after IS NOT NULL
   AND reconcile_after > now() - make_interval(secs => $1)
@@ -236,6 +335,8 @@ export interface BatchRow {
   /** The decision R2 recorded; not_due (the workers' pass has not run yet, skipped); busy (someone holds it); not_recorded (fenced out / stopped). */
   result: BatchRowResult;
   wasReconciledAt: Date | null;
+  /** When the workers' pass had abandoned this job's reconcile (R3, D59): the batch is the only one that re-reads it. */
+  wasAbandonedAt: Date | null;
   matches: number | null;
   detail: string | null;
 }
@@ -257,11 +358,14 @@ export interface BatchReport {
  */
 export async function reconcileWindow(ctx: VerifyContext, input: { sinceSeconds: number; tenant?: string }): Promise<BatchReport> {
   const candidates = (
-    await ctx.pool.query<{ id: string; tenant_id: string; state: string; reconciled_at: Date | null; not_due: boolean }>(RECONCILE_WINDOW_SQL, [input.sinceSeconds, input.tenant ?? null])
+    await ctx.pool.query<{ id: string; tenant_id: string; state: string; reconciled_at: Date | null; reconcile_abandoned_at: Date | null; not_due: boolean }>(RECONCILE_WINDOW_SQL, [
+      input.sinceSeconds,
+      input.tenant ?? null,
+    ])
   ).rows;
   const rows: BatchRow[] = [];
   for (const c of candidates) {
-    const base = { jobId: c.id, tenant: c.tenant_id, state: c.state, wasReconciledAt: c.reconciled_at };
+    const base = { jobId: c.id, tenant: c.tenant_id, state: c.state, wasReconciledAt: c.reconciled_at, wasAbandonedAt: c.reconcile_abandoned_at };
     if (c.not_due) {
       rows.push({ ...base, result: "not_due", matches: null, detail: "the workers' reconcile pass is not due yet; left to it" });
       continue;

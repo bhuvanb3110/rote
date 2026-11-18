@@ -60,6 +60,10 @@ export const JobRowSchema = z.object({
   max_crashes: z.number().int().min(1),
   /** 0007 (D58): the deaths before the intent only (T6.1 / T6.2): not own attempts, so own = attempt - lease_crashes. */
   lease_crashes: z.number().int().nonnegative(),
+  /** 0008 (D59): reconcilers that died on this (terminal) job: counted apart from `crashes`, capped by max_crashes. */
+  reconcile_crashes: z.number().int().nonnegative(),
+  /** 0008 (D59): the workers' reconcile pass gave up at the cap (R3); `rote reconcile --since` still re-reads the job. */
+  reconcile_abandoned_at: z.date().nullable(),
 });
 export type JobRow = z.infer<typeof JobRowSchema>;
 

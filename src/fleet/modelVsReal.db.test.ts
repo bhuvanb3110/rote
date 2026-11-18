@@ -4,7 +4,8 @@
 // compares, after EVERY command, each job's state, fencing token, owner, attempt, crashes and lease crashes (D57, D58), outcome and lease, its
 // verify cycle as VERIFY_CYCLE_SQL derives it from job_verifications (phases, dead phases, deferrals,
 // deferred-for, prior status, the newest phase's decision), its requeue backoff (not_before, Step 10 D49),
-// its reconcile marks (reconcile_after, reconciled_at; D50), plus each command's own answer (leased which
+// its reconcile marks (reconcile_after, reconciled_at; D50; reconcile_crashes and the pass's abandonment, D59),
+// plus each command's own answer (leased which
 // job, extended or not, recorded / fenced (lease_lost) / illegal_transition / CHECK violation, which jobs
 // recovered how, which one was claimed to verify). This is what catches drift between the model the
 // property tests trust and the SQL the workers run.
@@ -150,6 +151,9 @@ interface RealJob {
   /** Seconds until reconcile_after (negative = due), or null. */
   reconcile_in: number | null;
   reconciled: boolean;
+  /** 0008 (D59). */
+  reconcile_crashes: number;
+  abandoned: boolean;
 }
 
 async function readReal(pool: Pool): Promise<RealJob[]> {
@@ -159,7 +163,7 @@ async function readReal(pool: Pool): Promise<RealJob[]> {
               EXTRACT(EPOCH FROM (lease_expires_at - now()))::float8 AS remaining,
               EXTRACT(EPOCH FROM (not_before - now()))::float8 AS not_before_in,
               EXTRACT(EPOCH FROM (reconcile_after - now()))::float8 AS reconcile_in,
-              reconciled_at IS NOT NULL AS reconciled
+              reconciled_at IS NOT NULL AS reconciled, reconcile_crashes, reconcile_abandoned_at IS NOT NULL AS abandoned
        FROM jobs ORDER BY created_at, id`,
     )
   ).rows;
@@ -206,6 +210,11 @@ async function compare(m: Model, r: Real, after: string): Promise<void> {
       expect(Math.abs(rj.reconcile_in! - mReconcile), `${where}: reconcile_after in real ${rj.reconcile_in} vs model ${mReconcile} (slack ${slack.toFixed(3)} s)`).toBeLessThan(slack);
     }
     expect(rj.reconciled, `${where}: reconciled_at set`).toBe(mj.reconciledAt !== null);
+    // A reconciler's deaths, apart from the job's crashes, and the pass's abandonment (D59).
+    expect({ reconcileCrashes: rj.reconcile_crashes, abandoned: rj.abandoned }, `${where}: reconcile_crashes / abandoned`).toEqual({
+      reconcileCrashes: mj.reconcileCrashes,
+      abandoned: mj.reconcileAbandonedAt !== null,
+    });
     // The verify cycle (VERIFY_CYCLE_SQL vs the model's phases).
     const rc = cycles[i]!;
     const mc = modelVerifyCycle(mj, m.db.now);
@@ -501,10 +510,13 @@ class ReconcileClaimCmd implements Cmd {
   constructor(readonly w: W) {}
   check = (m: Readonly<Model>) => !nearReconcileDue(m as Model) && !nearReconcileLease(m as Model) && !reconcileTie(m as Model);
   async run(m: Model, r: Real) {
-    const { db: next, claimed } = modelReconcileClaim(m.db, this.w, LEASE);
-    const real = await claimReconcile(r.pool, { workerId: this.w, leaseSeconds: LEASE });
+    const { db: next, claimed, abandoned } = modelReconcileClaim(m.db, this.w, LEASE);
+    const realAbandoned: string[] = [];
+    const real = await claimReconcile(r.pool, { workerId: this.w, leaseSeconds: LEASE, onAbandoned: (a) => realAbandoned.push(a.job.id) });
     expect(real ? `${real.job.id}:${real.fencingToken}` : null, this.toString()).toEqual(claimed ? `${claimed.jobId}:${claimed.token}` : null);
+    expect(realAbandoned, `${this.toString()}: abandoned on the way (R3, D59)`).toEqual(abandoned);
     hit(`R1:${claimed ? "claimed" : "none"}`);
+    if (abandoned.length > 0) hit("R1:abandoned");
     if (real) hit(`R1:claimed:${real.state}`); // D55: the claimed terminal state
     if (real && claimed) expect(real.state, `${this.toString()}: claimed state`).toBe(m.db.jobs.find((j) => j.id === claimed.jobId)!.state);
     m.db = next;
@@ -516,7 +528,7 @@ class ReconcileClaimCmd implements Cmd {
 
 /** Two due jobs sharing a reconcile_after: Postgres breaks the tie by id, the model by creation order. */
 function reconcileTie(m: Model): boolean {
-  const due = m.db.jobs.filter((j) => isReconcilable(j.state) && j.reconciledAt === null && j.reconcileAfter !== null && j.reconcileAfter <= m.db.now);
+  const due = m.db.jobs.filter((j) => isReconcilable(j.state) && j.reconciledAt === null && j.reconcileAbandonedAt === null && j.reconcileAfter !== null && j.reconcileAfter <= m.db.now);
   return new Set(due.map((j) => j.reconcileAfter)).size < due.length;
 }
 
@@ -731,8 +743,12 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
       fc.asyncProperty(
         fc.record({
           maxAttempts: fc.constantFrom(2, 3),
+          // D59: a small cap so a reconciler's death reaches it (the pass abandons, R3); 5 = the default.
+          maxCrashes: fc.constantFrom(1, 2, 5),
           jobs: fc.constantFrom(1, 2),
           early: fc.boolean(),
+          // With `early` (the reconcile is due): reconcilers that claim job 0 and die (their lease passes, no R2).
+          deadReconcilers: fc.constantFrom(0, 0, 1, 2),
           start: fc.constantFrom<"succeeded" | "failed" | "business_outcome" | "exhausted">("succeeded", "succeeded", "failed", "business_outcome", "exhausted"),
         }),
         fc.commands([...commandArbs, ...reconcileArbs], { maxCommands: 15, size: "max" }),
@@ -741,8 +757,8 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
           await pool.query("UPDATE tenants SET max_concurrent = 2 WHERE id = $1", [TENANT]);
           const jobs: ModelJob[] = [];
           for (let i = 0; i < cfg.jobs; i += 1) {
-            const { job } = await enqueue(pool, { capability: CAP, tenantId: TENANT, idempotencyKey: `mvr-r-${i}`, params: { memberId: "1" }, maxAttempts: cfg.maxAttempts });
-            jobs.push(newJob({ id: job.id, tenant: TENANT, seq: i + 1, maxAttempts: cfg.maxAttempts }));
+            const { job } = await enqueue(pool, { capability: CAP, tenantId: TENANT, idempotencyKey: `mvr-r-${i}`, params: { memberId: "1" }, maxAttempts: cfg.maxAttempts, maxCrashes: cfg.maxCrashes });
+            jobs.push(newJob({ id: job.id, tenant: TENANT, seq: i + 1, maxAttempts: cfg.maxAttempts, maxCrashes: cfg.maxCrashes }));
           }
           const model = { db: { now: 0, jobs, caps: { [TENANT]: 2 } }, held: {} } as Model;
           const real = { pool, tokens: new Map<string, number>(), lastSync: Date.now() } as Real;
@@ -754,6 +770,8 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
               ? [new DequeueCmd("wA"), new CompleteIntoVerifyCmd("wA", "failure"), new VerifyResultCmd("wA", "exhausted")]
               : [new DequeueCmd("wA"), new CompleteIntoVerifyCmd("wA", "failure"), new VerifyResultCmd("wA", "resubmitted"), new DequeueCmd("wB"), new CompleteCmd("wB", cfg.start)];
           if (cfg.early) prefix.push(new TickCmd(45), new TickCmd(29));
+          // D59: dead reconcilers, so the random commands that follow meet the reconcile cap (R3) under caps 1 and 2.
+          if (cfg.early) for (let d = 0; d < cfg.deadReconcilers; d += 1) prefix.push(new ReconcileClaimCmd("wA"), new TickCmd(31));
           for (const c of prefix.map(synced)) await c.run(model, real);
           expect(model.db.jobs[0]!.reconcileAfter, `the ${cfg.start} prefix marks job 0`).not.toBeNull();
           await fc.asyncModelRun(() => ({ model, real }), cmds);
@@ -772,6 +790,7 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
       "dequeue:held_back_by_not_before",
       "dequeue:lease_beyond_max_attempts", // D57: crashes did not use the attempts
       "R1:claimed", "R1:none", "batchClaim:claimed", "batchClaim:refused",
+      "R1:abandoned", // D59: the pass gave up at the reconcile cap (R3)
       "R1:claimed:succeeded", "R1:claimed:failed", "R1:claimed:business_outcome", // D55
       "R2:reconciled:recorded", "R2:duplicate_suspected:recorded", "R2:reconcile_unreadable:recorded", "R2:reconcile_deferred:recorded",
       "R2:unrecorded_commit_suspected:recorded", "R2:wrong_state:illegal_transition",

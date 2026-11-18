@@ -17,6 +17,7 @@ const clean = (over: Partial<RunObservation> = {}): RunObservation => ({
   requeuedAfterFailure: 0,
   deferrals: 0,
   crashLimitEscalations: [],
+  reconcileAbandoned: [],
   ...over,
 });
 /** A needs_human / crash_limit job's verdict (src/chaos/attribution.ts decides it; here it is given). */
@@ -110,11 +111,15 @@ describe("judgeFamily", () => {
     expect(judgeFamily(FAMILY_SPECS.standard, clean())).toEqual([]); // the standard family has no bank events to check
   });
 
-  it("every family: the oracle, settled, leaks, OOM", () => {
+  it("every family: the oracle, settled, a reconcile the pass abandoned (D59), leaks, OOM", () => {
     for (const fam of CHAOS_FAMILIES) {
       const base = fam === "standard" ? clean : bankRun;
       expect(judgeFamily(FAMILY_SPECS[fam], base({ oraclePass: false, oracleBad: { DUPLICATE: 1, LOST: 0 } }))).toEqual(["the oracle failed (DUPLICATE 1)"]);
       expect(judgeFamily(FAMILY_SPECS[fam], base({ notSettled: 2, drainTimedOut: true }))).toEqual(["2 job(s) not settled after the drain (the drain timed out)"]);
+      // Settled, but its zombie check never ran: fails every family, naming the job.
+      const abandoned = judgeFamily(FAMILY_SPECS[fam], base({ reconcileAbandoned: ["job-7"] }));
+      expect(abandoned).toHaveLength(1);
+      expect(abandoned[0]).toMatch(/^1 job\(s\) reconcile_abandoned: .*\(job-7; run `rote reconcile --since`\)$/);
       expect(judgeFamily(FAMILY_SPECS[fam], base({ leaks: ["ROTE_CRED_TENANT_A_PASSWORD"] }))[0]).toMatch(/credential values/);
       expect(judgeFamily(FAMILY_SPECS[fam], base({ oom: ["rote-worker-2"] }))[0]).toMatch(/OOM-killed/);
     }

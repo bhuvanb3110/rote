@@ -23,7 +23,9 @@ import {
   RECONCILABLE_STATES,
   RECONCILE_FLAGS,
   RECONCILE_TRIGGERS,
+  reconcileClaimAction,
   reconcileDecision,
+  reconcileStatus,
   reconcileDueSeconds,
   reconcileExpectedMatches,
   reconcileResultPatch,
@@ -469,5 +471,52 @@ describe("reconcileDecision (Step 10 section 2, R2's table; D50; every terminal 
     expect(jobSettled({ state: "failed", reconcile_after: at, reconciled_at: null })).toBe(false); // D55
     expect(jobSettled({ state: "business_outcome", reconcile_after: at, reconciled_at: at })).toBe(true);
     for (const state of ["queued", "running", "committing", "verifying"]) expect(jobSettled({ state, reconcile_after: null, reconciled_at: null }), state).toBe(false);
+    // D59: the pass abandoned it: settled (no automatic check runs again), though nothing was confirmed.
+    expect(jobSettled({ state: "succeeded", reconcile_after: at, reconciled_at: null, reconcile_abandoned_at: at })).toBe(true);
+    expect(jobSettled({ state: "failed", reconcile_after: at, reconciled_at: null, reconcile_abandoned_at: null })).toBe(false);
+  });
+
+  it("reconcileStatus (GET /jobs/:id `reconcile`, D59): none, pending, reconciled, flagged, abandoned; a decision after an abandonment wins", () => {
+    const at = new Date();
+    const job = (over: Partial<Parameters<typeof reconcileStatus>[0]>) => ({ state: "succeeded", outcome: "success", reconcile_after: at, reconciled_at: null, reconcile_abandoned_at: null, ...over });
+    expect(reconcileStatus(job({ reconcile_after: null }))).toBe("none");
+    expect(reconcileStatus(job({ state: "needs_human", outcome: "ambiguous", reconcile_after: null }))).toBe("none"); // a verify's escalation, never marked
+    expect(reconcileStatus(job({}))).toBe("pending");
+    expect(reconcileStatus(job({ state: "failed", outcome: "not_committed_attempts_exhausted" }))).toBe("pending");
+    expect(reconcileStatus(job({ reconciled_at: at }))).toBe("reconciled");
+    expect(reconcileStatus(job({ state: "business_outcome", outcome: "business_outcome", reconciled_at: at }))).toBe("reconciled");
+    for (const flag of RECONCILE_FLAGS) expect(reconcileStatus(job({ state: "needs_human", outcome: flag, reconciled_at: at })), flag).toBe("flagged");
+    expect(reconcileStatus(job({ reconcile_abandoned_at: at }))).toBe("abandoned");
+    // The end-of-day batch decided after the pass gave up: its decision is the status.
+    expect(reconcileStatus(job({ reconcile_abandoned_at: at, reconciled_at: at }))).toBe("reconciled");
+    expect(reconcileStatus(job({ reconcile_abandoned_at: at, reconciled_at: at, state: "needs_human", outcome: "duplicate_suspected" }))).toBe("flagged");
+    // Settled and abandoned are both true at once: settled alone never says "confirmed".
+    expect(jobSettled(job({ reconcile_abandoned_at: at }))).toBe(true);
+    // Rows read without 0008's column (undefined) are never abandoned.
+    expect(reconcileStatus({ state: "succeeded", reconcile_after: at, reconciled_at: null })).toBe("pending");
+  });
+
+  it("reconcileClaimAction (D59): a reconciler's death counts apart; the workers' pass abandons at max_crashes (R3); the batch never does", () => {
+    const pass = (reconcileCrashes: number, deadReconciler: boolean, maxCrashes = DEFAULT_MAX_CRASHES) =>
+      reconcileClaimAction({ state: "succeeded", reconcileCrashes, deadReconciler, maxCrashes, by: "pass" });
+    expect(pass(0, false)).toEqual({ kind: "reconcile", label: "R1", reconcileCrashes: 0 }); // the first claim
+    expect(pass(0, true)).toEqual({ kind: "reconcile", label: "R1", reconcileCrashes: 1 }); // a dead reconciler: counted
+    expect(pass(3, true)).toEqual({ kind: "reconcile", label: "R1", reconcileCrashes: 4 }); // 4 of 5: still reconciled
+    const fifth = pass(4, true);
+    expect(fifth).toMatchObject({ kind: "abandon", label: "R3", reconcileCrashes: 5 }); // the 5th death: abandoned
+    if (fifth.kind !== "abandon") throw new Error("unreachable");
+    expect(fifth.error).toMatch(/^reconcile abandoned: 5 reconciler\(s\) died on this job \(cap 5, counted apart from the job's own crash budget\); the job stays succeeded; .*`rote reconcile --since` still re-reads it$/);
+    // At the cap already (the batch's deaths are counted, D59) with no new death: the pass abandons too.
+    expect(pass(5, false)).toMatchObject({ kind: "abandon", reconcileCrashes: 5 });
+    // The cap is the job's max_crashes.
+    expect(pass(0, true, 1)).toMatchObject({ kind: "abandon", reconcileCrashes: 1 });
+    expect(pass(1, true, 3)).toMatchObject({ kind: "reconcile", reconcileCrashes: 2 });
+    expect(reconcileClaimAction({ state: "failed", reconcileCrashes: 1, deadReconciler: true, maxCrashes: 2, by: "pass" })).toMatchObject({ kind: "abandon", error: expect.stringMatching(/the job stays failed/) });
+    // The batch (rote reconcile --since): counts the death, never abandons, however many.
+    for (const n of [0, 4, 5, 19]) {
+      expect(reconcileClaimAction({ state: "business_outcome", reconcileCrashes: n, deadReconciler: true, maxCrashes: 5, by: "batch" })).toEqual({ kind: "reconcile", label: "R1", reconcileCrashes: n + 1 });
+    }
+    expect(() => pass(-1, false)).toThrow(RangeError);
+    expect(() => pass(0, false, 0)).toThrow(RangeError);
   });
 });

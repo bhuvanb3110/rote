@@ -610,3 +610,38 @@ How the build reads it (flagged in the handoff):
 - **Lookup 1.3.0** (read every matching transfer's Reference, so a `duplicate_suspected` job carries both
   references in a field, not only in the reconcile's screenshot): the Day-4 hardening step (decision 1). It
   is a capability change and needs re-approval with the override digests.
+
+## Reviewer confirmation of the D58 readings (2026-11-18)
+
+1. **The worker dying after its intent (T6.4) counts as a death.** Confirmed; as built in D58.
+2. **A reconciler's death does NOT count toward the job's budget, but is counted separately.** After 5, stop
+   reconciling that job, keep its state, mark it `reconcile_abandoned`, log it and count it in a metric;
+   `rote reconcile --since` still covers it. Add a test. Built as **D59** (below).
+3. **`needs_human` / `crash_limit` after an intent can be reverified; `failed` / `crash_limit` before any intent
+   cannot.** Confirmed; as built (`crash_limit` is in `REVERIFIABLE_OUTCOMES`, and `rote jobs reverify` only
+   takes a `needs_human` job, so a `failed` one is refused).
+
+### How the build reads reading 2 (D59)
+
+- The counter is `jobs.reconcile_crashes` (migration 0008). The claim that closes a dead reconciler's open phase
+  `crashed` adds 1, whether that claim is the workers' pass (R1) or the batch. `jobs.crashes` is never touched.
+- "After 5" is the job's `max_crashes` (default 5): the same number as its crash budget, counted apart. The
+  tests reach it with small caps.
+- R3, abandon: the pass's claim, at the cap, does not lease the job. It sets `reconcile_abandoned_at`, bumps the
+  token (a paused reconciler's late R2 is then `lease_lost`) and releases the lease. The state, outcome, result
+  and error are kept. An error-level log line and `reconcile_abandoned_total`. The pass then takes the next due
+  job.
+- The pass never claims an abandoned job again. The batch claims it regardless, counts any death it finds, and
+  never abandons.
+- An abandoned job is **settled**: the pass is done with it, and only the operator's batch can still flag it.
+  Otherwise the drain and polling clients would wait forever. Every chaos family fails on an abandoned job: its
+  zombie check did not run.
+
+### Reviewer decision on the two D59 judgement calls (2026-11-18)
+
+1. Reusing `max_crashes` as the reconcile cap (counted apart in `reconcile_crashes`): **approved**.
+2. Abandoned counts as settled: **approved, with one addition.** `GET /jobs/:id` returns the reconcile status
+   explicitly, `reconcile: "none" | "pending" | "reconciled" | "abandoned" | "flagged"`, so a client can see that
+   a job was settled WITHOUT being confirmed duplicate-free. The README says that settled + `reconcile:
+   "abandoned"` means "no automatic check will run again; the end-of-day `rote reconcile --since` still can".
+   Every chaos family failing on an abandoned job: **approved**.

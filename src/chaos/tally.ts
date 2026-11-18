@@ -148,6 +148,8 @@ export interface SeedSummary {
     ledgerRows: number;
     deaths: Array<{ row: string; n: number; holder: string; recovery: string; event: { kind: string; container: string; at: string; tMs: number | null } | null }>;
   }>;
+  /** Jobs whose reconcile the workers' pass abandoned (R3, D59); any fails the seed. Absent before D59. */
+  reconcileAbandoned?: string[];
   workerProtections: Record<string, number>;
   leaks: string[];
   oom: string[];

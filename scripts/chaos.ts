@@ -298,7 +298,9 @@ async function main(): Promise<void> {
   let drainTimedOut = false;
   let lastSettledAt = Date.now();
   for (;;) {
-    const { rows } = await pool.query<{ state: string; reconcile_after: Date | null; reconciled_at: Date | null }>("SELECT state, reconcile_after, reconciled_at FROM jobs");
+    const { rows } = await pool.query<{ state: string; reconcile_after: Date | null; reconciled_at: Date | null; reconcile_abandoned_at: Date | null }>(
+      "SELECT state, reconcile_after, reconciled_at, reconcile_abandoned_at FROM jobs",
+    );
     const unsettled = rows.filter((r) => !jobSettled(r)).length;
     if (unsettled === 0) {
       lastSettledAt = Date.now();
@@ -389,6 +391,15 @@ async function main(): Promise<void> {
     `crash budget (D57): ${crashBudget.totalCrashes} crash(es) on ${crashBudget.jobsWithCrashes} job(s), at most ${crashBudget.maxCrashesOnOneJob} on one job; ` +
       `${crashBudget.jobsLeasedPastMaxAttempts} job(s) leased past max_attempts (crashes used no attempt); ${crashBudget.crashLimit} at the crash cap`,
   );
+  // D59: reconciler deaths, counted apart from the job's crashes; a job the pass abandoned fails every family.
+  const reconcileRows = (await pool.query<{ id: string; reconcile_crashes: number; abandoned: boolean }>(
+    "SELECT id, reconcile_crashes, reconcile_abandoned_at IS NOT NULL AS abandoned FROM jobs WHERE reconcile_crashes > 0 OR reconcile_abandoned_at IS NOT NULL ORDER BY id",
+  )).rows;
+  const reconcileAbandoned = reconcileRows.filter((r) => r.abandoned).map((r) => r.id);
+  log(
+    `reconciler deaths (D59): ${reconcileRows.reduce((n, r) => n + r.reconcile_crashes, 0)} on ${reconcileRows.filter((r) => r.reconcile_crashes > 0).length} job(s); ` +
+      `${reconcileAbandoned.length} reconcile(s) abandoned by the pass${reconcileAbandoned.length ? ` (${reconcileAbandoned.join(", ")})` : ""}`,
+  );
   log(`attempt outcomes: ${[...attemptOutcomes].sort().map(([k, n]) => `${k} x${n}`).join(", ")}`);
   log(`final job states: ${Object.entries(finals).sort().map(([k, n]) => `${k} x${n}`).join(", ")}`);
   log(`settled: ${jobs.length - notSettled}/${jobs.length}; drain ${Math.round((Date.now() - drainStart) / 1000)} s${drainTimedOut ? " (TIMED OUT)" : ""}`);
@@ -422,6 +433,7 @@ async function main(): Promise<void> {
     reconcileDecisionFencedOut: count(/reconcile: lease lost; decision NOT recorded/),
     duplicatesDetected: count(/reconcile: DUPLICATE SUSPECTED/),
     unrecordedCommitsDetected: count(/reconcile: UNRECORDED COMMIT SUSPECTED/),
+    reconcileAbandoned: count(/reconcile: ABANDONED/), // D59
   };
   log(`worker protections fired (container logs): ${Object.entries(workerProtections).map(([k, n]) => `${k} x${n}`).join(", ")}`);
   const leaks = Object.entries(FAKE_CREDS)
@@ -467,6 +479,7 @@ async function main(): Promise<void> {
     requeuedAfterFailure: recoveries.requeuedAfterFailure,
     deferrals: recoveries.deferred + recoveries.reconcile_deferred,
     crashLimitEscalations,
+    reconcileAbandoned,
   });
   const accepted = acceptedEscalations(spec, { crashLimitEscalations });
   log("");
@@ -517,6 +530,7 @@ async function main(): Promise<void> {
       ledgerRows: v.ledgerRows,
       deaths: v.deaths.map((d) => ({ row: d.row, n: d.n, holder: d.holder, recovery: d.recovery, event: d.event })),
     })),
+    reconcileAbandoned,
     workerProtections,
     leaks,
     oom,

@@ -318,4 +318,12 @@ describe("rote jobs reverify (the SQL)", () => {
     // Fenced on its state: a second reverify of the same job is refused (it is verifying now).
     expect(await reverifyJob(pool, { jobId: p.id, who: "x" })).toMatchObject({ moved: false, state: "verifying" });
   });
+
+  it("the D58 readings, reading 3 (confirmed 2026-11-18): needs_human / crash_limit (the cap after an intent) is reverifiable; failed / crash_limit (the cap before any intent: nothing irreversible happened) is not", async () => {
+    expect((await reverifyJob(pool, { jobId: (await parked("crash_limit")).id, who: "x" })).moved).toBe(true);
+    const failed = await leased();
+    await pool.query("UPDATE jobs SET state = 'failed', outcome = 'crash_limit', lease_owner = NULL, lease_expires_at = NULL WHERE id = $1", [failed.id]);
+    expect(await reverifyJob(pool, { jobId: failed.id, who: "x" })).toMatchObject({ moved: false, why: "not_reverifiable", state: "failed" });
+    expect(await row(failed.id)).toMatchObject({ state: "failed", outcome: "crash_limit", fencing_token: failed.fencing_token }); // untouched
+  });
 });

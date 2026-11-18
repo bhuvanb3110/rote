@@ -10,13 +10,18 @@
 //                     again (Step 10, D49: retries back off)
 //   recoveryAction    what T6 does with an expired lease (T6.1 requeue, T6.2 fail at the crash cap; Step 9:
 //                     T6.4 claim a `committing` job to verify, T6.5 re-claim a dead verifier's job, T6.6
-//                     escalate after 3 dead verify phases, T6.7 resume a deferred or handed-off verify)
-//   ownAttempts       the job's own attempts: its leases minus its crashes (Step 10b, D57: two budgets)
+//                     escalate at the crash cap after the intent (D58), T6.7 resume a deferred or handed-off
+//                     verify); every death counts against the job's one crash budget (D58)
+//   ownAttempts       the job's own attempts: its leases minus its deaths before the intent (Step 10b, D57,
+//                     D58: two budgets)
 //   classifyLookup    what one history lookup said: a count, the bank unavailable, transient, unreadable
 //   verifyDecision    what a verify phase concludes from its lookups (Step 9, docs/plans/step-08.md
 //                     section 5, plus step-09 reviewer decisions 4-5: deferral)
 //   reconcileDecision what the reconcile pass concludes from its one lookup (Step 10, D50), and
-//                     jobSettled: terminal with no reconcile due (GET /jobs/:id `settled`)
+//                     jobSettled: terminal with no automatic reconcile still to run (GET /jobs/:id `settled`)
+//   reconcileClaimAction  what a reconcile claim does with the job's reconciler deaths: lease it (R1), or, in
+//                     the workers' pass at the cap, abandon its reconcile (R3) (Step 10b, D59)
+//   reconcileStatus   none / pending / reconciled / flagged / abandoned (GET /jobs/:id `reconcile`, D59)
 //
 // jobOutcomeFor (docs/plans/step-06.md section 2, reviewer decisions 2-3), tested row by row. The
 // load-bearing rules:
@@ -774,8 +779,9 @@ export const REVERIFIABLE_OUTCOMES = ["commit_uncertain", "unreadable", "verify_
 //
 // The one exception to "terminal states are final": a reconcile's flag, succeeded / failed / business_outcome
 // -> needs_human (reviewer decision 3; 10a decision 2). A job is SETTLED (GET /jobs/:id `settled`) once it
-// is terminal and no reconcile is due: it never had a reconcile_after, or the reconcile decided
-// (reconciled_at). Until then a terminal job can still become needs_human.
+// is terminal and no automatic reconcile is still to run: it never had a reconcile_after, the reconcile
+// decided (reconciled_at), or the workers' pass abandoned it (reconcile_abandoned_at, D59). Until then a
+// terminal job can still become needs_human. GET /jobs/:id `reconcile` says which (reconcileStatus).
 //
 // The honest limit (reviewer decision 5): a zombie frozen longer than the delay that also beats its own
 // overdue heartbeat on waking clicks AFTER the reconcile read, and that row is silent again. The end-of-day
@@ -905,12 +911,90 @@ export function reconcileResultPatch(d: ReconcileDecision, evidenceRef: string |
   };
 }
 
+/** The reconcile columns of a job row (0004, 0008), as jobSettled and reconcileStatus read them. */
+export interface ReconcileColumns {
+  state: string;
+  outcome?: string | null;
+  reconcile_after: Date | null | undefined;
+  reconciled_at: Date | null | undefined;
+  /** 0008 (D59): the workers' pass gave up on this job's reconcile; absent on rows read before 0008. */
+  reconcile_abandoned_at?: Date | null;
+}
+
 /**
- * Settled (GET /jobs/:id): terminal, and no reconcile is due -- the job never had one (reconcile_after
- * NULL) or the reconcile pass decided (reconciled_at set). Until then a succeeded, failed or
- * business_outcome job can still change to needs_human (reviewer decision 3; D55).
+ * Settled (GET /jobs/:id): terminal, and no AUTOMATIC reconcile is still to run -- the job never had one
+ * (reconcile_after NULL), the reconcile pass decided (reconciled_at set), or the pass abandoned it after
+ * max_crashes dead reconcilers (reconcile_abandoned_at, D59; only `rote reconcile --since` re-reads it now).
+ * Until then a succeeded, failed or business_outcome job can still change to needs_human (reviewer decision 3;
+ * D55). `settled` alone does not say the job was confirmed: reconcileStatus does.
  */
-export function jobSettled(job: { state: string; reconcile_after: Date | null | undefined; reconciled_at: Date | null | undefined }): boolean {
+export function jobSettled(job: ReconcileColumns): boolean {
   if (!(TERMINAL_STATES as readonly string[]).includes(job.state)) return false;
-  return job.reconcile_after == null || job.reconciled_at != null;
+  return job.reconcile_after == null || job.reconciled_at != null || job.reconcile_abandoned_at != null;
+}
+
+/**
+ * GET /jobs/:id `reconcile` (D59, the reviewer's addition): which kind of settled a job is.
+ *   none        the job was never marked (no verify ever read [0, 0] on it): nothing to re-read
+ *   pending     marked, and the pass has not decided yet (not settled)
+ *   reconciled  a reconcile decided and the history agreed with the job's state (the pass or the batch)
+ *   flagged     a reconcile moved it to needs_human (duplicate_suspected, unrecorded_commit_suspected,
+ *               reconcile_unreadable)
+ *   abandoned   the workers' pass gave up after max_crashes dead reconcilers and nothing decided since:
+ *               settled WITHOUT being confirmed; no automatic check runs again, `rote reconcile --since` still can
+ * A decision by the batch after an abandonment wins (reconciled / flagged).
+ */
+export type ReconcileStatus = "none" | "pending" | "reconciled" | "flagged" | "abandoned";
+export function reconcileStatus(job: ReconcileColumns): ReconcileStatus {
+  if (job.reconcile_after == null) return "none";
+  if (job.state === "needs_human" && (RECONCILE_FLAGS as readonly string[]).includes(job.outcome ?? "")) return "flagged";
+  if (job.reconciled_at != null) return "reconciled";
+  if (job.reconcile_abandoned_at != null) return "abandoned";
+  return "pending";
+}
+
+// ---------------------------------------------------------------------------------------------------
+// A reconciler's deaths (Step 10b; the reviewer's confirmation of the D58 readings, reading 2: D59).
+//
+// A reconcile run that dies leaves its phase open with its reconcile lease expired; the next claim closes it
+// `crashed`. That death is NOT one of the job's crashes (jobs.crashes, D58): the job's own work is over, and a
+// reconcile only reads the history. It is counted apart (jobs.reconcile_crashes, 0008) by whichever claim
+// closes the dead phase: the workers' pass (R1) or the end-of-day batch's claim by id. At the job's crash cap
+// (max_crashes: the same number, counted apart) the workers' pass stops reconciling the job (R3): no lease;
+// reconcile_abandoned_at = now(), token + 1 (a paused reconciler's late R2 is then lease_lost), the lease
+// released, the job's state / outcome / result / error kept; an error-level log line and
+// reconcile_abandoned_total. The pass never claims it again. The batch never abandons: it still re-reads it.
+//
+//   claimer   reconcile_crashes (+ the death this claim closes)   action
+//   pass      < max_crashes                                         R1 lease it, reconcile_crashes recorded
+//   pass      >= max_crashes                                        R3 abandon
+//   batch     any                                                   R1 lease it, reconcile_crashes recorded
+
+export type ReconcileClaimer = "pass" | "batch";
+
+export type ReconcileClaimAction =
+  | { kind: "reconcile"; label: "R1"; reconcileCrashes: number }
+  | { kind: "abandon"; label: "R3"; reconcileCrashes: number; error: string };
+
+export function reconcileClaimAction(input: {
+  state: ReconcilableState;
+  /** jobs.reconcile_crashes before this claim. */
+  reconcileCrashes: number;
+  /** This claim found (and closes) a dead reconciler's open phase. */
+  deadReconciler: boolean;
+  maxCrashes: number;
+  by: ReconcileClaimer;
+}): ReconcileClaimAction {
+  if (!(Number.isInteger(input.reconcileCrashes) && input.reconcileCrashes >= 0)) throw new RangeError(`reconcileClaimAction: reconcileCrashes must be an integer >= 0 (got ${input.reconcileCrashes})`);
+  if (!(Number.isInteger(input.maxCrashes) && input.maxCrashes >= 1)) throw new RangeError(`reconcileClaimAction: maxCrashes must be an integer >= 1 (got ${input.maxCrashes})`);
+  const deaths = input.reconcileCrashes + (input.deadReconciler ? 1 : 0);
+  if (input.by === "batch" || deaths < input.maxCrashes) return { kind: "reconcile", label: "R1", reconcileCrashes: deaths };
+  return {
+    kind: "abandon",
+    label: "R3",
+    reconcileCrashes: deaths,
+    error:
+      `reconcile abandoned: ${deaths} reconciler(s) died on this job (cap ${input.maxCrashes}, counted apart from the job's own crash budget); ` +
+      `the job stays ${input.state}; the workers' reconcile pass will not claim it again; \`rote reconcile --since\` still re-reads it`,
+  };
 }

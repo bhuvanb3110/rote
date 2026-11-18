@@ -119,6 +119,8 @@ export interface RunObservation {
   deferrals: number;
   /** The verdict on every needs_human / crash_limit job (src/chaos/attribution.ts, D58); [] when there is none. */
   crashLimitEscalations: readonly CrashLimitVerdict[];
+  /** Jobs whose reconcile the workers' pass abandoned after max_crashes dead reconcilers (R3, D59). */
+  reconcileAbandoned: readonly string[];
 }
 
 /** The needs_human / crash_limit jobs the family accepts: every death attributed, at most 1 ledger row (D58). */
@@ -146,6 +148,13 @@ export function judgeFamily(spec: FamilySpec, o: RunObservation): string[] {
     problems.push(`${n} job(s) ended ${final}, which the ${spec.family} family does not allow (allowed: ${spec.allowedFinal.join(", ")})`);
   }
   if (o.notSettled > 0) problems.push(`${o.notSettled} job(s) not settled after the drain${o.drainTimedOut ? " (the drain timed out)" : ""}`);
+  // Every family (D59, the reviewer's decision): settled, but its zombie check never ran.
+  if (o.reconcileAbandoned.length > 0) {
+    problems.push(
+      `${o.reconcileAbandoned.length} job(s) reconcile_abandoned: the workers' pass gave up after max_crashes dead reconcilers, so their reconcile never ran ` +
+        `(${o.reconcileAbandoned.join(", ")}; run \`rote reconcile --since\`)`,
+    );
+  }
   if (o.leaks.length > 0) problems.push(`credential values found in the output: ${o.leaks.join(", ")}`);
   if (o.oom.length > 0) problems.push(`OOM-killed (not a chaos kill, D9): ${o.oom.join(", ")}`);
   if (spec.bankFaults) {
