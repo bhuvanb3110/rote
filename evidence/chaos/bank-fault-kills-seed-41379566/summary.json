@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "completed": true,
+  "seed": 41379566,
+  "family": "bank-fault-kills",
+  "jobs": 100,
+  "workers": 4,
+  "durationMs": 150000,
+  "pauseMs": 45000,
+  "drainTimeoutMs": 600000,
+  "commit": "3c2426e",
+  "startedAt": "2026-11-17T19:20:01.049Z",
+  "wallMs": 258532,
+  "workMs": 233703,
+  "drainMs": 89145,
+  "drainTimedOut": false,
+  "kills": 16,
+  "restarts": 16,
+  "actionErrors": 0,
+  "pause": {
+    "replica": 2,
+    "fromMs": 100876,
+    "toMs": 145876
+  },
+  "bank": {
+    "outage": {
+      "fromMs": 91967,
+      "toMs": 121967
+    },
+    "slow": {
+      "fromMs": 11301,
+      "toMs": 71301,
+      "latencyMs": 2000
+    }
+  },
+  "bankControlsApplied": 4,
+  "oracle": {
+    "pass": true,
+    "counts": {
+      "ok": 100,
+      "DUPLICATE": 0,
+      "MISSING_COMMIT": 0,
+      "UNRECORDED_COMMIT": 0,
+      "MISMATCH": 0,
+      "LOST": 0,
+      "PENDING": 0,
+      "ORPHAN": 0
+    },
+    "ledgerRows": 98
+  },
+  "finals": {
+    "succeeded/already_done": 2,
+    "succeeded/success": 96,
+    "failed/failure": 1,
+    "failed/lease_expired": 1
+  },
+  "needsHuman": [],
+  "failed": [
+    {
+      "id": "076e7ccd-4106-4ef9-861d-ad0ff7703501",
+      "outcome": "failure",
+      "attempts": [
+        "1:crashed",
+        "2:crashed",
+        "3:failure"
+      ]
+    },
+    {
+      "id": "93c77857-ce1c-4f6f-9f55-e03e83638e13",
+      "outcome": "lease_expired",
+      "attempts": [
+        "1:crashed",
+        "2:failure",
+        "3:crashed"
+      ]
+    }
+  ],
+  "notSettled": 0,
+  "recoveries": {
+    "requeuedAfterCrash": 6,
+    "requeuedAfterFailure": 54,
+    "failedByRecovery": 1,
+    "claimedToVerify": 3,
+    "reclaimedVerify": 3,
+    "resumedVerify": 4,
+    "escalatedByRecovery": 0,
+    "ownVerify": 1,
+    "already_done": 2,
+    "resubmitted": 2,
+    "exhausted": 0,
+    "not_committed_final": 0,
+    "deferred": 4,
+    "escalated": 0,
+    "reconciled": 2,
+    "duplicate_suspected": 0,
+    "unrecorded_commit_suspected": 0,
+    "reconcile_unreadable": 0,
+    "reconcile_deferred": 0
+  },
+  "workerProtections": {
+    "heartbeatLeaseLost": 1,
+    "fencedCommitIntent": 0,
+    "completionFencedOut": 0,
+    "runAbortedOnLostLease": 1,
+    "verifyPhaseAborted": 0,
+    "verifyDecisionFencedOut": 0,
+    "reconcileDecisionFencedOut": 0,
+    "duplicatesDetected": 0,
+    "unrecordedCommitsDetected": 0
+  },
+  "leaks": [],
+  "oom": [],
+  "problems": [
+    "1 job(s) ended failed/failure, which the bank-fault-kills family does not allow (allowed: succeeded/success, succeeded/already_done)",
+    "1 job(s) ended failed/lease_expired, which the bank-fault-kills family does not allow (allowed: succeeded/success, succeeded/already_done)"
+  ],
+  "pass": false
+}

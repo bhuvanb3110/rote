@@ -1,0 +1,193 @@
+[
+  {
+    "id": 1,
+    "job_id": "37035fe2-0af9-467d-83f5-36b4a174d8f3",
+    "fencing_token": 2,
+    "worker_id": "e567ce3d145f-7-c848",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-17T19:20:56.723Z",
+    "ended_at": "2026-11-17T19:21:27.542Z",
+    "lookups": null,
+    "decision": "crashed",
+    "error": "lease expired in verifying; recovered by fa1eaedbc1b5-7-5a95 (T6.5 verify)"
+  },
+  {
+    "id": 2,
+    "job_id": "94ed1055-56fc-4a4b-9a01-a2bf39d1d25d",
+    "fencing_token": 2,
+    "worker_id": "e567ce3d145f-7-5126",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-17T19:21:01.767Z",
+    "ended_at": "2026-11-17T19:21:32.870Z",
+    "lookups": null,
+    "decision": "crashed",
+    "error": "lease expired in verifying; recovered by e567ce3d145f-7-2795 (T6.5 verify)"
+  },
+  {
+    "id": 3,
+    "job_id": "37035fe2-0af9-467d-83f5-36b4a174d8f3",
+    "fencing_token": 3,
+    "worker_id": "fa1eaedbc1b5-7-5a95",
+    "reason": "lease_expired_in_verifying",
+    "prior_status": null,
+    "started_at": "2026-11-17T19:21:27.542Z",
+    "ended_at": "2026-11-17T19:21:35.750Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 4,
+    "job_id": "94ed1055-56fc-4a4b-9a01-a2bf39d1d25d",
+    "fencing_token": 3,
+    "worker_id": "e567ce3d145f-7-2795",
+    "reason": "lease_expired_in_verifying",
+    "prior_status": null,
+    "started_at": "2026-11-17T19:21:32.870Z",
+    "ended_at": "2026-11-17T19:21:35.257Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 5,
+    "job_id": "cfac1015-6248-4a92-90d1-5c5994edba18",
+    "fencing_token": 2,
+    "worker_id": "f47f84aeaca8-7-37f1",
+    "reason": "commit_uncertain",
+    "prior_status": "failure",
+    "started_at": "2026-11-17T19:22:04.341Z",
+    "ended_at": "2026-11-17T19:22:04.889Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 5 s (deferral 1; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 6,
+    "job_id": "cfac1015-6248-4a92-90d1-5c5994edba18",
+    "fencing_token": 4,
+    "worker_id": "fa1eaedbc1b5-6-b8ce",
+    "reason": "resumed",
+    "prior_status": "failure",
+    "started_at": "2026-11-17T19:22:10.588Z",
+    "ended_at": "2026-11-17T19:22:11.401Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 10 s (deferral 2; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 7,
+    "job_id": "22b13102-05a6-45eb-bbbe-e4d10780e8b2",
+    "fencing_token": 2,
+    "worker_id": "fa1eaedbc1b5-6-b8ce",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-17T19:22:21.323Z",
+    "ended_at": "2026-11-17T19:22:22.015Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 5 s (deferral 1; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 8,
+    "job_id": "cfac1015-6248-4a92-90d1-5c5994edba18",
+    "fencing_token": 6,
+    "worker_id": "f47f84aeaca8-6-a748",
+    "reason": "resumed",
+    "prior_status": "failure",
+    "started_at": "2026-11-17T19:22:21.494Z",
+    "ended_at": "2026-11-17T19:22:22.283Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 20 s (deferral 3; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 9,
+    "job_id": "22b13102-05a6-45eb-bbbe-e4d10780e8b2",
+    "fencing_token": 4,
+    "worker_id": "f47f84aeaca8-6-a748",
+    "reason": "resumed",
+    "prior_status": null,
+    "started_at": "2026-11-17T19:22:27.555Z",
+    "ended_at": "2026-11-17T19:22:57.791Z",
+    "lookups": null,
+    "decision": "crashed",
+    "error": "lease expired in verifying; recovered by f47f84aeaca8-7-ca87 (T6.5 verify)"
+  },
+  {
+    "id": 10,
+    "job_id": "cfac1015-6248-4a92-90d1-5c5994edba18",
+    "fencing_token": 8,
+    "worker_id": "f47f84aeaca8-7-ca87",
+    "reason": "resumed",
+    "prior_status": "failure",
+    "started_at": "2026-11-17T19:22:42.765Z",
+    "ended_at": "2026-11-17T19:22:54.277Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 11,
+    "job_id": "22b13102-05a6-45eb-bbbe-e4d10780e8b2",
+    "fencing_token": 5,
+    "worker_id": "f47f84aeaca8-7-ca87",
+    "reason": "lease_expired_in_verifying",
+    "prior_status": null,
+    "started_at": "2026-11-17T19:22:57.791Z",
+    "ended_at": "2026-11-17T19:23:09.538Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 12,
+    "job_id": "cfac1015-6248-4a92-90d1-5c5994edba18",
+    "fencing_token": 10,
+    "worker_id": "fa1eaedbc1b5-6-b8ce",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-17T19:23:57.819Z",
+    "ended_at": "2026-11-17T19:23:59.611Z",
+    "lookups": [
+      1
+    ],
+    "decision": "reconciled",
+    "error": null
+  },
+  {
+    "id": 13,
+    "job_id": "22b13102-05a6-45eb-bbbe-e4d10780e8b2",
+    "fencing_token": 7,
+    "worker_id": "e567ce3d145f-7-ad8e",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-17T19:24:12.850Z",
+    "ended_at": "2026-11-17T19:24:14.321Z",
+    "lookups": [
+      1
+    ],
+    "decision": "reconciled",
+    "error": null
+  }
+]

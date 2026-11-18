@@ -1,0 +1,1170 @@
+[
+  {
+    "Id": "fa1eaedbc1b57a4b98da3b1b788d319e4b8b6f8d34a78255ae15752cc6bb8593",
+    "Created": "2026-11-17T19:16:48.157267851Z",
+    "Path": "node",
+    "Args": [
+      "dist/src/worker/main.js"
+    ],
+    "State": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 63492,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-11-17T19:16:49.316395697Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-11-17T19:19:28.764619598Z",
+            "End": "2026-11-17T19:19:28.891807687Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:33.893310655Z",
+            "End": "2026-11-17T19:19:34.010425901Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:39.01124695Z",
+            "End": "2026-11-17T19:19:39.13235247Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:44.133986726Z",
+            "End": "2026-11-17T19:19:44.21102687Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:49.211751307Z",
+            "End": "2026-11-17T19:19:49.278935696Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "Image": "sha256:c65e2411eb181a001f31625565205d96318bfede50cfd9942ff5d45c848a54f1",
+    "ResolvConfPath": "/var/lib/docker/containers/fa1eaedbc1b57a4b98da3b1b788d319e4b8b6f8d34a78255ae15752cc6bb8593/resolv.conf",
+    "HostnamePath": "/var/lib/docker/containers/fa1eaedbc1b57a4b98da3b1b788d319e4b8b6f8d34a78255ae15752cc6bb8593/hostname",
+    "HostsPath": "/var/lib/docker/containers/fa1eaedbc1b57a4b98da3b1b788d319e4b8b6f8d34a78255ae15752cc6bb8593/hosts",
+    "LogPath": "",
+    "Name": "/rote-worker-1",
+    "RestartCount": 0,
+    "Driver": "overlayfs",
+    "Platform": "linux",
+    "MountLabel": "",
+    "ProcessLabel": "",
+    "AppArmorProfile": "",
+    "ExecIDs": null,
+    "HostConfig": {
+      "Binds": [
+        "rote_worker-evidence:/evidence:rw"
+      ],
+      "ContainerIDFile": "",
+      "LogConfig": {
+        "Type": "local",
+        "Config": {}
+      },
+      "NetworkMode": "rote_default",
+      "PortBindings": {},
+      "RestartPolicy": {
+        "Name": "no",
+        "MaximumRetryCount": 0
+      },
+      "AutoRemove": false,
+      "VolumeDriver": "",
+      "VolumesFrom": null,
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "CapAdd": null,
+      "CapDrop": null,
+      "CgroupnsMode": "host",
+      "Dns": null,
+      "DnsOptions": null,
+      "DnsSearch": null,
+      "ExtraHosts": [],
+      "GroupAdd": null,
+      "IpcMode": "private",
+      "Cgroup": "",
+      "Links": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyRootfs": false,
+      "SecurityOpt": null,
+      "UTSMode": "",
+      "UsernsMode": "",
+      "ShmSize": 67108864,
+      "Runtime": "runc",
+      "Isolation": "",
+      "CpuShares": 0,
+      "Memory": 734003200,
+      "NanoCpus": 0,
+      "CgroupParent": "",
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": null,
+      "BlkioDeviceReadBps": null,
+      "BlkioDeviceWriteBps": null,
+      "BlkioDeviceReadIOps": null,
+      "BlkioDeviceWriteIOps": null,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "Devices": null,
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "MemoryReservation": 0,
+      "MemorySwap": 1468006400,
+      "MemorySwappiness": null,
+      "OomKillDisable": false,
+      "PidsLimit": null,
+      "Ulimits": null,
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "IOMaximumIOps": 0,
+      "IOMaximumBandwidth": 0,
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "Init": true
+    },
+    "Storage": {
+      "RootFS": {
+        "Snapshot": {
+          "Name": "overlayfs"
+        }
+      }
+    },
+    "Mounts": [
+      {
+        "Type": "volume",
+        "Name": "rote_worker-evidence",
+        "Source": "/var/lib/docker/volumes/rote_worker-evidence/_data",
+        "Destination": "/evidence",
+        "Driver": "local",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": ""
+      }
+    ],
+    "Config": {
+      "Hostname": "fa1eaedbc1b5",
+      "Domainname": "",
+      "User": "pwuser",
+      "AttachStdin": false,
+      "AttachStdout": true,
+      "AttachStderr": true,
+      "Tty": false,
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Env": [
+        "ROTE_CRED_TENANT_A_PASSWORD=fake-pass-a",
+        "ROTE_HEALTH_FILE=/tmp/rote-worker-alive",
+        "ROTE_CRED_TENANT_A_USERNAME=fleet-op-a",
+        "ROTE_BANK_FORWARD=bank:4100",
+        "ROTE_DATABASE_URL=postgres://rote:rote_dev_only@postgres:5432/rote",
+        "ROTE_CRED_TENANT_C_USERNAME=fleet-op-c",
+        "ROTE_SHUTDOWN_GRACE_MS=30000",
+        "ROTE_LEASE_SECONDS=30",
+        "ROTE_HEARTBEAT_SECONDS=10",
+        "ROTE_CRED_TENANT_C_PASSWORD=fake-pass-c",
+        "ROTE_EVIDENCE_DIR=/evidence",
+        "ROTE_CRED_TENANT_B_USERNAME=fleet-op-b",
+        "ROTE_CRED_TENANT_B_PASSWORD=fake-pass-b",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "LANG=C.UTF-8",
+        "LC_ALL=C.UTF-8",
+        "PLAYWRIGHT_BROWSERS_PATH=/ms-playwright",
+        "NODE_ENV=production",
+        "PLAYWRIGHT_VERSION=1.62.1"
+      ],
+      "Cmd": [
+        "node",
+        "dist/src/worker/main.js"
+      ],
+      "Healthcheck": {
+        "Test": [
+          "CMD",
+          "node",
+          "-e",
+          "const s=require('fs').statSync('/tmp/rote-worker-alive');process.exit(Date.now()-s.mtimeMs<120000?0:1)"
+        ],
+        "Interval": 5000000000,
+        "Timeout": 3000000000,
+        "StartPeriod": 20000000000,
+        "Retries": 6
+      },
+      "Image": "rote-fleet:local",
+      "Volumes": null,
+      "WorkingDir": "/app",
+      "Entrypoint": null,
+      "Labels": {
+        "com.docker.compose.config-hash": "d77e5ced932e330212af31c2ab7b20837e8a373d4c375983541cbf35d9980815",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:ba107e996bb59e5cca6c45cd9dcaa88d8d13a1629306b6be65040d09687aa0ee",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "rote",
+        "com.docker.compose.project.config_files": "C:\\Users\\hp\\Downloads\\rote\\docker-compose.yml",
+        "com.docker.compose.project.working_dir": "C:\\Users\\hp\\Downloads\\rote",
+        "com.docker.compose.replace": "worker-1",
+        "com.docker.compose.service": "worker",
+        "com.docker.compose.version": "5.7.0",
+        "org.opencontainers.image.version": "24.04"
+      },
+      "StopTimeout": 45
+    },
+    "NetworkSettings": {
+      "SandboxID": "9750707a727bbc44f681d8c4a5c1302b894fab468ca0940e5c488c16b616299d",
+      "SandboxKey": "/var/run/docker/netns/9750707a727b",
+      "Ports": {},
+      "Networks": {
+        "rote_default": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "rote-worker-1",
+            "worker"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "a1eaa8d86a80fb0c36fa166c7bef111e055f34d093346ffd4ba5cf2d15e14a83",
+          "EndpointID": "6693b83050cc5a77e16354c316e8a473bc3045753cf22b6abe1ed3a576840f8c",
+          "Gateway": "172.18.0.1",
+          "IPAddress": "172.18.0.5",
+          "MacAddress": "16:c9:5c:43:27:5b",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "rote-worker-1",
+            "worker",
+            "fa1eaedbc1b5"
+          ]
+        }
+      }
+    },
+    "ImageManifestDescriptor": {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:ba107e996bb59e5cca6c45cd9dcaa88d8d13a1629306b6be65040d09687aa0ee",
+      "size": 3348,
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    }
+  },
+  {
+    "Id": "e567ce3d145ff3065fba86d828f9f2c4015bbe1be72108190421b01d1d8b74c8",
+    "Created": "2026-11-17T19:16:48.150338979Z",
+    "Path": "node",
+    "Args": [
+      "dist/src/worker/main.js"
+    ],
+    "State": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 63557,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-11-17T19:16:49.6023085Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-11-17T19:19:30.267458952Z",
+            "End": "2026-11-17T19:19:30.460756115Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:35.461667081Z",
+            "End": "2026-11-17T19:19:35.636706134Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:40.637157445Z",
+            "End": "2026-11-17T19:19:40.72943031Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:45.730369115Z",
+            "End": "2026-11-17T19:19:45.807079156Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:50.808096837Z",
+            "End": "2026-11-17T19:19:50.87132436Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "Image": "sha256:c65e2411eb181a001f31625565205d96318bfede50cfd9942ff5d45c848a54f1",
+    "ResolvConfPath": "/var/lib/docker/containers/e567ce3d145ff3065fba86d828f9f2c4015bbe1be72108190421b01d1d8b74c8/resolv.conf",
+    "HostnamePath": "/var/lib/docker/containers/e567ce3d145ff3065fba86d828f9f2c4015bbe1be72108190421b01d1d8b74c8/hostname",
+    "HostsPath": "/var/lib/docker/containers/e567ce3d145ff3065fba86d828f9f2c4015bbe1be72108190421b01d1d8b74c8/hosts",
+    "LogPath": "",
+    "Name": "/rote-worker-2",
+    "RestartCount": 0,
+    "Driver": "overlayfs",
+    "Platform": "linux",
+    "MountLabel": "",
+    "ProcessLabel": "",
+    "AppArmorProfile": "",
+    "ExecIDs": null,
+    "HostConfig": {
+      "Binds": [
+        "rote_worker-evidence:/evidence:rw"
+      ],
+      "ContainerIDFile": "",
+      "LogConfig": {
+        "Type": "local",
+        "Config": {}
+      },
+      "NetworkMode": "rote_default",
+      "PortBindings": {},
+      "RestartPolicy": {
+        "Name": "no",
+        "MaximumRetryCount": 0
+      },
+      "AutoRemove": false,
+      "VolumeDriver": "",
+      "VolumesFrom": null,
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "CapAdd": null,
+      "CapDrop": null,
+      "CgroupnsMode": "host",
+      "Dns": null,
+      "DnsOptions": null,
+      "DnsSearch": null,
+      "ExtraHosts": [],
+      "GroupAdd": null,
+      "IpcMode": "private",
+      "Cgroup": "",
+      "Links": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyRootfs": false,
+      "SecurityOpt": null,
+      "UTSMode": "",
+      "UsernsMode": "",
+      "ShmSize": 67108864,
+      "Runtime": "runc",
+      "Isolation": "",
+      "CpuShares": 0,
+      "Memory": 734003200,
+      "NanoCpus": 0,
+      "CgroupParent": "",
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": null,
+      "BlkioDeviceReadBps": null,
+      "BlkioDeviceWriteBps": null,
+      "BlkioDeviceReadIOps": null,
+      "BlkioDeviceWriteIOps": null,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "Devices": null,
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "MemoryReservation": 0,
+      "MemorySwap": 1468006400,
+      "MemorySwappiness": null,
+      "OomKillDisable": false,
+      "PidsLimit": null,
+      "Ulimits": null,
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "IOMaximumIOps": 0,
+      "IOMaximumBandwidth": 0,
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "Init": true
+    },
+    "Storage": {
+      "RootFS": {
+        "Snapshot": {
+          "Name": "overlayfs"
+        }
+      }
+    },
+    "Mounts": [
+      {
+        "Type": "volume",
+        "Name": "rote_worker-evidence",
+        "Source": "/var/lib/docker/volumes/rote_worker-evidence/_data",
+        "Destination": "/evidence",
+        "Driver": "local",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": ""
+      }
+    ],
+    "Config": {
+      "Hostname": "e567ce3d145f",
+      "Domainname": "",
+      "User": "pwuser",
+      "AttachStdin": false,
+      "AttachStdout": true,
+      "AttachStderr": true,
+      "Tty": false,
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Env": [
+        "ROTE_HEALTH_FILE=/tmp/rote-worker-alive",
+        "ROTE_EVIDENCE_DIR=/evidence",
+        "ROTE_CRED_TENANT_B_PASSWORD=fake-pass-b",
+        "ROTE_CRED_TENANT_C_USERNAME=fleet-op-c",
+        "ROTE_SHUTDOWN_GRACE_MS=30000",
+        "ROTE_CRED_TENANT_A_PASSWORD=fake-pass-a",
+        "ROTE_HEARTBEAT_SECONDS=10",
+        "ROTE_CRED_TENANT_A_USERNAME=fleet-op-a",
+        "ROTE_CRED_TENANT_C_PASSWORD=fake-pass-c",
+        "ROTE_BANK_FORWARD=bank:4100",
+        "ROTE_DATABASE_URL=postgres://rote:rote_dev_only@postgres:5432/rote",
+        "ROTE_CRED_TENANT_B_USERNAME=fleet-op-b",
+        "ROTE_LEASE_SECONDS=30",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "LANG=C.UTF-8",
+        "LC_ALL=C.UTF-8",
+        "PLAYWRIGHT_BROWSERS_PATH=/ms-playwright",
+        "NODE_ENV=production",
+        "PLAYWRIGHT_VERSION=1.62.1"
+      ],
+      "Cmd": [
+        "node",
+        "dist/src/worker/main.js"
+      ],
+      "Healthcheck": {
+        "Test": [
+          "CMD",
+          "node",
+          "-e",
+          "const s=require('fs').statSync('/tmp/rote-worker-alive');process.exit(Date.now()-s.mtimeMs<120000?0:1)"
+        ],
+        "Interval": 5000000000,
+        "Timeout": 3000000000,
+        "StartPeriod": 20000000000,
+        "Retries": 6
+      },
+      "Image": "rote-fleet:local",
+      "Volumes": null,
+      "WorkingDir": "/app",
+      "Entrypoint": null,
+      "Labels": {
+        "com.docker.compose.config-hash": "d77e5ced932e330212af31c2ab7b20837e8a373d4c375983541cbf35d9980815",
+        "com.docker.compose.container-number": "2",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:ba107e996bb59e5cca6c45cd9dcaa88d8d13a1629306b6be65040d09687aa0ee",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "rote",
+        "com.docker.compose.project.config_files": "C:\\Users\\hp\\Downloads\\rote\\docker-compose.yml",
+        "com.docker.compose.project.working_dir": "C:\\Users\\hp\\Downloads\\rote",
+        "com.docker.compose.replace": "worker-2",
+        "com.docker.compose.service": "worker",
+        "com.docker.compose.version": "5.7.0",
+        "org.opencontainers.image.version": "24.04"
+      },
+      "StopTimeout": 45
+    },
+    "NetworkSettings": {
+      "SandboxID": "66cc306a241932ea05795c3729dd88a5ce39c80019f206a32272de52d5826b44",
+      "SandboxKey": "/var/run/docker/netns/66cc306a2419",
+      "Ports": {},
+      "Networks": {
+        "rote_default": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "rote-worker-2",
+            "worker"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "a1eaa8d86a80fb0c36fa166c7bef111e055f34d093346ffd4ba5cf2d15e14a83",
+          "EndpointID": "dc2efcc0ba4cad32c1c53acd4f6e43a4206f8d854653ed905ebf03eb772993dc",
+          "Gateway": "172.18.0.1",
+          "IPAddress": "172.18.0.6",
+          "MacAddress": "2a:3a:7c:73:6d:9a",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "rote-worker-2",
+            "worker",
+            "e567ce3d145f"
+          ]
+        }
+      }
+    },
+    "ImageManifestDescriptor": {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:ba107e996bb59e5cca6c45cd9dcaa88d8d13a1629306b6be65040d09687aa0ee",
+      "size": 3348,
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    }
+  },
+  {
+    "Id": "9665a8a0ad6997352efdfec554114c211e580e8fea37e1ae669f46369795f85c",
+    "Created": "2026-11-17T19:16:48.144606437Z",
+    "Path": "node",
+    "Args": [
+      "dist/src/worker/main.js"
+    ],
+    "State": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 63621,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-11-17T19:16:49.931633084Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-11-17T19:19:30.282782094Z",
+            "End": "2026-11-17T19:19:30.451507664Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:35.452546874Z",
+            "End": "2026-11-17T19:19:35.59289966Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:40.594186355Z",
+            "End": "2026-11-17T19:19:40.683747213Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:45.684680402Z",
+            "End": "2026-11-17T19:19:45.768518418Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:50.769916764Z",
+            "End": "2026-11-17T19:19:50.831829699Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "Image": "sha256:c65e2411eb181a001f31625565205d96318bfede50cfd9942ff5d45c848a54f1",
+    "ResolvConfPath": "/var/lib/docker/containers/9665a8a0ad6997352efdfec554114c211e580e8fea37e1ae669f46369795f85c/resolv.conf",
+    "HostnamePath": "/var/lib/docker/containers/9665a8a0ad6997352efdfec554114c211e580e8fea37e1ae669f46369795f85c/hostname",
+    "HostsPath": "/var/lib/docker/containers/9665a8a0ad6997352efdfec554114c211e580e8fea37e1ae669f46369795f85c/hosts",
+    "LogPath": "",
+    "Name": "/rote-worker-3",
+    "RestartCount": 0,
+    "Driver": "overlayfs",
+    "Platform": "linux",
+    "MountLabel": "",
+    "ProcessLabel": "",
+    "AppArmorProfile": "",
+    "ExecIDs": null,
+    "HostConfig": {
+      "Binds": [
+        "rote_worker-evidence:/evidence:rw"
+      ],
+      "ContainerIDFile": "",
+      "LogConfig": {
+        "Type": "local",
+        "Config": {}
+      },
+      "NetworkMode": "rote_default",
+      "PortBindings": {},
+      "RestartPolicy": {
+        "Name": "no",
+        "MaximumRetryCount": 0
+      },
+      "AutoRemove": false,
+      "VolumeDriver": "",
+      "VolumesFrom": null,
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "CapAdd": null,
+      "CapDrop": null,
+      "CgroupnsMode": "host",
+      "Dns": null,
+      "DnsOptions": null,
+      "DnsSearch": null,
+      "ExtraHosts": [],
+      "GroupAdd": null,
+      "IpcMode": "private",
+      "Cgroup": "",
+      "Links": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyRootfs": false,
+      "SecurityOpt": null,
+      "UTSMode": "",
+      "UsernsMode": "",
+      "ShmSize": 67108864,
+      "Runtime": "runc",
+      "Isolation": "",
+      "CpuShares": 0,
+      "Memory": 734003200,
+      "NanoCpus": 0,
+      "CgroupParent": "",
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": null,
+      "BlkioDeviceReadBps": null,
+      "BlkioDeviceWriteBps": null,
+      "BlkioDeviceReadIOps": null,
+      "BlkioDeviceWriteIOps": null,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "Devices": null,
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "MemoryReservation": 0,
+      "MemorySwap": 1468006400,
+      "MemorySwappiness": null,
+      "OomKillDisable": false,
+      "PidsLimit": null,
+      "Ulimits": null,
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "IOMaximumIOps": 0,
+      "IOMaximumBandwidth": 0,
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "Init": true
+    },
+    "Storage": {
+      "RootFS": {
+        "Snapshot": {
+          "Name": "overlayfs"
+        }
+      }
+    },
+    "Mounts": [
+      {
+        "Type": "volume",
+        "Name": "rote_worker-evidence",
+        "Source": "/var/lib/docker/volumes/rote_worker-evidence/_data",
+        "Destination": "/evidence",
+        "Driver": "local",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": ""
+      }
+    ],
+    "Config": {
+      "Hostname": "9665a8a0ad69",
+      "Domainname": "",
+      "User": "pwuser",
+      "AttachStdin": false,
+      "AttachStdout": true,
+      "AttachStderr": true,
+      "Tty": false,
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Env": [
+        "ROTE_EVIDENCE_DIR=/evidence",
+        "ROTE_CRED_TENANT_B_PASSWORD=fake-pass-b",
+        "ROTE_CRED_TENANT_C_USERNAME=fleet-op-c",
+        "ROTE_LEASE_SECONDS=30",
+        "ROTE_HEALTH_FILE=/tmp/rote-worker-alive",
+        "ROTE_HEARTBEAT_SECONDS=10",
+        "ROTE_BANK_FORWARD=bank:4100",
+        "ROTE_DATABASE_URL=postgres://rote:rote_dev_only@postgres:5432/rote",
+        "ROTE_CRED_TENANT_B_USERNAME=fleet-op-b",
+        "ROTE_SHUTDOWN_GRACE_MS=30000",
+        "ROTE_CRED_TENANT_A_PASSWORD=fake-pass-a",
+        "ROTE_CRED_TENANT_A_USERNAME=fleet-op-a",
+        "ROTE_CRED_TENANT_C_PASSWORD=fake-pass-c",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "LANG=C.UTF-8",
+        "LC_ALL=C.UTF-8",
+        "PLAYWRIGHT_BROWSERS_PATH=/ms-playwright",
+        "NODE_ENV=production",
+        "PLAYWRIGHT_VERSION=1.62.1"
+      ],
+      "Cmd": [
+        "node",
+        "dist/src/worker/main.js"
+      ],
+      "Healthcheck": {
+        "Test": [
+          "CMD",
+          "node",
+          "-e",
+          "const s=require('fs').statSync('/tmp/rote-worker-alive');process.exit(Date.now()-s.mtimeMs<120000?0:1)"
+        ],
+        "Interval": 5000000000,
+        "Timeout": 3000000000,
+        "StartPeriod": 20000000000,
+        "Retries": 6
+      },
+      "Image": "rote-fleet:local",
+      "Volumes": null,
+      "WorkingDir": "/app",
+      "Entrypoint": null,
+      "Labels": {
+        "com.docker.compose.config-hash": "d77e5ced932e330212af31c2ab7b20837e8a373d4c375983541cbf35d9980815",
+        "com.docker.compose.container-number": "3",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:ba107e996bb59e5cca6c45cd9dcaa88d8d13a1629306b6be65040d09687aa0ee",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "rote",
+        "com.docker.compose.project.config_files": "C:\\Users\\hp\\Downloads\\rote\\docker-compose.yml",
+        "com.docker.compose.project.working_dir": "C:\\Users\\hp\\Downloads\\rote",
+        "com.docker.compose.replace": "worker-3",
+        "com.docker.compose.service": "worker",
+        "com.docker.compose.version": "5.7.0",
+        "org.opencontainers.image.version": "24.04"
+      },
+      "StopTimeout": 45
+    },
+    "NetworkSettings": {
+      "SandboxID": "0f5a24762061fe94738b269c743db13be923e07f4ab938e58d25f69c1c1c96b9",
+      "SandboxKey": "/var/run/docker/netns/0f5a24762061",
+      "Ports": {},
+      "Networks": {
+        "rote_default": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "rote-worker-3",
+            "worker"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "a1eaa8d86a80fb0c36fa166c7bef111e055f34d093346ffd4ba5cf2d15e14a83",
+          "EndpointID": "345b23ce58b236a6e1410148eab4d13e7479d8c60ced7a81d44627d9e6a3fc31",
+          "Gateway": "172.18.0.1",
+          "IPAddress": "172.18.0.7",
+          "MacAddress": "aa:7c:6f:c0:0d:a9",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "rote-worker-3",
+            "worker",
+            "9665a8a0ad69"
+          ]
+        }
+      }
+    },
+    "ImageManifestDescriptor": {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:ba107e996bb59e5cca6c45cd9dcaa88d8d13a1629306b6be65040d09687aa0ee",
+      "size": 3348,
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    }
+  },
+  {
+    "Id": "f47f84aeaca851dbfd5c4a71a0f97a3f06e94dcb7ec042c430e7a58dfdf8d552",
+    "Created": "2026-11-17T19:16:48.18012695Z",
+    "Path": "node",
+    "Args": [
+      "dist/src/worker/main.js"
+    ],
+    "State": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 63689,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-11-17T19:16:50.341743973Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-11-17T19:19:30.317905272Z",
+            "End": "2026-11-17T19:19:30.479569867Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:35.480245337Z",
+            "End": "2026-11-17T19:19:35.655785543Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:40.657602393Z",
+            "End": "2026-11-17T19:19:40.746761261Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:45.747877608Z",
+            "End": "2026-11-17T19:19:45.812608067Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-17T19:19:50.813124646Z",
+            "End": "2026-11-17T19:19:50.875049504Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "Image": "sha256:c65e2411eb181a001f31625565205d96318bfede50cfd9942ff5d45c848a54f1",
+    "ResolvConfPath": "/var/lib/docker/containers/f47f84aeaca851dbfd5c4a71a0f97a3f06e94dcb7ec042c430e7a58dfdf8d552/resolv.conf",
+    "HostnamePath": "/var/lib/docker/containers/f47f84aeaca851dbfd5c4a71a0f97a3f06e94dcb7ec042c430e7a58dfdf8d552/hostname",
+    "HostsPath": "/var/lib/docker/containers/f47f84aeaca851dbfd5c4a71a0f97a3f06e94dcb7ec042c430e7a58dfdf8d552/hosts",
+    "LogPath": "",
+    "Name": "/rote-worker-4",
+    "RestartCount": 0,
+    "Driver": "overlayfs",
+    "Platform": "linux",
+    "MountLabel": "",
+    "ProcessLabel": "",
+    "AppArmorProfile": "",
+    "ExecIDs": null,
+    "HostConfig": {
+      "Binds": [
+        "rote_worker-evidence:/evidence:rw"
+      ],
+      "ContainerIDFile": "",
+      "LogConfig": {
+        "Type": "local",
+        "Config": {}
+      },
+      "NetworkMode": "rote_default",
+      "PortBindings": {},
+      "RestartPolicy": {
+        "Name": "no",
+        "MaximumRetryCount": 0
+      },
+      "AutoRemove": false,
+      "VolumeDriver": "",
+      "VolumesFrom": null,
+      "ConsoleSize": [
+        0,
+        0
+      ],
+      "CapAdd": null,
+      "CapDrop": null,
+      "CgroupnsMode": "host",
+      "Dns": null,
+      "DnsOptions": null,
+      "DnsSearch": null,
+      "ExtraHosts": [],
+      "GroupAdd": null,
+      "IpcMode": "private",
+      "Cgroup": "",
+      "Links": null,
+      "OomScoreAdj": 0,
+      "PidMode": "",
+      "Privileged": false,
+      "PublishAllPorts": false,
+      "ReadonlyRootfs": false,
+      "SecurityOpt": null,
+      "UTSMode": "",
+      "UsernsMode": "",
+      "ShmSize": 67108864,
+      "Runtime": "runc",
+      "Isolation": "",
+      "CpuShares": 0,
+      "Memory": 734003200,
+      "NanoCpus": 0,
+      "CgroupParent": "",
+      "BlkioWeight": 0,
+      "BlkioWeightDevice": null,
+      "BlkioDeviceReadBps": null,
+      "BlkioDeviceWriteBps": null,
+      "BlkioDeviceReadIOps": null,
+      "BlkioDeviceWriteIOps": null,
+      "CpuPeriod": 0,
+      "CpuQuota": 0,
+      "CpuRealtimePeriod": 0,
+      "CpuRealtimeRuntime": 0,
+      "CpusetCpus": "",
+      "CpusetMems": "",
+      "Devices": null,
+      "DeviceCgroupRules": null,
+      "DeviceRequests": null,
+      "MemoryReservation": 0,
+      "MemorySwap": 1468006400,
+      "MemorySwappiness": null,
+      "OomKillDisable": false,
+      "PidsLimit": null,
+      "Ulimits": null,
+      "CpuCount": 0,
+      "CpuPercent": 0,
+      "IOMaximumIOps": 0,
+      "IOMaximumBandwidth": 0,
+      "MaskedPaths": [
+        "/proc/acpi",
+        "/proc/asound",
+        "/proc/interrupts",
+        "/proc/kcore",
+        "/proc/keys",
+        "/proc/latency_stats",
+        "/proc/sched_debug",
+        "/proc/scsi",
+        "/proc/timer_list",
+        "/proc/timer_stats",
+        "/sys/devices/virtual/powercap",
+        "/sys/firmware"
+      ],
+      "ReadonlyPaths": [
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/sys",
+        "/proc/sysrq-trigger"
+      ],
+      "Init": true
+    },
+    "Storage": {
+      "RootFS": {
+        "Snapshot": {
+          "Name": "overlayfs"
+        }
+      }
+    },
+    "Mounts": [
+      {
+        "Type": "volume",
+        "Name": "rote_worker-evidence",
+        "Source": "/var/lib/docker/volumes/rote_worker-evidence/_data",
+        "Destination": "/evidence",
+        "Driver": "local",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": ""
+      }
+    ],
+    "Config": {
+      "Hostname": "f47f84aeaca8",
+      "Domainname": "",
+      "User": "pwuser",
+      "AttachStdin": false,
+      "AttachStdout": true,
+      "AttachStderr": true,
+      "Tty": false,
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Env": [
+        "ROTE_SHUTDOWN_GRACE_MS=30000",
+        "ROTE_CRED_TENANT_A_PASSWORD=fake-pass-a",
+        "ROTE_HEALTH_FILE=/tmp/rote-worker-alive",
+        "ROTE_HEARTBEAT_SECONDS=10",
+        "ROTE_CRED_TENANT_A_USERNAME=fleet-op-a",
+        "ROTE_CRED_TENANT_C_PASSWORD=fake-pass-c",
+        "ROTE_EVIDENCE_DIR=/evidence",
+        "ROTE_CRED_TENANT_B_USERNAME=fleet-op-b",
+        "ROTE_LEASE_SECONDS=30",
+        "ROTE_BANK_FORWARD=bank:4100",
+        "ROTE_DATABASE_URL=postgres://rote:rote_dev_only@postgres:5432/rote",
+        "ROTE_CRED_TENANT_B_PASSWORD=fake-pass-b",
+        "ROTE_CRED_TENANT_C_USERNAME=fleet-op-c",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "LANG=C.UTF-8",
+        "LC_ALL=C.UTF-8",
+        "PLAYWRIGHT_BROWSERS_PATH=/ms-playwright",
+        "NODE_ENV=production",
+        "PLAYWRIGHT_VERSION=1.62.1"
+      ],
+      "Cmd": [
+        "node",
+        "dist/src/worker/main.js"
+      ],
+      "Healthcheck": {
+        "Test": [
+          "CMD",
+          "node",
+          "-e",
+          "const s=require('fs').statSync('/tmp/rote-worker-alive');process.exit(Date.now()-s.mtimeMs<120000?0:1)"
+        ],
+        "Interval": 5000000000,
+        "Timeout": 3000000000,
+        "StartPeriod": 20000000000,
+        "Retries": 6
+      },
+      "Image": "rote-fleet:local",
+      "Volumes": null,
+      "WorkingDir": "/app",
+      "Entrypoint": null,
+      "Labels": {
+        "com.docker.compose.config-hash": "d77e5ced932e330212af31c2ab7b20837e8a373d4c375983541cbf35d9980815",
+        "com.docker.compose.container-number": "4",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:ba107e996bb59e5cca6c45cd9dcaa88d8d13a1629306b6be65040d09687aa0ee",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "rote",
+        "com.docker.compose.project.config_files": "C:\\Users\\hp\\Downloads\\rote\\docker-compose.yml",
+        "com.docker.compose.project.working_dir": "C:\\Users\\hp\\Downloads\\rote",
+        "com.docker.compose.replace": "worker-4",
+        "com.docker.compose.service": "worker",
+        "com.docker.compose.version": "5.7.0",
+        "org.opencontainers.image.version": "24.04"
+      },
+      "StopTimeout": 45
+    },
+    "NetworkSettings": {
+      "SandboxID": "3329636e458924183d3681c0a9a54a3dfaaca3fd1849b792e7cb8a293cc2daf9",
+      "SandboxKey": "/var/run/docker/netns/3329636e4589",
+      "Ports": {},
+      "Networks": {
+        "rote_default": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "rote-worker-4",
+            "worker"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "a1eaa8d86a80fb0c36fa166c7bef111e055f34d093346ffd4ba5cf2d15e14a83",
+          "EndpointID": "235033ce996872fc16cbc367f7f0ac37e55a022d522421b6db4d0c9546286ad6",
+          "Gateway": "172.18.0.1",
+          "IPAddress": "172.18.0.8",
+          "MacAddress": "06:38:0b:4e:62:f1",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "rote-worker-4",
+            "worker",
+            "f47f84aeaca8"
+          ]
+        }
+      }
+    },
+    "ImageManifestDescriptor": {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:ba107e996bb59e5cca6c45cd9dcaa88d8d13a1629306b6be65040d09687aa0ee",
+      "size": 3348,
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    }
+  }
+]

@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "completed": true,
+  "seed": 2130356189,
+  "family": "bank-fault-only",
+  "jobs": 100,
+  "workers": 4,
+  "durationMs": 150000,
+  "pauseMs": 0,
+  "drainTimeoutMs": 600000,
+  "commit": "3c2426e",
+  "startedAt": "2026-11-17T19:16:27.247Z",
+  "wallMs": 206368,
+  "workMs": 171679,
+  "drainMs": 37058,
+  "drainTimedOut": false,
+  "kills": 0,
+  "restarts": 0,
+  "actionErrors": 0,
+  "pause": null,
+  "bank": {
+    "outage": {
+      "fromMs": 24239,
+      "toMs": 54239
+    },
+    "slow": {
+      "fromMs": 79690,
+      "toMs": 139690,
+      "latencyMs": 2000
+    }
+  },
+  "bankControlsApplied": 4,
+  "oracle": {
+    "pass": true,
+    "counts": {
+      "ok": 100,
+      "DUPLICATE": 0,
+      "MISSING_COMMIT": 0,
+      "UNRECORDED_COMMIT": 0,
+      "MISMATCH": 0,
+      "LOST": 0,
+      "PENDING": 0,
+      "ORPHAN": 0
+    },
+    "ledgerRows": 100
+  },
+  "finals": {
+    "succeeded/success": 100
+  },
+  "needsHuman": [],
+  "failed": [],
+  "notSettled": 0,
+  "recoveries": {
+    "requeuedAfterCrash": 0,
+    "requeuedAfterFailure": 110,
+    "failedByRecovery": 0,
+    "claimedToVerify": 0,
+    "reclaimedVerify": 0,
+    "resumedVerify": 3,
+    "escalatedByRecovery": 0,
+    "ownVerify": 1,
+    "already_done": 0,
+    "resubmitted": 1,
+    "exhausted": 0,
+    "not_committed_final": 0,
+    "deferred": 3,
+    "escalated": 0,
+    "reconciled": 1,
+    "duplicate_suspected": 0,
+    "unrecorded_commit_suspected": 0,
+    "reconcile_unreadable": 0,
+    "reconcile_deferred": 0
+  },
+  "workerProtections": {
+    "heartbeatLeaseLost": 0,
+    "fencedCommitIntent": 0,
+    "completionFencedOut": 0,
+    "runAbortedOnLostLease": 0,
+    "verifyPhaseAborted": 0,
+    "verifyDecisionFencedOut": 0,
+    "reconcileDecisionFencedOut": 0,
+    "duplicatesDetected": 0,
+    "unrecordedCommitsDetected": 0
+  },
+  "leaks": [],
+  "oom": [],
+  "problems": [],
+  "pass": true
+}
