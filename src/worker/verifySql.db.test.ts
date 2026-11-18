@@ -302,7 +302,8 @@ describe("rote jobs reverify (the SQL)", () => {
   });
 
   it("accepts the 'could not tell' outcomes; refuses ambiguous, other needs_human, other states, another tenant, a missing job", async () => {
-    for (const outcome of ["unreadable", "verify_unavailable", "verify_exhausted"]) {
+    // crash_limit (D58): the crash cap after the intent took over verify_exhausted's role.
+    for (const outcome of ["unreadable", "verify_unavailable", "verify_exhausted", "crash_limit"]) {
       expect((await reverifyJob(pool, { jobId: (await parked(outcome)).id, who: "x" })).moved).toBe(true);
     }
     for (const outcome of ["ambiguous", "needs_human"]) {

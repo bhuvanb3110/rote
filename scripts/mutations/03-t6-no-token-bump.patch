@@ -1,8 +1,8 @@
 diff --git a/src/worker/recover.ts b/src/worker/recover.ts
 --- a/src/worker/recover.ts
 +++ b/src/worker/recover.ts
-@@ -69,7 +69,7 @@
- SET state = $4, outcome = COALESCE($5, outcome), error = $6, not_before = NULL, crashes = crashes + $8,
+@@ -70,7 +70,7 @@
+ SET state = $4, outcome = COALESCE($5, outcome), error = $6, not_before = NULL, crashes = crashes + $8, lease_crashes = lease_crashes + $9,
      reconcile_after = CASE WHEN $4 IN (${RECONCILABLE_STATES_SQL}) AND ${RECONCILE_TRIGGERED_SQL}
                        THEN now() + make_interval(secs => $7) ELSE reconcile_after END,
 -    fencing_token = fencing_token + 1, lease_owner = NULL, lease_expires_at = NULL, updated_at = now()

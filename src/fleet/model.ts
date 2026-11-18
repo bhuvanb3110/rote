@@ -66,9 +66,11 @@ export interface ModelJob {
   /** Every lease (dequeue) so far, as jobs.attempt. */
   readonly attempt: number;
   readonly maxAttempts: number;
-  /** Leases that died before their intent (T6.1 / T6.2), as jobs.crashes (0006, D57): not attempts. */
+  /** Every worker death on the job (T6.1 / T6.2 / T6.4 / T6.5 / T6.6), as jobs.crashes: the one budget (D58). */
   readonly crashes: number;
   readonly maxCrashes: number;
+  /** The deaths before the intent only (T6.1 / T6.2), as jobs.lease_crashes (0007): not own attempts (D57). */
+  readonly leaseCrashes: number;
   readonly token: number;
   readonly owner: string | null;
   /** Seconds on the database clock; null = no lease. */
@@ -125,6 +127,7 @@ export function newJob(fields: { id: string; tenant: string; seq: number; maxAtt
     state: "queued",
     attempt: 0,
     crashes: 0,
+    leaseCrashes: 0,
     token: 0,
     owner: null,
     leaseExpiresAt: null,
@@ -158,11 +161,11 @@ const holds = (job: ModelJob, ref: LeaseRef) => job.token === ref.token && job.o
 const due = (job: ModelJob, now: number) => job.notBefore === null || job.notBefore <= now;
 
 /**
- * The two queued CHECKs (0006, D57) for a job about to be (or being) queued: an own attempt left
- * (`attempt - crashes < max_attempts`) and under the crash cap (`crashes < max_crashes`). Also PICK_JOB_SQL's filter.
+ * The two queued CHECKs (0006, 0007; D57, D58) for a job about to be (or being) queued: an own attempt left
+ * (`attempt - lease_crashes < max_attempts`) and under the crash cap (`crashes < max_crashes`). Also PICK_JOB_SQL's filter.
  */
-export const queueable = (job: Pick<ModelJob, "attempt" | "crashes" | "maxAttempts" | "maxCrashes">): boolean =>
-  job.attempt - job.crashes < job.maxAttempts && job.crashes < job.maxCrashes;
+export const queueable = (job: Pick<ModelJob, "attempt" | "crashes" | "leaseCrashes" | "maxAttempts" | "maxCrashes">): boolean =>
+  job.attempt - job.leaseCrashes < job.maxAttempts && job.crashes < job.maxCrashes;
 
 /** Thrown where Postgres would reject a statement with a CHECK violation the caller does not expect (T6, a bug). */
 export class ModelCheckViolation extends Error {
@@ -465,23 +468,30 @@ export function modelRecover(
       maxAttempts: job.maxAttempts,
       crashes: job.crashes,
       maxCrashes: job.maxCrashes,
+      leaseCrashes: job.leaseCrashes,
       verify: from === "verifying" ? cycle : undefined,
     });
     const token = job.token + 1;
-    // T6.1 / T6.2 count a crash (RECOVER_JOB_SQL's crashes + $8, D57).
+    // Every death counts one crash (all but T6.7: RECOVER_JOB_SQL's $8, CLAIM_TO_VERIFY_SQL's $7, D58); a death
+    // before the intent (T6.1 / T6.2) is also a lease crash (RECOVER_JOB_SQL's $9, D57).
     const crashes = job.crashes + (action.crash ? 1 : 0);
+    const leaseCrashes = job.leaseCrashes + (action.leaseCrash ? 1 : 0);
     // The dead verifier's open phase row (if any) is closed `crashed`.
     const closed: ModelJob = {
       ...job,
       crashes,
+      leaseCrashes,
       phases: job.phases.map((p) => (p.token === job.token && p.decision === null ? { ...p, decision: "crashed", endedAt: current.now } : p)),
     };
-    // The CHECKs Postgres would enforce on RECOVER_JOB_SQL: a requeue needs an own attempt left and room
-    // under the crash cap (0006); every crash is a lease. recoveryAction never asks otherwise -- unless it is
+    // The CHECKs Postgres would enforce on T6: a requeue needs an own attempt left and room under the crash cap;
+    // every lease crash is a lease and a crash (0006, 0007). recoveryAction never asks otherwise -- unless it is
     // wrong, and then the real recovery transaction fails, so the model throws too.
-    if (crashes > job.attempt) throw new ModelCheckViolation(`T6 on job ${job.id}: crashes ${crashes} > attempt ${job.attempt} (jobs_crashes_are_leases)`);
+    if (leaseCrashes > job.attempt) throw new ModelCheckViolation(`T6 on job ${job.id}: lease_crashes ${leaseCrashes} > attempt ${job.attempt} (jobs_lease_crashes_are_leases)`);
+    if (leaseCrashes > crashes) throw new ModelCheckViolation(`T6 on job ${job.id}: lease_crashes ${leaseCrashes} > crashes ${crashes} (jobs_lease_crashes_are_crashes)`);
     if (action.to === "queued" && !queueable(closed)) {
-      throw new ModelCheckViolation(`T6.1 on job ${job.id}: requeue at attempt ${job.attempt}, crashes ${crashes} (own ${ownAttempts(job.attempt, crashes)}/${job.maxAttempts}, crash cap ${job.maxCrashes})`);
+      throw new ModelCheckViolation(
+        `T6.1 on job ${job.id}: requeue at attempt ${job.attempt}, lease crashes ${leaseCrashes} (own ${ownAttempts(job.attempt, leaseCrashes)}/${job.maxAttempts}), crashes ${crashes} (cap ${job.maxCrashes})`,
+      );
     }
     let next: ModelJob;
     if (action.kind === "verify") {

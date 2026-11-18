@@ -21,7 +21,7 @@ export const ACTIVE_STATES = ["running", "committing", "verifying"] as const sat
 /** No further transitions. business_outcome is terminal: a bank refusal is final, never retried (D21). */
 export const TERMINAL_STATES = ["succeeded", "business_outcome", "failed", "needs_human"] as const satisfies readonly JobState[];
 
-/** The crash cap's default, jobs.max_crashes DEFAULT 5 (0006, D57): the 5th worker death before the intent fails the job / crash_limit. */
+/** The crash cap's default, jobs.max_crashes DEFAULT 5 (0006, D57, D58): the 5th worker death on a job fails or escalates it / crash_limit. */
 export const DEFAULT_MAX_CRASHES = 5;
 
 export const JobRowSchema = z.object({
@@ -52,11 +52,14 @@ export const JobRowSchema = z.object({
   /** 0004 (D50): when the reconcile pass decided (reconciled, duplicate_suspected or reconcile_unreadable). */
   reconciled_at: z.date().nullable(),
   /**
-   * 0006 (D57): leases that died before their intent (T6.1 / T6.2). They do not use an attempt: the job's own
-   * attempts are attempt - crashes. At max_crashes, T6.2 fails the job / crash_limit.
+   * 0006, 0007 (D57, D58): every worker death on the job (a lease that expired in running, committing or a
+   * dying verify phase): ONE budget. At max_crashes the job fails / crash_limit before any intent (T6.2), or
+   * goes to needs_human / crash_limit after one (T6.6).
    */
   crashes: z.number().int().nonnegative(),
   max_crashes: z.number().int().min(1),
+  /** 0007 (D58): the deaths before the intent only (T6.1 / T6.2): not own attempts, so own = attempt - lease_crashes. */
+  lease_crashes: z.number().int().nonnegative(),
 });
 export type JobRow = z.infer<typeof JobRowSchema>;
 

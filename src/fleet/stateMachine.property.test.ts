@@ -38,18 +38,22 @@
 //               silent either, with the same exemption (D55)
 //   property 9  with the end-of-day batch (rote reconcile --since, D51) after the drain: neither, ever
 //
-// Step 10b (D57, the reviewer decision on the bank-fault+kills failure): crashes stop using attempts. A lease
-// that dies before its intent (T6.1) is a crash, capped by max_crashes (T6.2 -> failed / crash_limit). The
-// simulation counts leases and crashes ITSELF, from the transitions (a dequeue: queued -> running; a crash:
-// recovery of a `running` lease, running -> queued / failed with the token bumped), not from the model's
-// counters, so:
-//   property 11 a job is never failed by fewer than max_attempts of its own failures (leases that were not
-//               crashes) unless it hit the crash cap (crash_limit, with max_crashes crashes)
+// Step 10b (D57, D58, the reviewer decisions during 10b): crashes stop using attempts, and every worker death
+// counts against ONE crash budget. A lease that dies before its intent (T6.1) is a lease crash; a lease that dies
+// after it (T6.4) and a verifier that dies (T6.5) are deaths too; the death that reaches max_crashes fails the job
+// before any intent (T6.2) and sends it to a human after one (T6.6), both `crash_limit`. The simulation counts
+// ITSELF, never from the model's counters: leases and lease crashes from the transitions (a dequeue: queued ->
+// running; a lease crash: running -> queued / failed with the token bumped), and every death in its recovery
+// step, from the job as it was before (an expired active lease, unless a deferred or handed-off verify), so:
+//   property 11 a job is never failed or escalated by worker deaths before max_crashes of them, and never failed
+//               by fewer than max_attempts of its own failures (leases that were not lease crashes); a job past
+//               its intent is never failed by the cap, only escalated
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import type { ReplayResult } from "../artifact/index.js";
 import { checkLedger, type LedgerRow } from "../oracle/index.js";
 import {
+  isActive,
   isTerminal,
   modelComplete,
   modelCompleteIntoVerify,
@@ -189,7 +193,10 @@ const zombieArb: fc.Arbitrary<Ev[]> = fc
 /** A core sequence with 0..2 random events after each step. */
 const withNoise = (core: Ev[]): fc.Arbitrary<Ev[]> =>
   fc.array(fc.array(eventArb, { maxLength: 2 }), { minLength: core.length, maxLength: core.length }).map((noise) => core.flatMap((ev, i) => [ev, ...noise[i]!]));
-/** Verifiers that keep dying (T6.5, then T6.6 verify_exhausted), the first worker having committed or not. */
+/**
+ * Verifiers that keep dying (T6.5, then T6.6 at the crash cap: needs_human / crash_limit, D58), the first worker
+ * having committed or not. Its death plus five dead verifiers: 6 deaths, past the default cap of 5.
+ */
 const deadVerifiersArb: fc.Arbitrary<Ev[]> = fc.boolean().chain((clicked) =>
   withNoise([
     { k: "dequeue", w: 0 },
@@ -297,12 +304,20 @@ const leaseRunArb: fc.Arbitrary<Ev[]> = fc
 const crashLoopArb: fc.Arbitrary<Ev[]> = fc
   .integer({ min: 1, max: 7 })
   .chain((n) => withNoise(Array.from({ length: n }, (_, i): Ev[] => [{ k: "dequeue", w: i % 3 }, { k: "crash", w: i % 3 }, { k: "tick", dt: 31 }, { k: "restart", w: i % 3 }]).flat()));
-/** Property 11's scenarios: small crash caps, so the cap is reached; the storm for everything else at once. */
+/**
+ * Property 11's scenarios: small crash caps, so the cap is reached before the intent (lease runs, poison loops)
+ * and after it (dead verifiers, D58); the storm for everything else at once.
+ */
 const crashScenarioArb = fc.record({
   maxAttempts: fc.integer({ min: 1, max: 3 }),
   maxCrashes: fc.integer({ min: 1, max: 5 }),
   lag: fc.constant(0),
-  events: fc.oneof({ weight: 3, arbitrary: leaseRunArb }, { weight: 2, arbitrary: crashLoopArb }, { weight: 1, arbitrary: stormArb }),
+  events: fc.oneof(
+    { weight: 3, arbitrary: leaseRunArb },
+    { weight: 2, arbitrary: crashLoopArb },
+    { weight: 2, arbitrary: deadVerifiersArb },
+    { weight: 1, arbitrary: stormArb },
+  ),
 });
 const lagArb = fc.oneof(fc.constant(0), fc.integer({ min: 0, max: 12 }));
 const scenarioArb = fc.record({
@@ -333,9 +348,9 @@ interface SimWorker {
   phase: Phase;
   /**
    * The lease this worker believes it holds (kept while frozen: that is the zombie), with the job's attempt
-   * and crashes as its dequeued row carried them (what the worker passes to jobOutcomeFor, D57).
+   * and lease crashes as its dequeued row carried them (what the worker passes to jobOutcomeFor, D57).
    */
-  held: { token: number; attempt: number; crashes: number } | null;
+  held: { token: number; attempt: number; leaseCrashes: number } | null;
   /** Database time its held lease was last set or extended (dequeue, T3, T2, T5, a claim). */
   lastExtendedAt: number;
   /** The row its click wrote, when the bank committed it. */
@@ -375,12 +390,16 @@ interface World {
   /** The ledger rows that read saw (a row not among them came after it: a late zombie). */
   lastReconciledSeen: string[] | null;
   /**
-   * Property 11 (D57), counted by the SIMULATION from the transitions, never from the model's counters:
-   * leases (queued -> running) and crashes (recovery of a `running` lease: running -> queued / failed with
-   * the token bumped -- T4 never bumps it, T5 goes to verifying).
+   * Property 11 (D57, D58), counted by the SIMULATION, never from the model's counters: leases (queued ->
+   * running), lease crashes (recovery of a `running` lease: running -> queued / failed with the token bumped --
+   * T4 never bumps it, T5 goes to verifying), and deaths (every recovery of an expired active lease that was not a
+   * deferred or handed-off verify, judged on the job before the recovery: recover() sets pendingDeath).
    */
   simLeases: number;
-  simCrashes: number;
+  simLeaseCrashes: number;
+  simDeaths: number;
+  /** Set by recover() just before it commits a recovery of a dead holder's lease; consumed by commit(). */
+  pendingDeath: boolean;
 }
 
 interface Transition {
@@ -389,7 +408,8 @@ interface Transition {
   afterIntent: boolean;
   /** The simulation's own counts after this transition (property 11). */
   leases: number;
-  crashes: number;
+  leaseCrashes: number;
+  deaths: number;
 }
 
 /** The only way the simulation writes the database: records every job transition. */
@@ -399,9 +419,23 @@ function commit(world: World, db: ModelDb): void {
   const to = job(world);
   if (from.state !== to.state || from.token !== to.token) {
     if (from.state === "queued" && to.state === "running") world.simLeases += 1;
-    if (from.state === "running" && to.token === from.token + 1 && (to.state === "queued" || to.state === "failed")) world.simCrashes += 1;
-    world.transitions.push({ from, to, afterIntent: world.intentEver, leases: world.simLeases, crashes: world.simCrashes });
+    if (from.state === "running" && to.token === from.token + 1 && (to.state === "queued" || to.state === "failed")) world.simLeaseCrashes += 1;
+    if (world.pendingDeath) world.simDeaths += 1;
+    world.transitions.push({ from, to, afterIntent: world.intentEver, leases: world.simLeases, leaseCrashes: world.simLeaseCrashes, deaths: world.simDeaths });
   }
+  world.pendingDeath = false;
+}
+
+/**
+ * Did the job's holder die (D58: a death counts against the crash budget)? An active job whose lease expired,
+ * unless its newest verify phase ended on purpose (deferred, or handed off by reverify): that one is resumed.
+ * Judged on the job BEFORE recovery, from the phases the verifiers wrote, not from recoveryAction's decision.
+ */
+function holderDied(j: ModelJob, now: number): boolean {
+  if (!(isActive(j.state) && j.leaseExpiresAt !== null && j.leaseExpiresAt < now)) return false;
+  if (j.state !== "verifying") return true;
+  const last = j.phases.filter((p) => p.reason !== "reconcile").at(-1);
+  return !(last && (last.decision === "deferred" || last.decision === "handed_off"));
 }
 
 const idOf = (w: SimWorker) => `${w.name}#${w.incarnation}`;
@@ -427,7 +461,9 @@ function newWorld(maxAttempts: number, lag: number, maxCrashes: number = DEFAULT
     lastReconciledRead: null,
     lastReconciledSeen: null,
     simLeases: 0,
-    simCrashes: 0,
+    simLeaseCrashes: 0,
+    simDeaths: 0,
+    pendingDeath: false,
   };
 }
 
@@ -456,26 +492,26 @@ function runEndFor(w: SimWorker, how: How): RunEnd {
   return { kind: "result", result };
 }
 
-function startVerify(world: World, w: SimWorker, token: number, attempt: number, crashes: number): void {
-  Object.assign(w, { phase: "verify", held: { token, attempt, crashes }, clickedRow: null, verify: { readings: [], firstAt: null }, lastExtendedAt: world.db.now });
+function startVerify(world: World, w: SimWorker, token: number, attempt: number, leaseCrashes: number): void {
+  Object.assign(w, { phase: "verify", held: { token, attempt, leaseCrashes }, clickedRow: null, verify: { readings: [], firstAt: null }, lastExtendedAt: world.db.now });
   world.lastHolder = idOf(w);
 }
 
-/** The worker's run ends: jobOutcomeFor decides (on the crashes its dequeued row carried, D57); T4 records it, or T5 moves it into this worker's verify. */
+/** The worker's run ends: jobOutcomeFor decides (on the lease crashes its dequeued row carried, D57); T4 records it, or T5 moves it into this worker's verify. */
 function finishRun(world: World, w: SimWorker, end: RunEnd, irreversibleStarted: boolean): void {
   const j = job(world);
-  const { attempt, crashes } = w.held!;
-  const outcome = jobOutcomeFor(end, { attempt, maxAttempts: j.maxAttempts, crashes, irreversibleStarted });
+  const { attempt, leaseCrashes } = w.held!;
+  const outcome = jobOutcomeFor(end, { attempt, maxAttempts: j.maxAttempts, leaseCrashes, irreversibleStarted });
   if (outcome.state === "verifying") {
     const { db, result, token } = modelCompleteIntoVerify(world.db, refOf(w), LEASE, outcome.priorStatus ?? null, outcome.result);
     commit(world, db);
-    if (result === "recorded") return startVerify(world, w, token!, attempt, crashes);
+    if (result === "recorded") return startVerify(world, w, token!, attempt, leaseCrashes);
     Object.assign(w, IDLE());
     return;
   }
   // A requeue backs off as the worker's does (D49), keyed on the job's own attempt that failed (D57), with
   // the jitter at its middle (x 1.0): 10 s, 30 s.
-  const notBeforeSeconds = outcome.state === "queued" ? requeueBackoffSeconds(ownAttempts(attempt, crashes), () => 0.5) : null;
+  const notBeforeSeconds = outcome.state === "queued" ? requeueBackoffSeconds(ownAttempts(attempt, leaseCrashes), () => 0.5) : null;
   const { db, result } = modelComplete(world.db, refOf(w), outcome.state, outcome.outcome, outcome.result, { notBeforeSeconds, reconcileDueSeconds: RECONCILE_DUE });
   if (result === "check_violation") world.violations.push(`T4 would violate jobs_queued_has_attempts_left (${outcome.state} at attempt ${attempt})`);
   commit(world, db);
@@ -494,17 +530,19 @@ function beat(world: World, w: SimWorker): void {
 
 /** T6 by `w` (idle): may hand it a job to verify; if not, R1 may hand it a due reconcile (the sweep). */
 function recover(world: World, w: SimWorker): boolean {
+  // One job: a sweep recovers it at most once (afterwards it is queued, terminal, or freshly leased).
+  world.pendingDeath = holderDied(job(world), world.db.now);
   const { db, claimed } = modelRecover(world.db, RECOVER_PER_LOOP, { owner: idOf(w), leaseSeconds: LEASE, reconcileDueSeconds: RECONCILE_DUE });
   commit(world, db);
   if (!claimed) return reconcileClaim(world, w);
-  startVerify(world, w, claimed.token, job(world).attempt, job(world).crashes);
+  startVerify(world, w, claimed.token, job(world).attempt, job(world).leaseCrashes);
   return true;
 }
 
 function startReconcile(world: World, w: SimWorker, token: number): void {
   const state = job(world).state;
   if (!isReconcilable(state)) throw new Error(`the simulation: a reconcile claimed a ${state} job`);
-  Object.assign(w, { phase: "reconcile", held: { token, attempt: job(world).attempt, crashes: job(world).crashes }, clickedRow: null, verify: null, rec: { state, reading: null, at: null, seen: [] }, lastExtendedAt: world.db.now });
+  Object.assign(w, { phase: "reconcile", held: { token, attempt: job(world).attempt, leaseCrashes: job(world).leaseCrashes }, clickedRow: null, verify: null, rec: { state, reading: null, at: null, seen: [] }, lastExtendedAt: world.db.now });
   world.lastHolder = idOf(w);
 }
 
@@ -569,7 +607,7 @@ function dequeue(world: World, w: SimWorker): void {
   const { db, job: leased } = modelDequeue(world.db, idOf(w), LEASE);
   commit(world, db);
   if (leased) {
-    Object.assign(w, { phase: "steps", held: { token: leased.token, attempt: leased.attempt, crashes: leased.crashes }, lastExtendedAt: world.db.now });
+    Object.assign(w, { phase: "steps", held: { token: leased.token, attempt: leased.attempt, leaseCrashes: leased.leaseCrashes }, lastExtendedAt: world.db.now });
     world.lastHolder = idOf(w);
   }
 }
@@ -637,7 +675,7 @@ function decide(world: World, w: SimWorker): void {
     priorStatus: cycle.priorStatus,
     attempt: j.attempt,
     maxAttempts: j.maxAttempts,
-    crashes: j.crashes,
+    leaseCrashes: j.leaseCrashes,
     deferrals: cycle.deferrals,
     deferredForSeconds: cycle.deferredForSeconds,
     defer: DEFER,
@@ -760,7 +798,7 @@ function runEvents(s: Scenario): Trace {
 
 /** Checked on EVERY transition, including the ones inside one event (recover, then dequeue). */
 function checkTransitions(transitions: Transition[], at: string, found: Found): void {
-  for (const { from, to, leases, crashes } of transitions) {
+  for (const { from, to, leases, leaseCrashes, deaths } of transitions) {
     const what = `${at}: ${from.state}/${from.token} -> ${to.state}/${to.token}`;
     // Terminal states are final, except: reverify (needs_human -> verifying; not modelled here), and the
     // reconcile pass on a succeeded / failed / business_outcome job: its claim / deferral bump the token (the
@@ -770,16 +808,23 @@ function checkTransitions(transitions: Transition[], at: string, found: Found): 
     const reconcileTouch = isReconcilable(from.state) && to.state === from.state;
     const reconcileFlag = isReconcilable(from.state) && to.state === "needs_human" && (RECONCILE_FLAGS as readonly string[]).includes(to.outcome ?? "");
     if (isTerminal(from.state) && !reverify && !reconcileTouch && !reconcileFlag) found.terminalMoved.push(what);
-    // Queued always has an own attempt left and is under the crash cap (D21; D57's two budgets).
-    if (to.state === "queued" && !(to.attempt - to.crashes < to.maxAttempts && to.crashes < to.maxCrashes)) {
-      found.queuedExhausted.push(`${what} at attempt ${to.attempt}/${to.maxAttempts}, crashes ${to.crashes}/${to.maxCrashes}`);
+    // Queued always has an own attempt left and is under the crash cap (D21; D57's and D58's two budgets).
+    if (to.state === "queued" && !(to.attempt - to.leaseCrashes < to.maxAttempts && to.crashes < to.maxCrashes)) {
+      found.queuedExhausted.push(`${what} at attempt ${to.attempt}/${to.maxAttempts}, lease crashes ${to.leaseCrashes}, crashes ${to.crashes}/${to.maxCrashes}`);
     }
-    // Property 11 (D57), on the simulation's own counts: failed only after max_attempts own failures (leases
-    // that were not crashes), or at the crash cap with max_crashes crashes.
+    // Property 11 (D57, D58), on the simulation's own counts: failed only after max_attempts own failures
+    // (leases that were not lease crashes), or at the crash cap with max_crashes deaths -- and then only before
+    // any intent (from running).
+    const counts = `${leases} leases, ${leaseCrashes} lease crashes, ${deaths} deaths (max_attempts ${to.maxAttempts}, max_crashes ${to.maxCrashes})`;
     if (to.state === "failed" && from.state !== "failed") {
-      const ownFailures = leases - crashes;
-      const ok = to.outcome === "crash_limit" ? crashes >= to.maxCrashes : ownFailures >= to.maxAttempts;
-      if (!ok) found.failedEarly.push(`${what}: failed/${to.outcome} after ${leases} leases, ${crashes} crashes (${ownFailures} own failures; max_attempts ${to.maxAttempts}, max_crashes ${to.maxCrashes})`);
+      const ownFailures = leases - leaseCrashes;
+      const ok = to.outcome === "crash_limit" ? deaths >= to.maxCrashes && from.state === "running" : ownFailures >= to.maxAttempts;
+      if (!ok) found.failedEarly.push(`${what}: failed/${to.outcome} after ${counts}`);
+    }
+    // ... and escalated by recovery (an active job to needs_human, the token bumped: T6.6; T7 and T4 never bump
+    // it) only at the crash cap, as crash_limit, past the intent.
+    if (to.state === "needs_human" && (from.state === "committing" || from.state === "verifying") && to.token === from.token + 1) {
+      if (!(to.outcome === "crash_limit" && deaths >= to.maxCrashes)) found.failedEarly.push(`${what}: needs_human/${to.outcome} by recovery after ${counts}`);
     }
     if (to.state === "queued" && from.state !== "running") {
       // Property 5: after an intent, the only way back to queued is a verify that looked twice and saw 0.
@@ -1038,8 +1083,8 @@ describe("fleet state machine, pure model (Step 9: verify, settle, history lag, 
   }, PROPERTY_TIMEOUT_MS);
 });
 
-describe("the two budgets (Step 10b, D57): crashes stop using attempts", () => {
-  it("property 11: a job is never failed by fewer than max_attempts own failures unless it hit the crash cap -- over the Step 9/10 sequences (cap 5) AND crash-heavy ones (caps 1-5), queued always within both budgets", () => {
+describe("the two budgets (Step 10b, D57, D58): crashes stop using attempts; one crash budget for every death", () => {
+  it("property 11: a job is never failed or escalated by worker deaths before max_crashes of them, never failed by fewer than max_attempts own failures, and never failed past its intent -- over the Step 9/10 sequences (cap 5) AND crash-heavy ones (caps 1-5), queued always within both budgets", () => {
     fc.assert(
       fc.property(fc.oneof(scenarioArb, crashScenarioArb), (s) => {
         const { found } = simulate(s);
@@ -1050,27 +1095,36 @@ describe("the two budgets (Step 10b, D57): crashes stop using attempts", () => {
     );
   }, PROPERTY_TIMEOUT_MS);
 
-  it("property 11's cases are real: fast-check reaches the crash cap (failed / crash_limit, 0 rows), and a job that crashed max_attempts times or more still succeeds", () => {
-    const capped = fc.check(
-      fc.property(crashScenarioArb, (s) => job(simulate(s).world).outcome !== "crash_limit"),
-      params,
-    );
-    expect(capped.failed, "fast-check never reached crash_limit").toBe(true);
-    const [shrunk] = capped.counterexample!;
-    const { world } = simulate(shrunk);
-    expect(job(world)).toMatchObject({ state: "failed", outcome: "crash_limit" });
-    expect(job(world).crashes).toBe(job(world).maxCrashes);
-    expect(world.simCrashes).toBe(job(world).maxCrashes);
-    expect(world.ledger).toHaveLength(0);
+  it("property 11's cases are real: fast-check reaches the crash cap before the intent (failed / crash_limit, 0 rows) and after it (needs_human / crash_limit), and a job whose deaths reached max_attempts still succeeds", () => {
+    for (const [state, intent] of [
+      ["failed", false],
+      ["needs_human", true],
+    ] as const) {
+      const capped = fc.check(
+        fc.property(crashScenarioArb, (s) => {
+          const j = job(simulate(s).world);
+          return !(j.state === state && j.outcome === "crash_limit");
+        }),
+        params,
+      );
+      expect(capped.failed, `fast-check never reached ${state} / crash_limit`).toBe(true);
+      const [shrunk] = capped.counterexample!;
+      const { world } = simulate(shrunk);
+      expect(job(world)).toMatchObject({ state, outcome: "crash_limit" });
+      expect(job(world).crashes).toBe(job(world).maxCrashes);
+      expect(world.simDeaths).toBe(job(world).maxCrashes);
+      expect(world.intentEver).toBe(intent);
+      if (!intent) expect(world.ledger).toHaveLength(0);
+    }
     // Under Step 8's rule a job whose crashes reached max_attempts was failed (lease_expired); now it goes on.
     const survived = fc.check(
       fc.property(crashScenarioArb, (s) => {
         const { world: w } = simulate(s);
-        return !(job(w).state === "succeeded" && w.simCrashes >= job(w).maxAttempts);
+        return !(job(w).state === "succeeded" && w.simDeaths >= job(w).maxAttempts);
       }),
       params,
     );
-    expect(survived.failed, "fast-check found no job that succeeded after max_attempts crashes").toBe(true);
+    expect(survived.failed, "fast-check found no job that succeeded after max_attempts deaths").toBe(true);
   }, PROPERTY_TIMEOUT_MS);
 });
 
@@ -1121,7 +1175,7 @@ describe("the simulation reaches the interesting states (so the properties are n
       "phase:crashed",
       "final:succeeded/success",
       "final:succeeded/already_done",
-      "final:needs_human/verify_exhausted",
+      "final:needs_human/crash_limit", // T6.6 at the one crash budget (D58; was verify_exhausted)
       "final:failed/not_committed_attempts_exhausted",
       "rows:0",
       "rows:1",
@@ -1174,13 +1228,55 @@ describe("deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills
     expect(job(two.world)).toMatchObject({ state: "failed", outcome: "crash_limit", crashes: 2 });
   });
 
-  it("a lease that expires AFTER the intent is not a crash: T6.4 verifies [0, 0] and resubmits as an own attempt (crashes stays 0)", () => {
+  it("a lease that expires AFTER the intent is a death (crashes 1, D58) but not a lease crash: T6.4 verifies [0, 0] and resubmits it as an own attempt", () => {
     const { world } = run(
       [{ k: "dequeue", w: 0 }, { k: "intent", w: 0 }, { k: "crash", w: 0 }, { k: "tick", dt: 31 }, { k: "dequeue", w: 1 }, { k: "lookup", w: 1 }, { k: "tick", dt: 5 }, { k: "lookup", w: 1 }, { k: "decide", w: 1 }],
       { maxAttempts: 2 },
     );
-    expect(job(world)).toMatchObject({ state: "queued", attempt: 1, crashes: 0 });
+    expect(job(world)).toMatchObject({ state: "queued", attempt: 1, crashes: 1, leaseCrashes: 0 });
     expect(job(world).phases.map((p) => p.decision)).toEqual(["resubmitted"]);
+  });
+
+  /** Chaos seed 2080386450's job 1ba81fdf (evidence/chaos/day2-exit/README.md): its worker dies after the intent, then `verifiers` verifiers die mid-verify. */
+  const killedVerifiers = (verifiers: number): Ev[] => [
+    { k: "dequeue", w: 0 },
+    { k: "intent", w: 0 },
+    { k: "click", w: 0, commits: true },
+    { k: "crash", w: 0 },
+    ...Array.from({ length: verifiers }, (_, i): Ev[] => {
+      const w = 1 + (i % 2);
+      return [{ k: "tick", dt: 31 }, { k: "restart", w }, { k: "dequeue", w }, { k: "lookup", w }, { k: "crash", w }];
+    }).flat(),
+    { k: "tick", dt: 31 },
+    { k: "restart", w: 0 },
+    { k: "recover", w: 0 },
+  ];
+
+  it("the chaos seed's job, replayed: its worker and then three verifiers killed (4 deaths) is NOT escalated any more (Step 9's verify_exhausted at 3 dead phases, D58): the next verifier decides [1], already_done, 1 row", () => {
+    const { world, found } = run(killedVerifiers(3));
+    expect(job(world)).toMatchObject({ state: "verifying", crashes: 4, leaseCrashes: 0, attempt: 1 });
+    expect(Object.values(found).flat()).toEqual([]);
+    quiesce(world);
+    expect(job(world)).toMatchObject({ state: "succeeded", outcome: "already_done", crashes: 4 });
+    expect(world.ledger).toHaveLength(1);
+  });
+
+  it("the fifth death on the job, after the intent, escalates it: needs_human / crash_limit, never failed (T6.6, D58); with a cap of 2, the second death does", () => {
+    const five = run(killedVerifiers(4));
+    expect(job(five.world)).toMatchObject({ state: "needs_human", outcome: "crash_limit", crashes: 5, leaseCrashes: 0 });
+    expect(five.world.simDeaths).toBe(5);
+    expect(Object.values(five.found).flat()).toEqual([]);
+    const two = run(killedVerifiers(1), { maxCrashes: 2 });
+    expect(job(two.world)).toMatchObject({ state: "needs_human", outcome: "crash_limit", crashes: 2 });
+    // The attempt's own death at a cap of 1: escalated at once, without a verify (the Submit may have committed).
+    const one = run(killedVerifiers(0), { maxCrashes: 1 });
+    expect(job(one.world)).toMatchObject({ state: "needs_human", outcome: "crash_limit", crashes: 1 });
+  });
+
+  it("one budget: lease crashes before the intent and verifier deaths after it add up (2 + 1 + 2 = 5 -> needs_human / crash_limit)", () => {
+    const events: Ev[] = [...crash(0), ...crash(1), ...killedVerifiers(2)];
+    const { world } = run(events);
+    expect(job(world)).toMatchObject({ state: "needs_human", outcome: "crash_limit", crashes: 5, leaseCrashes: 2, attempt: 3 });
   });
 
   it("verify counts own attempts too: two crashes, then the third lease reaches its intent and dies; [0, 0] resubmits (Step 8's count would say exhausted)", () => {
@@ -1197,7 +1293,7 @@ describe("deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills
       { k: "lookup", w: 0 },
       { k: "decide", w: 0 },
     ]);
-    expect(job(world)).toMatchObject({ state: "queued", attempt: 3, crashes: 2 });
+    expect(job(world)).toMatchObject({ state: "queued", attempt: 3, crashes: 3, leaseCrashes: 2 });
     expect(job(world).phases.map((p) => p.decision)).toEqual(["resubmitted"]);
   });
 });
@@ -1423,7 +1519,8 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
   it("D55: the same with attempt 2 refused before Submit (business_outcome), or its worker dying at the crash cap (T6.2 crash_limit, D57): flagged the same way", () => {
     for (const [end, maxCrashes] of [
       [[{ k: "finish", w: 2, how: "refused" }] as Ev[], undefined],
-      [[{ k: "crash", w: 2 }, { k: "tick", dt: 31 }, { k: "recover", w: 1 }] as Ev[], 1], // T6.2 (the cap of 1) marks it
+      // T6.2 marks it: a cap of 2, since w0's death after its intent (T6.4) is the job's first (D58).
+      [[{ k: "crash", w: 2 }, { k: "tick", dt: 31 }, { k: "recover", w: 1 }] as Ev[], 2],
     ] as const) {
       const { world } = run([...zombieAfterResubmit, ...end, { k: "resume", w: 0, beatFirst: false }, { k: "click", w: 0, commits: true }], { maxAttempts: 2, maxCrashes });
       expect(world.decisions.at(-1), JSON.stringify(end)).toBe("unrecorded_commit_suspected:[1]");
@@ -1437,7 +1534,7 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
       { maxAttempts: 2 },
     );
     expect(world.decisions.at(-1)).toBe("duplicate_suspected:[2]");
-    expect(job(world)).toMatchObject({ state: "needs_human", outcome: "duplicate_suspected", attempt: 3, crashes: 1 });
+    expect(job(world)).toMatchObject({ state: "needs_human", outcome: "duplicate_suspected", attempt: 3, crashes: 2, leaseCrashes: 1 });
   });
 
   it("D55: with no zombie, the resubmitted job that ended failed is reconciled with 0 rows and stays failed (settled)", () => {
@@ -1569,7 +1666,7 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
     expect(job(world)).toMatchObject({ state: "needs_human", outcome: "verify_unavailable" });
   });
 
-  it("three verifiers die in a row: T6.6 escalates needs_human / verify_exhausted", () => {
+  it("three verifiers die in a row: Step 9's T6.6 (verify_exhausted at 3 dead phases) is gone -- 4 deaths are under the crash cap of 5, so a fourth verifier claims it and the drain decides it (D58)", () => {
     const { world } = run([
       { k: "dequeue", w: 0 },
       { k: "intent", w: 0 },
@@ -1586,10 +1683,13 @@ describe("deterministic scenarios (docs/plans/step-08.md section 6; step-09 revi
       { k: "crash", w: 0 },
       { k: "tick", dt: 31 },
       { k: "restart", w: 1 },
-      { k: "dequeue", w: 1 }, // the cycle has 3 dead phases: T6.6
+      { k: "dequeue", w: 1 }, // 3 dead phases, 4 deaths: T6.5, not an escalation
     ]);
-    expect(job(world)).toMatchObject({ state: "needs_human", outcome: "verify_exhausted" });
-    expect(job(world).phases.map((p) => p.decision)).toEqual(["crashed", "crashed", "crashed"]);
+    // No click ever went out: the drain's verify reads [0, 0] and resubmits; the next attempt transfers once.
+    expect(job(world).phases.slice(0, 3).map((p) => p.decision)).toEqual(["crashed", "crashed", "crashed"]);
+    expect(job(world).phases[3]).toMatchObject({ reason: "lease_expired_in_verifying", decision: "resubmitted" });
+    expect(job(world)).toMatchObject({ state: "succeeded", crashes: 4, leaseCrashes: 0 });
+    expect(world.ledger).toHaveLength(1);
   });
 });
 
@@ -1643,7 +1743,7 @@ function simulateOutage(s: OutageScenario, backoff: (attempt: number, random: ()
     const ref: LeaseRef = { jobId: j.id, token: j.token, owner };
     if (down()) {
       attemptsDuringOutage += 1;
-      const outcome = jobOutcomeFor({ kind: "result", result: FAILURE_503 }, { attempt: j.attempt, maxAttempts: j.maxAttempts, crashes: j.crashes, irreversibleStarted: false });
+      const outcome = jobOutcomeFor({ kind: "result", result: FAILURE_503 }, { attempt: j.attempt, maxAttempts: j.maxAttempts, leaseCrashes: j.leaseCrashes, irreversibleStarted: false });
       const jitter = s.jitters[requeues] ?? 0.5;
       if (outcome.state === "queued") requeues += 1;
       const notBeforeSeconds = outcome.state === "queued" ? backoff(j.attempt, () => jitter) : null;

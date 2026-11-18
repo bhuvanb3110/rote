@@ -97,8 +97,14 @@ export const MUTANTS: Mutant[] = [
   {
     id: "11",
     patch: "11-crash-requeue-uses-an-attempt.patch",
-    what: "Step 10b (D57): a crash requeue (T6.1) is not counted as a crash, so the dead lease consumes one of the job's attempts again (the bank-fault+kills failure)",
+    what: "Step 10b (D57): a crash requeue (T6.1) is not counted as a lease crash, so the dead lease consumes one of the job's attempts again (the bank-fault+kills failure)",
     tests: ["src/fleet/stateMachine.property.test.ts", "src/fleet/stateMachine.test.ts", "src/worker/recover.db.test.ts"],
+  },
+  {
+    id: "12",
+    patch: "12-verify-deaths-separate-low-cap.patch",
+    what: "Step 10b (D58): verify-phase deaths use a separate low cap again (3 dead verify phases escalate, below the one crash budget: the day2-exit seed 1 failure)",
+    tests: ["src/fleet/stateMachine.property.test.ts", "src/fleet/stateMachine.test.ts"],
   },
 ];
 

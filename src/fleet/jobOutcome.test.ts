@@ -72,13 +72,13 @@ describe("jobOutcomeFor (step-06 section 2)", () => {
   });
 
   it("D57: the job's OWN attempts decide -- crashes before this lease did not use one (the bank-fault+kills run's job 076e7ccd: 1:crashed 2:crashed 3:failure)", () => {
-    const afterTwoCrashes = jobOutcomeFor({ kind: "result", result: failure }, { ...last, crashes: 2 });
+    const afterTwoCrashes = jobOutcomeFor({ kind: "result", result: failure }, { ...last, leaseCrashes: 2 });
     expect(afterTwoCrashes).toMatchObject({ state: "queued", outcome: null });
     expect(afterTwoCrashes.error).toMatch(/attempt 1\/3 \(retrying\)/);
     const thrown = { kind: "thrown" as const, error: new Error("net::ERR_CONNECTION_REFUSED"), aborted: false };
-    expect(jobOutcomeFor(thrown, { attempt: 5, maxAttempts: 3, crashes: 2, irreversibleStarted: false })).toMatchObject({ state: "failed", outcome: "failure" });
-    expect(jobOutcomeFor(thrown, { attempt: 5, maxAttempts: 3, crashes: 2, irreversibleStarted: false }).error).toMatch(/attempt 3\/3 threw before anything irreversible \(attempts exhausted\)/);
-    expect(jobOutcomeFor(thrown, { attempt: 4, maxAttempts: 3, crashes: 2, irreversibleStarted: false })).toMatchObject({ state: "queued" });
+    expect(jobOutcomeFor(thrown, { attempt: 5, maxAttempts: 3, leaseCrashes: 2, irreversibleStarted: false })).toMatchObject({ state: "failed", outcome: "failure" });
+    expect(jobOutcomeFor(thrown, { attempt: 5, maxAttempts: 3, leaseCrashes: 2, irreversibleStarted: false }).error).toMatch(/attempt 3\/3 threw before anything irreversible \(attempts exhausted\)/);
+    expect(jobOutcomeFor(thrown, { attempt: 4, maxAttempts: 3, leaseCrashes: 2, irreversibleStarted: false })).toMatchObject({ state: "queued" });
   });
 
   it("invalid job (preflight refused) -> failed / invalid_job, never retried", () => {

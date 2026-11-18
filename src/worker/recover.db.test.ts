@@ -73,7 +73,7 @@ describe("T6: one row per line of the recovery table", () => {
     expect(r!.claim).toBeUndefined();
     const after = await row(job.id);
     // A crash requeue does not back off (D49): dequeueable at once.
-    expect(after).toMatchObject({ state: "queued", fencing_token: 2, lease_owner: null, lease_expires_at: null, outcome: null, attempt: 1, crashes: 1, max_crashes: 5, not_before: null });
+    expect(after).toMatchObject({ state: "queued", fencing_token: 2, lease_owner: null, lease_expires_at: null, outcome: null, attempt: 1, crashes: 1, lease_crashes: 1, max_crashes: 5, not_before: null });
     expect(after.error).toMatch(
       /lease expired while running, before any commit intent: crash 1\/5, not one of the job's attempts \(own attempts used 0\/3\); requeued \(T6\.1: the lease of dead-worker expired; recovered by rescuer\)/,
     );
@@ -104,7 +104,7 @@ describe("T6: one row per line of the recovery table", () => {
     const r = await recover();
     expect(r).toMatchObject({ action: { kind: "fail", label: "T6.2", outcome: "crash_limit", crash: true }, crashes: 2 });
     const after = await row(job.id);
-    expect(after).toMatchObject({ state: "failed", outcome: "crash_limit", attempt: 2, crashes: 2, max_crashes: 2, fencing_token: 4, lease_owner: null });
+    expect(after).toMatchObject({ state: "failed", outcome: "crash_limit", attempt: 2, crashes: 2, lease_crashes: 2, max_crashes: 2, fencing_token: 4, lease_owner: null });
     expect(after.error).toMatch(/crash limit: .*\(crash 2\/2\): a job that keeps killing its workers \(a poison job\?\); nothing irreversible happened \(T6\.2: the lease of dead-2 expired/);
     expect((await attemptRows(job.id)).map((a) => [a.attempt, a.outcome, a.error])).toEqual([
       [1, "crashed", "lease expired in running; recovered by rescuer (T6.1 requeue)"],
@@ -112,21 +112,25 @@ describe("T6: one row per line of the recovery table", () => {
     ]);
   });
 
-  it("the schema holds both budgets (0006): no requeue at the crash cap, never more crashes than leases", async () => {
+  it("the schema holds both budgets (0006, 0007): no requeue at the crash cap; lease crashes never more than leases or than crashes; deaths after the intent may outnumber the leases", async () => {
     const job = await leased(3, "dead-worker", 1);
     await pool.query("UPDATE jobs SET state = 'failed', lease_owner = NULL, lease_expires_at = NULL, crashes = 1 WHERE id = $1", [job.id]);
     await expect(pool.query("UPDATE jobs SET state = 'queued' WHERE id = $1", [job.id])).rejects.toThrow(/jobs_queued_under_crash_cap/);
-    await expect(pool.query("UPDATE jobs SET crashes = 2 WHERE id = $1", [job.id])).rejects.toThrow(/jobs_crashes_are_leases/);
+    await expect(pool.query("UPDATE jobs SET crashes = 3, lease_crashes = 2 WHERE id = $1", [job.id])).rejects.toThrow(/jobs_lease_crashes_are_leases/);
+    await expect(pool.query("UPDATE jobs SET crashes = 0, lease_crashes = 1 WHERE id = $1", [job.id])).rejects.toThrow(/jobs_lease_crashes_are_crashes/);
+    // One lease, four deaths (its own after the intent and three verifiers'): allowed since 0007.
+    await pool.query("UPDATE jobs SET crashes = 4, lease_crashes = 0 WHERE id = $1", [job.id]);
+    expect(await row(job.id)).toMatchObject({ attempt: 1, crashes: 4, lease_crashes: 0 });
   });
 
-  it("committing -> T6.4 claim to verify: verifying, owned by the recoverer with a fresh lease, a phase row (lease_expired_in_committing), never requeued", async () => {
+  it("committing -> T6.4 claim to verify: verifying, owned by the recoverer with a fresh lease, a phase row (lease_expired_in_committing), never requeued; a death (crashes + 1, D58), not a lease crash", async () => {
     const job = await committing();
     await expire(job.id);
     const r = await recover();
-    expect(r!.action).toMatchObject({ kind: "verify", label: "T6.4", reason: "lease_expired_in_committing" });
-    expect(r!.claim).toMatchObject({ label: "T6.4", fencingToken: 2, priorStatus: null, job: { id: job.id, tenant_id: "tenant-a", attempt: 1, max_attempts: 3, memo_key: `rote-${job.id}` } });
+    expect(r!.action).toMatchObject({ kind: "verify", label: "T6.4", reason: "lease_expired_in_committing", crash: true, leaseCrash: false });
+    expect(r!.claim).toMatchObject({ label: "T6.4", fencingToken: 2, priorStatus: null, job: { id: job.id, tenant_id: "tenant-a", attempt: 1, max_attempts: 3, crashes: 1, lease_crashes: 0, memo_key: `rote-${job.id}` } });
     const after = await row(job.id);
-    expect(after).toMatchObject({ state: "verifying", outcome: "commit_uncertain", fencing_token: 2, lease_owner: "rescuer" });
+    expect(after).toMatchObject({ state: "verifying", outcome: "commit_uncertain", fencing_token: 2, lease_owner: "rescuer", crashes: 1, lease_crashes: 0 });
     const remaining = (await pool.query("SELECT EXTRACT(EPOCH FROM lease_expires_at - now())::float8 AS s FROM jobs WHERE id = $1", [job.id])).rows[0].s;
     expect(remaining).toBeGreaterThan(LEASE - 2);
     expect(after.commit_intent_at).toBeInstanceOf(Date); // kept: evidence that an intent was written
@@ -142,9 +146,9 @@ describe("T6: one row per line of the recovery table", () => {
     await recover("v1"); // T6.4: v1 verifies
     await expire(job.id); // v1 dies
     const r = await recover("v2");
-    expect(r!.action).toMatchObject({ kind: "verify", label: "T6.5", reason: "lease_expired_in_verifying" });
+    expect(r!.action).toMatchObject({ kind: "verify", label: "T6.5", reason: "lease_expired_in_verifying", crash: true });
     expect(r!.verifyCycle).toMatchObject({ deadPhases: 1, lastDecision: null });
-    expect(await row(job.id)).toMatchObject({ state: "verifying", fencing_token: 3, lease_owner: "v2" });
+    expect(await row(job.id)).toMatchObject({ state: "verifying", fencing_token: 3, lease_owner: "v2", crashes: 2, lease_crashes: 0 });
     const p = await phases(job.id);
     expect(p.map((x) => [x.fencing_token, x.worker_id, x.reason, x.decision])).toEqual([
       [2, "v1", "lease_expired_in_committing", "crashed"],
@@ -153,18 +157,33 @@ describe("T6: one row per line of the recovery table", () => {
     expect(p[0].error).toBe("lease expired in verifying; recovered by v2 (T6.5 verify)");
   });
 
-  it("verifying, 3 dead phases -> T6.6 escalate: needs_human / verify_exhausted, the third dead phase closed", async () => {
+  it("the death that reaches the crash cap after the intent -> T6.6 escalate: needs_human / crash_limit (D58); 3 dead verifiers alone no longer escalate", async () => {
     const job = await committing();
-    for (const v of ["v1", "v2", "v3"]) {
+    // The attempt's own death (T6.4), then four verifiers' (T6.5 x3): 4 deaths, still verified.
+    for (const v of ["v1", "v2", "v3", "v4"]) {
       await expire(job.id);
       expect((await recover(v))!.action.kind).toBe("verify");
     }
-    await expire(job.id); // the third verifier dies too
-    const r = await recover("v4");
-    expect(r!.action).toMatchObject({ kind: "escalate", label: "T6.6", to: "needs_human", outcome: "verify_exhausted" });
+    expect(await row(job.id)).toMatchObject({ state: "verifying", crashes: 4, lease_owner: "v4" });
+    await expire(job.id); // the fourth verifier dies too: the 5th death
+    const r = await recover("v5");
+    expect(r!.action).toMatchObject({ kind: "escalate", label: "T6.6", to: "needs_human", outcome: "crash_limit", crash: true, leaseCrash: false });
     expect(r!.claim).toBeUndefined();
-    expect(await row(job.id)).toMatchObject({ state: "needs_human", outcome: "verify_exhausted", fencing_token: 5, lease_owner: null, lease_expires_at: null });
-    expect((await phases(job.id)).map((x) => x.decision)).toEqual(["crashed", "crashed", "crashed"]);
+    const after = await row(job.id);
+    expect(after).toMatchObject({ state: "needs_human", outcome: "crash_limit", crashes: 5, lease_crashes: 0, fencing_token: 6, lease_owner: null, lease_expires_at: null });
+    expect(after.error).toMatch(/crash limit after the commit intent: the lease expired in verifying \(dead verify phases in this cycle: 4\) \(crash 5\/5/);
+    expect((await phases(job.id)).map((x) => x.decision)).toEqual(["crashed", "crashed", "crashed", "crashed"]);
+  });
+
+  it("committing at the crash cap -> T6.6 escalate at once, needs_human / crash_limit, never failed (the Submit may have committed)", async () => {
+    await enqueue(pool, { capability: CAP, tenantId: "tenant-a", idempotencyKey: `k-${Math.random()}`, params: { memberId: "1" }, maxAttempts: 3, maxCrashes: 1 });
+    const job = (await dequeue(pool, { workerId: "dead-worker", leaseSeconds: LEASE }))!;
+    await writeCommitIntent(pool, { jobId: job.id, fencingToken: job.fencing_token, workerId: "dead-worker", leaseSeconds: LEASE });
+    await expire(job.id);
+    const r = await recover();
+    expect(r!.action).toMatchObject({ kind: "escalate", label: "T6.6", to: "needs_human", outcome: "crash_limit" });
+    expect(await row(job.id)).toMatchObject({ state: "needs_human", outcome: "crash_limit", crashes: 1, lease_crashes: 0 });
+    expect(await phases(job.id)).toEqual([]);
   });
 
   it("verifying, deferred (the bank was unavailable) -> T6.7 resume after the backoff; deferrals never count toward the cap", async () => {
@@ -190,6 +209,8 @@ describe("T6: one row per line of the recovery table", () => {
     // dying if its lease expired now); the 3 deferrals never count.
     expect(cycle).toMatchObject({ phases: 5, deadPhases: 2, deferrals: 3, lastDecision: null });
     expect(cycle.deferredForSeconds).toBeGreaterThanOrEqual(0);
+    // Two deaths (the attempt's, then v1's); the three resumes are not deaths (D58).
+    expect(await row(job.id)).toMatchObject({ crashes: 2, lease_crashes: 0 });
   });
 
   it("verifying, handed off by rote jobs reverify -> T6.7 resume (the hand-off is not a dead phase)", async () => {

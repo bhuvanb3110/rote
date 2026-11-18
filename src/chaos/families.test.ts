@@ -1,7 +1,8 @@
 // The chaos families' explicit expectations (step-10 reviewer decision 7; D56): each family names the final
 // states it allows, and the judge fails a run on anything else.
 import { describe, expect, it } from "vitest";
-import { CHAOS_FAMILIES, FAMILY_SPECS, familyFromFlags, judgeFamily, type RunObservation } from "./families.js";
+import type { CrashLimitVerdict } from "./attribution.js";
+import { acceptedEscalations, CHAOS_FAMILIES, FAMILY_SPECS, familyFromFlags, judgeFamily, type RunObservation } from "./families.js";
 
 const clean = (over: Partial<RunObservation> = {}): RunObservation => ({
   oraclePass: true,
@@ -15,7 +16,17 @@ const clean = (over: Partial<RunObservation> = {}): RunObservation => ({
   bankControlsApplied: 0,
   requeuedAfterFailure: 0,
   deferrals: 0,
+  crashLimitEscalations: [],
   ...over,
+});
+/** A needs_human / crash_limit job's verdict (src/chaos/attribution.ts decides it; here it is given). */
+const verdict = (jobId: string, attributed: boolean): CrashLimitVerdict => ({
+  jobId,
+  deaths: [],
+  crashes: 5,
+  ledgerRows: 1,
+  attributed,
+  reasons: attributed ? [] : ["1 death(s) match no scheduled kill or pause of their worker: verify phase 4 of x (T6.5)"],
 });
 const bankRun = (over: Partial<RunObservation> = {}) => clean({ bankControlsApplied: 4, requeuedAfterFailure: 12, deferrals: 2, ...over });
 
@@ -26,6 +37,35 @@ describe("familyFromFlags", () => {
     expect(familyFromFlags({ bankFault: true, noKills: true })).toBe("bank-fault-only");
     expect(() => familyFromFlags({ bankFault: false, noKills: true })).toThrow(/only a family with --bank-fault/);
     expect(CHAOS_FAMILIES).toEqual(["standard", "bank-fault-only", "bank-fault-kills"]);
+  });
+});
+
+describe("judgeFamily: the attributed escalation by the crash cap (D58; the reviewer decision during 10b, decision 3)", () => {
+  const capped = (verdicts: CrashLimitVerdict[]) => ({ finals: { "succeeded/success": 100 - verdicts.length, "needs_human/crash_limit": verdicts.length }, crashLimitEscalations: verdicts });
+
+  it("the standard family accepts needs_human / crash_limit ONLY when its verdict is attributed, and lists it as accepted", () => {
+    const o = clean(capped([verdict("job-a", true)]));
+    expect(judgeFamily(FAMILY_SPECS.standard, o)).toEqual([]);
+    expect(acceptedEscalations(FAMILY_SPECS.standard, o).map((v) => v.jobId)).toEqual(["job-a"]);
+  });
+
+  it("an unattributed one fails the run, with its reasons; an attributed one beside it does not excuse it", () => {
+    const one = judgeFamily(FAMILY_SPECS.standard, clean(capped([verdict("job-b", false)])));
+    expect(one.join(";")).toMatch(/1 job\(s\) ended needs_human\/crash_limit without an attributed history \(job-b: 1 death\(s\) match no scheduled kill or pause/);
+    const mixed = judgeFamily(FAMILY_SPECS.standard, clean(capped([verdict("job-a", true), verdict("job-b", false)])));
+    expect(mixed).toHaveLength(1);
+    expect(mixed[0]).toMatch(/^1 job\(s\) ended needs_human\/crash_limit without an attributed history \(job-b/);
+    // A crash_limit job the harness found no verdict for is never accepted.
+    expect(judgeFamily(FAMILY_SPECS.standard, clean({ finals: { "needs_human/crash_limit": 1 }, crashLimitEscalations: [] })).join(";")).toMatch(/no verdict recorded/);
+  });
+
+  it("any OTHER needs_human still fails the standard family, and the bank families accept no escalation at all", () => {
+    expect(judgeFamily(FAMILY_SPECS.standard, clean({ finals: { "needs_human/verify_exhausted": 1 }, crashLimitEscalations: [verdict("job-a", true)] }))).toHaveLength(1);
+    for (const fam of ["bank-fault-only", "bank-fault-kills"] as const) {
+      const o = bankRun(capped([verdict("job-a", true)]));
+      expect(judgeFamily(FAMILY_SPECS[fam], o).join(";")).toMatch(/1 job\(s\) ended needs_human\/crash_limit, which the .* family does not allow/);
+      expect(acceptedEscalations(FAMILY_SPECS[fam], o)).toEqual([]);
+    }
   });
 });
 

@@ -442,7 +442,7 @@ jobsCommand
   .command("reverify <id>")
   .description(
     "Hand ONE needs_human job that could not be decided (commit_uncertain, unreadable, verify_unavailable, " +
-      "verify_exhausted) back to verify: it becomes verifying with an expired lease, and the next worker's " +
+      "verify_exhausted, crash_limit) back to verify: it becomes verifying with an expired lease, and the next worker's " +
       "recovery reads the bank's history for its memo_key (T6.7). Never automatic; one job, by id.",
   )
   .option("--tenant <tenant>", "only if the job belongs to this tenant")

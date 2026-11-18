@@ -1390,6 +1390,8 @@ a verifier that keeps dying is a reason to stop; a slow bank is not.
 
 **Date.** 2026-11-13
 
+**Amended by D58** (2026-11-18): the separate cap of 3 dead verify phases is gone. T6.6 escalates at the job's one crash budget (`max_crashes`, every worker death counted) as `needs_human` / `crash_limit`; `verify_exhausted` is no longer produced.
+
 ## D46: `rote jobs reverify <id>` hands one parked job to recovery, by id only, fenced on its state
 
 (Step 9; step-09 plan item 7, reviewer decision 3.)
@@ -2020,3 +2022,88 @@ regenerated (their context moved).
 the fleet must not charge it to the job, while still stopping a job that keeps killing its workers.
 
 **Date.** 2026-11-17
+
+**Amended by D58** (2026-11-18): every worker death now counts against the one crash budget, the deaths after the intent too; the deaths before it are also counted in `jobs.lease_crashes`, which is what own attempts subtract.
+
+## D58: One crash budget per job: every worker death counts, before the intent and during verify; at the cap, `failed` before an intent, `needs_human` after one; the standard family's attributed escalation (amends D45, D56, D57)
+
+(Step 10b; the reviewer decision during 10b, 2026-11-18: "Both", with details 1–5.)
+
+**What failed.** The 2-seed proof of the 500-job batch (`evidence/chaos/day2-exit/`, `ee6589b`) was RESULT: FAIL,
+1 of 2. Seed 2080386450 had ok=500, 0 duplicates and 0 lost, but job `1ba81fdf` ended `needs_human` /
+`verify_exhausted`. Its worker was killed 2.5 s after the commit intent, then each of its three verifiers was
+killed mid-verify, and D45's cap of 3 dead verify phases escalated it. Its transfer had happened once. At chaos's
+kill rate 20–27% of verify phases die, so three in a row is ~1% of verify cycles, and a 20-seed batch should
+expect 1–2.5 such jobs. D57 had capped deaths before the intent at 5 and left the verify cap at 3: two caps for
+the same kind of bad luck.
+
+**Decision.**
+- **One budget** (`jobs.crashes`, `max_crashes` default 5, per job): every worker death on the job counts.
+  That covers a lease that expired in `running` (T6.1 / T6.2), in `committing` (T6.4: the attempt's own worker
+  died after its intent) and in a verify phase that died (T6.5 / T6.6). A deferred or handed-off verify ended on
+  purpose (T6.7) and is not a death. A reconciler's death on a terminal job is not counted either: the budget
+  guards active work. Step 9's separate cap of 3 dead verify phases is gone (`MAX_VERIFY_PHASES` removed). The
+  pure `recoveryAction` marks each action `crash`. `RECOVER_JOB_SQL` (`$8`) and `CLAIM_TO_VERIFY_SQL` (`$7`)
+  add it.
+- **At the cap**: before any intent → `failed` / `crash_limit` (T6.2, as D57). After an intent (`committing` or
+  `verifying`) → **`needs_human` / `crash_limit`** (T6.6): the Submit may have committed, so it is never
+  `failed`. `verify_exhausted` is no longer produced. `crash_limit` joins `REVERIFIABLE_OUTCOMES`, taking over
+  `verify_exhausted`'s role (`rote jobs reverify`).
+- **Own attempts** stay `attempt` minus the deaths before the intent. Since a verifier's death is not one of the
+  job's leases, those get their own column: **`jobs.lease_crashes`** (T6.1 / T6.2; `RecoveryAction.leaseCrash`,
+  `RECOVER_JOB_SQL` `$9`). `jobOutcomeFor`, `verifyDecision` and the backoff key read it (`leaseCrashes`).
+- **Migration `0007_one_crash_budget.sql`**: `lease_crashes` (backfilled from `crashes`: until 0007 every crash was
+  a lease crash). 0006's `jobs_crashes_are_leases` is replaced by `jobs_lease_crashes_are_leases` (`lease_crashes
+  <= attempt`) and `jobs_lease_crashes_are_crashes` (`lease_crashes <= crashes`). One lease can now carry several
+  deaths (its own, and its verifiers'). `jobs_queued_has_attempts_left` becomes `attempt - lease_crashes <
+  max_attempts`. `jobs_queued_under_crash_cap` is unchanged.
+- **The standard family's attributed escalation** (decision 3; `src/chaos/attribution.ts`). A `needs_human` /
+  `crash_limit` job is accepted only if every death in its history matches a scheduled `kill` or `pause` of that
+  worker's replica in `events.jsonl`, AND the ledger has at most 1 row for its `memo_key`. A death is a row
+  recovery closed with its note: an attempt, or a verify phase, `crashed` or re-labelled `lease_lost`. It matches
+  the event that hit the holder's hostname between the row's `started_at` and the recovery (±2 s of clock slack).
+  The death rows must also number exactly `jobs.crashes`. Any other `needs_human` still fails the run, and the
+  bank-fault families accept none. `check.txt` lists every death and its event. `summary.json` carries
+  `escalatedByCrashCapAttributed`. The seed's result is "PASS with N escalated by crash cap (attributed)", and the
+  batch's is `RESULT: PASS WITH N ESCALATION(S) BY CRASH CAP (ATTRIBUTED)`. The tally lists each such job with its
+  kill timestamps. It is **never a plain pass**: `chaos.ts` and `chaos-seeds.ts` exit 3 on it, 0 only on a plain
+  PASS, 1 on FAIL.
+
+**How the build reads the decision** (for the reviewer): the death of the attempt's own worker after its intent
+(T6.4) counts, because decision 2 names `committing` as a state the cap can be hit in. A reconciler's death does
+not count. `crash_limit` after the intent is reverifiable.
+
+**Tests.** Unit: every recovery row with the shared counter (T6.4 / T6.5 deaths, T6.6 at the cap from
+`committing` and `verifying`, T6.7 never a death even at the cap). An exhaustive sweep: escalation or failure
+only at the cap, `failed` only before an intent, a death on every recovery but a resume, a lease crash only from
+`running`. **Property 11, extended**: *a job is never failed or escalated by worker deaths before max_crashes of
+them*, plus never failed by fewer than max_attempts own failures, and never failed past its intent. The deaths
+are counted by the simulation in its recovery step, from the job as it was before (an expired active lease, unless
+its newest verify phase was deferred or handed off). The crash scenarios add the dead-verifier template.
+"Property 11's cases are real" reaches both `failed` / `crash_limit` and `needs_human` / `crash_limit`.
+Deterministic: **the chaos job replayed** (its worker and three verifiers killed: 4 deaths, now verified and
+`already_done`), the fifth death escalating, caps of 2 and 1, and lease crashes plus verifier deaths adding up.
+Step 9's "three verifiers die" now continues to a decision. Model vs real compares `lease_crashes` too. The verify
+family draws `max_crashes` from 1, 2, 5 and has a third start, an already-expired commit, so `recover:T6.6` is
+reached. DB: T6.4 / T6.5 counts, T6.6 at the cap from both states, the 0007 CHECKs, a resume that is not a death.
+Chaos: the attribution on the real seed-1 job (its four deaths matched to the kills at 139.5 s, 170.3 s,
+212.1 s and 242.1 s), the matching rule, the family judge's exception and the tally's listing. **Mutant 12**
+(`12-verify-deaths-separate-low-cap.patch`: 3 dead verify phases escalate again) is caught by property 11, the
+chaos replay and the unit rows. Mutant 11 now plants its bug in `leaseCrash`; 01 and 03 were regenerated.
+
+**Alternatives considered.**
+- **Raise the separate verify cap to 5** (the recommendation in the open question): two counters for one kind of
+  event, and a job could still take 5 deaths before its intent and 5 more after it.
+- **Count only verifier deaths, not the attempt's own death after its intent**: decision 2 names `committing`,
+  and "every worker death" reads plainly.
+- **Keep one counter and derive own attempts from `job_attempts`**: a subquery in the dequeue and in every T4,
+  instead of one column the CHECKs can state.
+- **Accept `needs_human` / `crash_limit` in the judge without attribution**: an escalation that no scheduled
+  kill explains could be a real defect (a worker crashing on its own).
+
+**Why.** A worker death is the fleet's event, whenever it happens; one budget, one cap, and one meaning of
+`crash_limit` (with the job's state saying whether money may have moved) are simpler to operate and to reason
+about. The judge's exception keeps the standard family strict: only deaths the schedule itself caused may send a
+job to a human, and each such job is named.
+
+**Date.** 2026-11-18

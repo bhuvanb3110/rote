@@ -38,90 +38,116 @@ import {
 } from "./stateMachine.js";
 
 const cycle = (over: Partial<VerifyCycle>): VerifyCycle => ({ ...EMPTY_VERIFY_CYCLE, phases: 1, deadPhases: 1, ...over });
-/** The crash budget's defaults (D57): no crashes yet, the cap at 5. */
-const NO_CRASH = { crashes: 0, maxCrashes: DEFAULT_MAX_CRASHES } as const;
+/** The crash budget's defaults (D57, D58): no deaths yet, the cap at 5. */
+const NO_CRASH = { crashes: 0, leaseCrashes: 0, maxCrashes: DEFAULT_MAX_CRASHES } as const;
 
-describe("ownAttempts and the crash cap (D57: two budgets)", () => {
-  it("own attempts = leases - crashes; the default cap is 5", () => {
+describe("ownAttempts and the crash cap (D57, D58: two budgets)", () => {
+  it("own attempts = leases - lease crashes (deaths before the intent); the default cap is 5", () => {
     expect(DEFAULT_MAX_CRASHES).toBe(5);
     expect(ownAttempts(1, 0)).toBe(1);
     expect(ownAttempts(3, 2)).toBe(1);
     expect(ownAttempts(7, 4)).toBe(3);
   });
 
-  it("refuses impossible counts (more crashes than leases, negatives, fractions)", () => {
+  it("refuses impossible counts (more lease crashes than leases, negatives, fractions)", () => {
     expect(() => ownAttempts(1, 2)).toThrow(RangeError);
     expect(() => ownAttempts(1, -1)).toThrow(RangeError);
     expect(() => ownAttempts(1.5, 0)).toThrow(RangeError);
   });
 });
 
-describe("recoveryAction (section 4's table; Step 9 rows; D57's crash budget)", () => {
-  it("running, under the crash cap -> T6.1 requeue, counted as a CRASH, not an attempt (no intent: nothing irreversible happened)", () => {
+describe("recoveryAction (section 4's table; Step 9 rows; D57's and D58's one crash budget)", () => {
+  it("running, under the crash cap -> T6.1 requeue, counted as a CRASH and a LEASE crash, not an attempt (no intent: nothing irreversible happened)", () => {
     const a = recoveryAction({ state: "running", attempt: 1, maxAttempts: 3, ...NO_CRASH });
-    expect(a).toMatchObject({ kind: "requeue", label: "T6.1", to: "queued", outcome: null, crash: true });
+    expect(a).toMatchObject({ kind: "requeue", label: "T6.1", to: "queued", outcome: null, crash: true, leaseCrash: true });
     expect(a.error).toMatch(/lease expired while running, before any commit intent: crash 1\/5, not one of the job's attempts \(own attempts used 0\/3\); requeued/);
     expect(recoveryAction({ state: "running", attempt: 2, maxAttempts: 3, ...NO_CRASH }).kind).toBe("requeue");
   });
 
   it("running on the job's LAST own attempt -> still T6.1 requeue: a crash never uses an attempt (the bank-fault+kills failure, D57)", () => {
     // Step 8's rule failed these (attempt >= max_attempts -> T6.2 lease_expired).
-    for (const [attempt, maxAttempts, crashes] of [
-      [3, 3, 0],
-      [1, 1, 0],
-      [3, 3, 2], // 1:crashed 2:crashed 3:<dies> -- the run's job 076e7ccd
-      [5, 3, 2],
+    for (const [attempt, maxAttempts, leaseCrashes, crashes] of [
+      [3, 3, 0, 0],
+      [1, 1, 0, 0],
+      [3, 3, 2, 2], // 1:crashed 2:crashed 3:<dies> -- the run's job 076e7ccd
+      [5, 3, 2, 2],
+      [2, 1, 1, 3], // a lease crash and two dead verifiers before (D58): still under the cap of 5
     ] as const) {
-      const a = recoveryAction({ state: "running", attempt, maxAttempts, crashes, maxCrashes: 5 });
-      expect(a, `attempt ${attempt}/${maxAttempts}, crashes ${crashes}`).toMatchObject({ kind: "requeue", label: "T6.1", to: "queued", crash: true });
+      const a = recoveryAction({ state: "running", attempt, maxAttempts, crashes, leaseCrashes, maxCrashes: 5 });
+      expect(a, `attempt ${attempt}/${maxAttempts}, lease crashes ${leaseCrashes}, crashes ${crashes}`).toMatchObject({ kind: "requeue", label: "T6.1", to: "queued", crash: true });
     }
   });
 
-  it("running, the crash that reaches the cap -> T6.2 fail / crash_limit (not lease_expired), NEVER queued", () => {
-    for (const [crashes, maxCrashes] of [
-      [4, 5],
-      [0, 1],
-      [2, 3],
-      [7, 5], // defensive: never past the cap, but if so still not queued
+  it("running, the death that reaches the cap -> T6.2 fail / crash_limit (not lease_expired), NEVER queued -- deaths during an earlier verify count too (D58)", () => {
+    for (const [crashes, leaseCrashes, maxCrashes] of [
+      [4, 4, 5],
+      [0, 0, 1],
+      [2, 2, 3],
+      [4, 1, 5], // one lease crash, three dead verifiers of an earlier, resubmitted attempt
+      [7, 7, 5], // defensive: never past the cap, but if so still not queued
     ] as const) {
-      const a = recoveryAction({ state: "running", attempt: crashes + 1, maxAttempts: 3, crashes, maxCrashes });
-      expect(a).toMatchObject({ kind: "fail", label: "T6.2", to: "failed", outcome: "crash_limit", crash: true });
+      const a = recoveryAction({ state: "running", attempt: leaseCrashes + 1, maxAttempts: 3, crashes, leaseCrashes, maxCrashes });
+      expect(a).toMatchObject({ kind: "fail", label: "T6.2", to: "failed", outcome: "crash_limit", crash: true, leaseCrash: true });
       expect(a.error).toMatch(new RegExp(`crash limit: .* \\(crash ${crashes + 1}/${maxCrashes}\\): a job that keeps killing its workers \\(a poison job\\?\\); nothing irreversible happened`));
     }
   });
 
-  it("committing -> T6.4 claim to verify (Step 9 replaces Step 8's T6.3 escalate), whatever the attempts; NOT a crash (past the intent, D57)", () => {
+  it("committing -> T6.4 claim to verify (Step 9 replaces Step 8's T6.3), whatever the attempts: a death (D58), never a lease crash", () => {
     for (const attempt of [1, 2, 3]) {
-      const a = recoveryAction({ state: "committing", attempt, maxAttempts: 3, crashes: 0, maxCrashes: 1 });
-      expect(a).toMatchObject({ kind: "verify", label: "T6.4", to: "verifying", outcome: "commit_uncertain", reason: "lease_expired_in_committing", crash: false });
-      expect(a.error).toMatch(/after the commit intent: the Submit may have committed; verifying in the bank's history by memo_key \(T6\.4\)/);
+      const a = recoveryAction({ state: "committing", attempt, maxAttempts: 3, ...NO_CRASH });
+      expect(a).toMatchObject({ kind: "verify", label: "T6.4", to: "verifying", outcome: "commit_uncertain", reason: "lease_expired_in_committing", crash: true, leaseCrash: false });
+      expect(a.error).toMatch(/lease expired after the commit intent \(crash 1\/5\): the Submit may have committed; verifying in the bank's history by memo_key \(T6\.4\)/);
     }
   });
 
-  it("verifying, fewer than 3 dead phases -> T6.5 re-claim; 3 or more -> T6.6 escalate needs_human / verify_exhausted; never a crash", () => {
-    for (const deadPhases of [0, 1, 2]) {
-      expect(recoveryAction({ state: "verifying", attempt: 1, maxAttempts: 3, ...NO_CRASH, verify: cycle({ deadPhases }) })).toMatchObject({
-        kind: "verify",
-        label: "T6.5",
-        reason: "lease_expired_in_verifying",
-        crash: false,
-      });
-    }
-    for (const deadPhases of [3, 4]) {
-      const a = recoveryAction({ state: "verifying", attempt: 1, maxAttempts: 3, ...NO_CRASH, verify: cycle({ deadPhases }) });
-      expect(a).toMatchObject({ kind: "escalate", label: "T6.6", to: "needs_human", outcome: "verify_exhausted", crash: false });
-      expect(a.error).toMatch(new RegExp(`verify exhausted: ${deadPhases} verify phases died without a decision`));
+  it("committing at the crash cap -> T6.6 escalate needs_human / crash_limit, never failed: the Submit may have committed (D58)", () => {
+    for (const [crashes, maxCrashes] of [
+      [4, 5],
+      [0, 1],
+    ] as const) {
+      const a = recoveryAction({ state: "committing", attempt: 1, maxAttempts: 3, crashes, leaseCrashes: 0, maxCrashes });
+      expect(a).toMatchObject({ kind: "escalate", label: "T6.6", to: "needs_human", outcome: "crash_limit", crash: true, leaseCrash: false });
+      expect(a.error).toMatch(new RegExp(`crash limit after the commit intent: the lease expired in committing \\(crash ${crashes + 1}/${maxCrashes}: every worker death on this job counts\\); the Submit may have committed`));
     }
   });
 
-  it("verifying whose newest phase was deferred or handed off -> T6.7 resume, even past the dead-phase cap (deferrals never count)", () => {
+  it("verifying, a dead verifier under the crash cap -> T6.5 re-claim, a death; however many dead phases (no separate cap of 3, D58)", () => {
+    for (const [deadPhases, crashes] of [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 3], // chaos seed 2080386450's job 1ba81fdf: the attempt's death + 3 dead verifiers = 4 deaths, under 5
+    ] as const) {
+      const a = recoveryAction({ state: "verifying", attempt: 1, maxAttempts: 3, crashes, leaseCrashes: 0, maxCrashes: 5, verify: cycle({ deadPhases }) });
+      expect(a, `dead phases ${deadPhases}, crashes ${crashes}`).toMatchObject({ kind: "verify", label: "T6.5", reason: "lease_expired_in_verifying", crash: true, leaseCrash: false });
+      expect(a.error).toMatch(new RegExp(`a verifier's lease expired \\(crash ${crashes + 1}/5; dead verify phases in this cycle: ${deadPhases}\\); re-verifying \\(T6\\.5\\)`));
+    }
+  });
+
+  it("verifying, the death that reaches the crash cap -> T6.6 escalate needs_human / crash_limit (Step 9's verify_exhausted after 3 dead phases is gone)", () => {
+    for (const [deadPhases, crashes, maxCrashes] of [
+      [4, 4, 5],
+      [1, 4, 5], // most deaths before this verify cycle (lease crashes, an earlier cycle): one budget
+      [0, 1, 2],
+    ] as const) {
+      const a = recoveryAction({ state: "verifying", attempt: 1, maxAttempts: 3, crashes, leaseCrashes: 0, maxCrashes, verify: cycle({ deadPhases }) });
+      expect(a).toMatchObject({ kind: "escalate", label: "T6.6", to: "needs_human", outcome: "crash_limit", crash: true });
+      expect(a.error).toMatch(new RegExp(`crash limit after the commit intent: the lease expired in verifying \\(dead verify phases in this cycle: ${deadPhases}\\) \\(crash ${crashes + 1}/${maxCrashes}`));
+    }
+  });
+
+  it("verifying whose newest phase was deferred or handed off -> T6.7 resume, NOT a death, even at the crash cap (deferrals never count)", () => {
     for (const lastDecision of ["deferred", "handed_off"] as const) {
-      for (const deadPhases of [0, 2, 3]) {
-        expect(recoveryAction({ state: "verifying", attempt: 2, maxAttempts: 3, ...NO_CRASH, verify: cycle({ lastDecision, deadPhases, deferrals: 4 }) })).toMatchObject({
+      for (const [deadPhases, crashes] of [
+        [0, 0],
+        [3, 4],
+      ] as const) {
+        expect(recoveryAction({ state: "verifying", attempt: 2, maxAttempts: 3, crashes, leaseCrashes: 0, maxCrashes: 5, verify: cycle({ lastDecision, deadPhases, deferrals: 4 }) })).toMatchObject({
           kind: "verify",
           label: "T6.7",
           reason: "resumed",
           crash: false,
+          leaseCrash: false,
         });
       }
     }
@@ -131,21 +157,30 @@ describe("recoveryAction (section 4's table; Step 9 rows; D57's crash budget)", 
     expect(() => recoveryAction({ state: "verifying", attempt: 1, maxAttempts: 3, ...NO_CRASH })).toThrow(/needs its verify cycle/);
   });
 
-  it("no input ever yields queued without an own attempt left or at the crash cap, or queued from past the intent; only a lease before the intent is a crash", () => {
+  it("no input ever yields queued without an own attempt left or at the crash cap, or queued from past the intent; escalation and failure only at the cap; every recovery but a resume is a death, only a running one a lease crash", () => {
     for (const state of ["running", "committing", "verifying"] as const) {
       for (let maxAttempts = 1; maxAttempts <= 4; maxAttempts += 1) {
         for (let maxCrashes = 1; maxCrashes <= 5; maxCrashes += 1) {
           for (let crashes = 0; crashes < maxCrashes; crashes += 1) {
-            // A leased job was queued: an own attempt left before this lease (own - 1 < max), under the cap.
-            for (let own = 1; own <= maxAttempts; own += 1) {
-              const attempt = own + crashes;
-              for (const verify of [cycle({}), cycle({ deadPhases: 3 }), cycle({ lastDecision: "deferred" })]) {
-                const a = recoveryAction({ state, attempt, maxAttempts, crashes, maxCrashes, verify });
-                expect(a.crash).toBe(state === "running");
-                if (a.to === "queued") {
-                  expect(state).toBe("running");
-                  expect(ownAttempts(attempt, crashes + 1)).toBeLessThan(maxAttempts); // jobs_queued_has_attempts_left
-                  expect(crashes + 1).toBeLessThan(maxCrashes); // jobs_queued_under_crash_cap
+            for (let leaseCrashes = 0; leaseCrashes <= crashes; leaseCrashes += 1) {
+              // A leased job was queued: an own attempt left before this lease (own - 1 < max), under the cap.
+              for (let own = 1; own <= maxAttempts; own += 1) {
+                const attempt = own + leaseCrashes;
+                for (const verify of [cycle({}), cycle({ deadPhases: 3 }), cycle({ lastDecision: "deferred" })]) {
+                  const a = recoveryAction({ state, attempt, maxAttempts, crashes, leaseCrashes, maxCrashes, verify });
+                  const resume = state === "verifying" && verify.lastDecision === "deferred";
+                  expect(a.crash).toBe(!resume);
+                  expect(a.leaseCrash).toBe(state === "running");
+                  if (a.to === "queued") {
+                    expect(state).toBe("running");
+                    expect(ownAttempts(attempt, leaseCrashes + 1)).toBeLessThan(maxAttempts); // jobs_queued_has_attempts_left
+                    expect(crashes + 1).toBeLessThan(maxCrashes); // jobs_queued_under_crash_cap
+                  }
+                  if (a.to === "failed" || a.to === "needs_human") {
+                    expect(a.outcome).toBe("crash_limit");
+                    expect(crashes + 1).toBeGreaterThanOrEqual(maxCrashes); // property 11's unit form
+                    expect(a.to).toBe(state === "running" ? "failed" : "needs_human"); // past the intent: never failed
+                  }
                 }
               }
             }
@@ -155,7 +190,6 @@ describe("recoveryAction (section 4's table; Step 9 rows; D57's crash budget)", 
     }
   });
 });
-
 describe("classifyLookup: what one history lookup said", () => {
   const ok = (outputs: Record<string, unknown>): ReplayResult => ({ status: "success", outputs, evidenceRef: "evidence://l" });
 
@@ -238,14 +272,14 @@ describe("verifyDecision: one row per line of section 5's table, plus the deferr
 
   it("[0, 0], attempts exhausted -> failed / not_committed_attempts_exhausted, never queued", () => {
     expect(verifyDecision(input([count(0), count(0)], { attempt: 3, maxAttempts: 3 }))).toMatchObject({ decision: "exhausted", to: "failed", outcome: "not_committed_attempts_exhausted" });
-    expect(verifyDecision(input([count(0), count(0)], { attempt: 5, maxAttempts: 3, crashes: 2 })).error).toMatch(/on the last attempt \(3\/3\)/);
+    expect(verifyDecision(input([count(0), count(0)], { attempt: 5, maxAttempts: 3, leaseCrashes: 2 })).error).toMatch(/on the last attempt \(3\/3\)/);
   });
 
   it("[0, 0] counts the job's OWN attempts (D57): crashes before the intent did not use one, so lease 3 after 2 crashes resubmits", () => {
-    const d = verifyDecision(input([count(0), count(0)], { attempt: 3, maxAttempts: 3, crashes: 2 }));
+    const d = verifyDecision(input([count(0), count(0)], { attempt: 3, maxAttempts: 3, leaseCrashes: 2 }));
     expect(d).toMatchObject({ decision: "resubmitted", to: "queued" });
     expect(d.error).toMatch(/resubmitting as attempt 2\/3/);
-    expect(verifyDecision(input([count(0), count(0)], { attempt: 4, maxAttempts: 3, crashes: 1 }))).toMatchObject({ decision: "exhausted" });
+    expect(verifyDecision(input([count(0), count(0)], { attempt: 4, maxAttempts: 3, leaseCrashes: 1 }))).toMatchObject({ decision: "exhausted" });
   });
 
   it("[0, 0] after a refusal shown after Submit -> not_committed_final: business_outcome, never retried (even with attempts left)", () => {
@@ -284,13 +318,13 @@ describe("verifyDecision: one row per line of section 5's table, plus the deferr
     const readingsSets: LookupReading[][] = [[count(1)], [count(2)], [unavailable], [unreadable], [count(0), count(1)], [count(0), count(2)], [count(0), unavailable], [count(0), unreadable], [count(0), count(0)]];
     for (const readings of readingsSets) {
       for (const priorStatus of ["failure", "business_outcome", "needs_human", null] as const) {
-        for (const [attempt, maxAttempts, crashes] of [[1, 3, 0], [3, 3, 0], [1, 1, 0], [3, 3, 2], [4, 3, 1], [2, 1, 1]] as const) {
+        for (const [attempt, maxAttempts, leaseCrashes] of [[1, 3, 0], [3, 3, 0], [1, 1, 0], [3, 3, 2], [4, 3, 1], [2, 1, 1]] as const) {
           for (const deferredForSeconds of [null, 10, 10_000]) {
-            const d = verifyDecision(input(readings, { priorStatus, attempt, maxAttempts, crashes, deferredForSeconds }));
+            const d = verifyDecision(input(readings, { priorStatus, attempt, maxAttempts, leaseCrashes, deferredForSeconds }));
             if (d.to === "queued") {
               expect(lookupsColumn(readings)).toEqual([0, 0]);
               expect(priorStatus).not.toBe("business_outcome");
-              expect(attempt - crashes).toBeLessThan(maxAttempts);
+              expect(attempt - leaseCrashes).toBeLessThan(maxAttempts);
             }
           }
         }

@@ -38,7 +38,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { gzipSync } from "node:zlib";
-import { FAMILY_SPECS, familyFromFlags, judgeFamily } from "../src/chaos/families.js";
+import {
+  describeAttributed,
+  judgeCrashLimitEscalation,
+  type AttemptRowForDeaths,
+  type ChaosEventForDeaths,
+  type PhaseRowForDeaths,
+} from "../src/chaos/attribution.js";
+import { acceptedEscalations, FAMILY_SPECS, familyFromFlags, judgeFamily } from "../src/chaos/families.js";
 import { buildSchedule, DEFAULT_CHAOS, drawSeed, type ChaosAction, type ChaosConfig } from "../src/chaos/schedule.js";
 import { recoveryKinds, type SeedSummary } from "../src/chaos/tally.js";
 import { jobSettled } from "../src/fleet/stateMachine.js";
@@ -427,6 +434,26 @@ async function main(): Promise<void> {
   // The oracle's report, then the family judge, then ONE final RESULT line.
   for (const line of report.text.split("\n").slice(0, -1)) log(line);
   const oracleBad = Object.fromEntries(Object.entries(report.counts).filter(([v, n]) => v !== "ok" && n > 0));
+  // D58: every needs_human / crash_limit job, judged on its own history (src/chaos/attribution.ts): every death
+  // matched to a scheduled kill or pause of its worker, and at most 1 ledger row for its memo_key.
+  const capped = (await pool.query<{ id: string; memo_key: string; crashes: number }>("SELECT id, memo_key, crashes FROM jobs WHERE state = 'needs_human' AND outcome = 'crash_limit' ORDER BY id")).rows;
+  const crashLimitEscalations = capped.map((j) =>
+    judgeCrashLimitEscalation({
+      jobId: j.id,
+      crashes: j.crashes,
+      ledgerRows: ledger.filter((r) => r.memo === j.memo_key).length,
+      attempts: attempts as AttemptRowForDeaths[],
+      phases: verifications as PhaseRowForDeaths[],
+      events: parsed as unknown as ChaosEventForDeaths[],
+      hostnameOfReplica: hostnames,
+    }),
+  );
+  for (const v of crashLimitEscalations) {
+    log(`crash-cap escalation ${v.jobId}: ${v.attributed ? "ATTRIBUTED" : "NOT attributed"}; ${v.crashes} crashes, ${v.ledgerRows} ledger row(s)${v.reasons.length ? `; ${v.reasons.join("; ")}` : ""}`);
+    for (const d of v.deaths) {
+      log(`  ${d.row} ${d.n} of ${d.holder} (${d.recovery}), held ${d.startedAt} .. ${d.endedAt ?? "open"}: ${d.event ? `${d.event.kind} of ${d.event.container} at ${d.event.tMs === null ? d.event.at : `${(d.event.tMs / 1000).toFixed(1)} s`}` : "NO scheduled kill or pause"}`);
+    }
+  }
   const problems = judgeFamily(spec, {
     oraclePass: report.pass,
     oracleBad,
@@ -439,11 +466,20 @@ async function main(): Promise<void> {
     bankControlsApplied,
     requeuedAfterFailure: recoveries.requeuedAfterFailure,
     deferrals: recoveries.deferred + recoveries.reconcile_deferred,
+    crashLimitEscalations,
   });
+  const accepted = acceptedEscalations(spec, { crashLimitEscalations });
   log("");
   log(`family judge (${family}; src/chaos/families.ts): ${problems.length === 0 ? "every expectation met" : problems.join("; ")}`);
   const pass = problems.length === 0;
-  log(pass ? "RESULT: PASS" : `RESULT: FAIL (${problems.join("; ")})`);
+  // Never a plain pass with an accepted escalation (the reviewer decision during 10b, decision 3).
+  log(
+    !pass
+      ? `RESULT: FAIL (${problems.join("; ")})`
+      : accepted.length > 0
+        ? `RESULT: PASS WITH ${accepted.length} ESCALATION(S) BY CRASH CAP (ATTRIBUTED): ${accepted.map(describeAttributed).join("; ")}`
+        : "RESULT: PASS",
+  );
 
   const firstEnqueue = jobs.length ? Math.min(...jobs.map((j) => j.created_at.getTime())) : t0;
   const summary: SeedSummary = {
@@ -475,6 +511,12 @@ async function main(): Promise<void> {
     notSettled,
     recoveries,
     crashBudget,
+    escalatedByCrashCapAttributed: accepted.map((v) => ({
+      jobId: v.jobId,
+      crashes: v.crashes,
+      ledgerRows: v.ledgerRows,
+      deaths: v.deaths.map((d) => ({ row: d.row, n: d.n, holder: d.holder, recovery: d.recovery, event: d.event })),
+    })),
     workerProtections,
     leaks,
     oom,
@@ -501,7 +543,9 @@ async function main(): Promise<void> {
   if (!KEEP_UP) await docker(["compose", "stop", "worker", "api", "bank"]);
   // Last: chaos-seeds.ts treats a folder with summary.json as finished.
   await writeFile(path.join(OUT, "summary.json"), JSON.stringify(summary, null, 2));
+  // 3: passed its family judge with an attributed escalation by the crash cap (D58), not a plain pass.
   if (!pass) process.exitCode = 1;
+  else if (accepted.length > 0) process.exitCode = 3;
 }
 
 main().catch(async (err) => {

@@ -18,7 +18,8 @@
 //   - NEVER runs the test suite (the fleet and the suite must never share this 8 GB machine);
 //   - stops the whole Compose stack when it is done (`docker compose stop`), and on Ctrl-C.
 // A failing seed stays in the tally and is investigated; after the investigation `--rerun <index>` runs that
-// one seed again (its old folder is set aside, not deleted). Exit 0 only on RESULT: PASS.
+// one seed again (its old folder is set aside, not deleted). Exit 0 only on RESULT: PASS; 3 on RESULT: PASS WITH
+// ESCALATIONS BY CRASH CAP (ATTRIBUTED) (D58: every seed met its family judge, but not a plain pass); 1 otherwise.
 //
 // Run it with nothing else running (no test suite, no other fleet): each seed brings up Postgres, the bank,
 // the API and 4 workers (about 2.5 GB in the Docker VM).
@@ -252,7 +253,7 @@ async function main(): Promise<void> {
   const tally = await writeTally(batch);
   await stopFleet("the batch is done");
   log(`ran ${ran} seed(s) in ${Math.round((Date.now() - started) / 60_000)} min. ${OUT_REL}/tally.md: ${tally.markdown.trim().split("\n").at(-1)}`);
-  process.exitCode = tally.result === "PASS" ? 0 : 1;
+  process.exitCode = tally.result === "PASS" ? 0 : tally.result === "PASS_WITH_ATTRIBUTED_ESCALATIONS" ? 3 : 1;
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

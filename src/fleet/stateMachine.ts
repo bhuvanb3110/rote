@@ -45,11 +45,11 @@ export interface OutcomeContext {
   attempt: number;
   maxAttempts: number;
   /**
-   * The job's crashes when this attempt was leased (jobs.crashes on the dequeued row, D57): earlier leases
-   * that died before their intent (T6.1). They do not use an attempt, so the attempts left are counted on
-   * ownAttempts(attempt, crashes). Default 0.
+   * The job's lease crashes when this attempt was leased (jobs.lease_crashes on the dequeued row, D57, D58):
+   * earlier leases that died before their intent (T6.1). They do not use an attempt, so the attempts left are
+   * counted on ownAttempts(attempt, leaseCrashes). Default 0.
    */
-  crashes?: number;
+  leaseCrashes?: number;
   /**
    * The Submit may have been clicked in this attempt: the commit intent (T3) was written, or its
    * COMMIT failed with an unknown result (Step 8). Without a commit intent (a runJob caller that passes
@@ -89,28 +89,32 @@ export interface JobOutcome {
 export const MAX_ERROR_LENGTH = 2000;
 
 // ---------------------------------------------------------------------------------------------------
-// The two budgets (Step 10b: docs/plans/step-10.md, "Reviewer decision during 10b"; D57).
+// The two budgets (Step 10b: docs/plans/step-10.md, the reviewer decisions during 10b; D57, D58).
 //
 //   attempts  the job's OWN failures (max_attempts, default 3): a run that failed before its intent (T4),
 //             or an attempt that reached its intent and was verified not committed (T7 resubmitted /
 //             exhausted). These are about the job and the bank: what a retry with a backoff is for.
-//   crashes   worker deaths before the intent (max_crashes, default 5): a lease that expired in `running`,
-//             recovered by T6.1. They say nothing about the job, so they do not use an attempt (the first
-//             bank-fault+kills run failed two jobs whose attempts kills had used up). Capped, so a poison
-//             job -- one that kills every worker that runs it -- ends `failed` / `crash_limit`, visibly.
+//   crashes   EVERY worker death on the job (max_crashes, default 5; one budget, D58): a lease that expired in
+//             `running` (T6.1), in `committing` (T6.4), or in a verify phase that died (T6.5). They say nothing
+//             about the job, so they never use an attempt (the first bank-fault+kills run failed two jobs whose
+//             attempts kills had used up). Capped, so a poison job -- one that kills every worker that runs or
+//             verifies it -- ends visibly: `failed` / `crash_limit` before any intent (T6.2), `needs_human` /
+//             `crash_limit` after one (T6.6: the Submit may have committed, so never `failed`).
 //
-// jobs.attempt still counts every lease (job_attempts.attempt is its number), so own = attempt - crashes.
-// A lease that expires AFTER the intent is not a crash: it is verified (T6.4) and its attempt is an own one.
+// jobs.attempt still counts every lease (job_attempts.attempt is its number). The deaths BEFORE the intent are
+// also counted apart (jobs.lease_crashes): those leases are not the job's own attempts, so own = attempt -
+// lease_crashes. A death after the intent counts against the crash budget, but that attempt is an own one
+// (verify decides whether it is retried). A reconciler's death on a terminal job is not counted.
 
-/** The crash cap's default (jobs.max_crashes, 0006): the 5th worker death before the intent fails the job. */
+/** The crash cap's default (jobs.max_crashes, 0006): the 5th worker death on a job fails or escalates it. */
 export { DEFAULT_MAX_CRASHES };
 
-/** The job's own attempts so far (the current lease included while it runs): its leases minus its crashes. */
-export function ownAttempts(attempt: number, crashes: number): number {
-  if (!(Number.isInteger(attempt) && Number.isInteger(crashes) && crashes >= 0 && crashes <= attempt)) {
-    throw new RangeError(`ownAttempts: need integers 0 <= crashes <= attempt (got attempt ${attempt}, crashes ${crashes})`);
+/** The job's own attempts so far (the current lease included while it runs): its leases minus its lease crashes. */
+export function ownAttempts(attempt: number, leaseCrashes: number): number {
+  if (!(Number.isInteger(attempt) && Number.isInteger(leaseCrashes) && leaseCrashes >= 0 && leaseCrashes <= attempt)) {
+    throw new RangeError(`ownAttempts: need integers 0 <= leaseCrashes <= attempt (got attempt ${attempt}, leaseCrashes ${leaseCrashes})`);
   }
-  return attempt - crashes;
+  return attempt - leaseCrashes;
 }
 
 function clip(text: string): string {
@@ -137,7 +141,7 @@ export function jobOutcomeFor(end: RunEnd, ctx: OutcomeContext): JobOutcome {
   const redact = ctx.redact ?? ((s: string) => s);
   const err = (text: string) => clip(redact(text));
   // The job's own attempts (D57): a crash requeue before the intent is not one of them.
-  const own = ownAttempts(ctx.attempt, ctx.crashes ?? 0);
+  const own = ownAttempts(ctx.attempt, ctx.leaseCrashes ?? 0);
   const attemptsLeft = own < ctx.maxAttempts;
 
   if (end.kind === "invalid") {
@@ -317,24 +321,30 @@ export function minRequeueScheduleSeconds(maxAttempts: number, config: RequeueBa
 // fenced" (reviewer decision 3), and closes the dead holder's attempt row (and, for a verifier, its
 // open job_verifications row) as `crashed`.
 //
-//   left in      condition                                   action                     jobs becomes
-//   running      crashes + 1 < max_crashes                   T6.1 requeue, crashes + 1  queued (nothing irreversible happened;
-//                                                                                       no attempt used, D57)
-//   running      crashes + 1 >= max_crashes                  T6.2 fail, crashes + 1     failed / crash_limit (a poison job, D57)
-//   committing   (the intent was written)                    T6.4 claim to verify       verifying, owned by the recoverer
-//   verifying    the newest phase was deferred / handed off  T6.7 resume                verifying, owned by the recoverer
-//   verifying    fewer than 3 dead phases in this cycle       T6.5 re-claim              verifying, owned by the recoverer
-//   verifying    3 dead phases (the verifier keeps dying)     T6.6 escalate              needs_human / verify_exhausted
+// Every expired lease is a worker DEATH and counts one crash (D58: one budget), except a deferred or
+// handed-off verify, which ended on purpose (T6.7). `c` = crashes + 1, the death being recovered:
 //
-// A lease that expires in `running` is a CRASH (D57): the worker died, or froze past its lease, before
-// its intent. It does not use one of the job's attempts (Step 8's T6.1/T6.2 did: `attempt < max_attempts`,
-// else failed / lease_expired; the first bank-fault+kills chaos run failed two jobs that way). The crash
-// cap fails a job that keeps killing its workers. A lease that expires after the intent is not a crash.
+//   left in      condition                                   action                     jobs becomes
+//   running      c < max_crashes                             T6.1 requeue               queued (nothing irreversible happened;
+//                                                                                       no attempt used: a lease crash, D57)
+//   running      c >= max_crashes                            T6.2 fail                  failed / crash_limit (a poison job, D57)
+//   committing   c < max_crashes (the intent was written)    T6.4 claim to verify       verifying, owned by the recoverer
+//   verifying    the newest phase was deferred / handed off  T6.7 resume (no death)     verifying, owned by the recoverer
+//   verifying    c < max_crashes (the verifier died)         T6.5 re-claim              verifying, owned by the recoverer
+//   committing / c >= max_crashes                            T6.6 escalate              needs_human / crash_limit (the Submit may
+//   verifying                                                                           have committed: never failed, D58)
+//
+// A lease that expires in `running` is a LEASE crash too (jobs.lease_crashes + 1): that lease is not one of
+// the job's own attempts (D57; Step 8's T6.1/T6.2 used `attempt < max_attempts`, else failed / lease_expired,
+// and the first bank-fault+kills chaos run failed two jobs that way). A death after the intent is not: that
+// attempt reached its intent and verify decides it. Step 9's separate cap of 3 dead verify phases (T6.6,
+// verify_exhausted) is gone (D58): at chaos's kill rate three dead verifiers in a row are ~1% of verify cycles,
+// bad luck rather than a poison job.
 //
 // Step 8's T6.3 (committing -> needs_human) is gone: an expired commit is verified, never parked. A
 // "dead" phase is one that ended without a decision: still open when its lease expired, closed
 // `crashed` by recovery, `lease_lost` by its own heartbeat, or `illegal_transition` (a bug). Deferred and
-// handed-off phases are not dead (they ended on purpose) and never count toward the cap (step-09
+// handed-off phases are not dead (they ended on purpose) and are never counted as deaths (step-09
 // reviewer decision 5).
 
 export type RecoverableState = "running" | "committing" | "verifying";
@@ -363,10 +373,8 @@ export type PhaseDecision =
   | "unrecorded_commit_suspected"
   | "reconcile_unreadable"
   | "reconcile_deferred";
-/** Phases that ended without a decision: they count toward the 3-phase cap (T6.6). */
+/** Phases that ended without a decision (the verifier died, or a bug): VerifyCycle.deadPhases counts them. */
 export const DEAD_PHASE_DECISIONS: readonly PhaseDecision[] = ["crashed", "lease_lost", "illegal_transition"];
-
-export const MAX_VERIFY_PHASES = 3;
 
 /**
  * The job's current verify cycle (the phases since the newest one that started a cycle), as
@@ -393,20 +401,23 @@ export interface RecoveryRow {
   state: RecoverableState;
   attempt: number;
   maxAttempts: number;
-  /** jobs.crashes / jobs.max_crashes (0006, D57): what a `running` lease's expiry is judged on. */
+  /** jobs.crashes / jobs.max_crashes (0006, D58): every worker death so far, and the one budget's cap. */
   crashes: number;
   maxCrashes: number;
+  /** jobs.lease_crashes (0007): the deaths before the intent, the leases that are not own attempts (messages only). */
+  leaseCrashes: number;
   /** Required for `verifying` (what the cycle's phases say). */
   verify?: VerifyCycle;
 }
 
 /**
- * `crash`: this recovery counts one crash (jobs.crashes + 1, RECOVER_JOB_SQL's $8): T6.1 and T6.2, a lease
- * that died before its intent. Never for a lease past its intent (T6.4-T6.7): that one is verified (D57).
+ * `crash`: this recovery counts one worker death (jobs.crashes + 1; RECOVER_JOB_SQL's $8, CLAIM_TO_VERIFY_SQL's
+ * $7): every action but T6.7 (D58). `leaseCrash`: the death was before the intent, so that lease is not one of
+ * the job's attempts (jobs.lease_crashes + 1, RECOVER_JOB_SQL's $9): T6.1 and T6.2 only (D57).
  */
 export type RecoveryAction =
-  | { kind: "requeue"; label: "T6.1"; to: "queued"; outcome: null; crash: boolean; error: string }
-  | { kind: "fail"; label: "T6.2"; to: "failed"; outcome: "crash_limit"; crash: boolean; error: string }
+  | { kind: "requeue"; label: "T6.1"; to: "queued"; outcome: null; crash: boolean; leaseCrash: boolean; error: string }
+  | { kind: "fail"; label: "T6.2"; to: "failed"; outcome: "crash_limit"; crash: boolean; leaseCrash: boolean; error: string }
   /** T6.4/T6.5/T6.7: the recoverer takes the job (token + 1, its own lease) and verifies it at once. */
   | {
       kind: "verify";
@@ -414,17 +425,34 @@ export type RecoveryAction =
       to: "verifying";
       outcome: "commit_uncertain";
       reason: Exclude<VerifyReason, "commit_uncertain">;
-      crash: false;
+      crash: boolean;
+      leaseCrash: false;
       error: string;
     }
-  | { kind: "escalate"; label: "T6.6"; to: "needs_human"; outcome: "verify_exhausted"; crash: false; error: string };
+  | { kind: "escalate"; label: "T6.6"; to: "needs_human"; outcome: "crash_limit"; crash: boolean; leaseCrash: false; error: string };
+
+/** T6.6: the crash cap reached after the intent (D58). The Submit may have committed: a human, never `failed`. */
+function crashLimitAfterIntent(row: RecoveryRow, crash: number, where: string): RecoveryAction {
+  return {
+    kind: "escalate",
+    label: "T6.6",
+    to: "needs_human",
+    outcome: "crash_limit",
+    crash: true,
+    leaseCrash: false,
+    error:
+      `crash limit after the commit intent: the lease expired ${where} (crash ${crash}/${row.maxCrashes}: every worker death on this job counts); ` +
+      "the Submit may have committed; check the bank's history for memo_key",
+  };
+}
 
 export function recoveryAction(row: RecoveryRow): RecoveryAction {
+  // The death being recovered (D58: one budget). T6.7 is the one recovery that is not a death.
+  const crash = row.crashes + 1;
   switch (row.state) {
     case "running": {
-      // A crash (D57): it uses no attempt; it counts toward the cap.
-      const crash = row.crashes + 1;
-      const own = ownAttempts(row.attempt, row.crashes);
+      // Before the intent: a lease crash too (D57), so it uses no attempt.
+      const own = ownAttempts(row.attempt, row.leaseCrashes);
       return crash < row.maxCrashes
         ? {
             kind: "requeue",
@@ -432,6 +460,7 @@ export function recoveryAction(row: RecoveryRow): RecoveryAction {
             to: "queued",
             outcome: null,
             crash: true,
+            leaseCrash: true,
             error:
               `lease expired while running, before any commit intent: crash ${crash}/${row.maxCrashes}, not one of the job's ` +
               `attempts (own attempts used ${own - 1}/${row.maxAttempts}); requeued`,
@@ -442,20 +471,25 @@ export function recoveryAction(row: RecoveryRow): RecoveryAction {
             to: "failed",
             outcome: "crash_limit",
             crash: true,
+            leaseCrash: true,
             error:
               `crash limit: the lease expired while running, before any commit intent, once too often (crash ${crash}/${row.maxCrashes}): ` +
               "a job that keeps killing its workers (a poison job?); nothing irreversible happened",
           };
     }
     case "committing":
+      if (crash >= row.maxCrashes) return crashLimitAfterIntent(row, crash, "in committing");
       return {
         kind: "verify",
         label: "T6.4",
         to: "verifying",
         outcome: "commit_uncertain",
         reason: "lease_expired_in_committing",
-        crash: false,
-        error: "lease expired after the commit intent: the Submit may have committed; verifying in the bank's history by memo_key (T6.4)",
+        crash: true,
+        leaseCrash: false,
+        error:
+          `lease expired after the commit intent (crash ${crash}/${row.maxCrashes}): the Submit may have committed; ` +
+          "verifying in the bank's history by memo_key (T6.4)",
       };
     case "verifying": {
       const cycle = row.verify;
@@ -468,32 +502,23 @@ export function recoveryAction(row: RecoveryRow): RecoveryAction {
           outcome: "commit_uncertain",
           reason: "resumed",
           crash: false,
+          leaseCrash: false,
           error:
             cycle.lastDecision === "deferred"
               ? `resuming a deferred verify (deferral ${cycle.deferrals}; the bank was unavailable) (T6.7)`
               : "resuming a verify handed over by rote jobs reverify (T6.7)",
         };
       }
-      if (cycle.deadPhases >= MAX_VERIFY_PHASES) {
-        return {
-          kind: "escalate",
-          label: "T6.6",
-          to: "needs_human",
-          outcome: "verify_exhausted",
-          crash: false,
-          error:
-            `verify exhausted: ${cycle.deadPhases} verify phases died without a decision (crash or lost lease); ` +
-            "the Submit may have committed; check the bank's history for memo_key",
-        };
-      }
+      if (crash >= row.maxCrashes) return crashLimitAfterIntent(row, crash, `in verifying (dead verify phases in this cycle: ${cycle.deadPhases})`);
       return {
         kind: "verify",
         label: "T6.5",
         to: "verifying",
         outcome: "commit_uncertain",
         reason: "lease_expired_in_verifying",
-        crash: false,
-        error: `a verifier's lease expired (dead verify phases in this cycle: ${cycle.deadPhases}/${MAX_VERIFY_PHASES}); re-verifying (T6.5)`,
+        crash: true,
+        leaseCrash: false,
+        error: `a verifier's lease expired (crash ${crash}/${row.maxCrashes}; dead verify phases in this cycle: ${cycle.deadPhases}); re-verifying (T6.5)`,
       };
     }
   }
@@ -605,11 +630,11 @@ export interface VerifyInput {
   attempt: number;
   maxAttempts: number;
   /**
-   * The job's crashes (jobs.crashes, D57). The attempt being verified reached its intent, so it is one of
-   * the job's own; the crashes before it are not: [0, 0] resubmits while ownAttempts(attempt, crashes) <
-   * maxAttempts. Default 0.
+   * The job's lease crashes (jobs.lease_crashes, D57, D58). The attempt being verified reached its intent, so it
+   * is one of the job's own; the leases that died before their intent are not: [0, 0] resubmits while
+   * ownAttempts(attempt, leaseCrashes) < maxAttempts. Verifier deaths never matter here. Default 0.
    */
-  crashes?: number;
+  leaseCrashes?: number;
   /** From the job's verify cycle, read at decision time (database clock). */
   deferrals: number;
   deferredForSeconds: number | null;
@@ -692,8 +717,8 @@ export function verifyDecision(input: VerifyInput): VerifyDecision {
       error: `verified not committed (lookups ${fmt(readings)}): the bank's refusal after Submit stands; never retried`,
     };
   }
-  // The job's own attempts (D57): crashes before the intent did not use one.
-  const own = ownAttempts(input.attempt, input.crashes ?? 0);
+  // The job's own attempts (D57): leases that died before their intent did not use one.
+  const own = ownAttempts(input.attempt, input.leaseCrashes ?? 0);
   if (own < input.maxAttempts) {
     return {
       decision: "resubmitted",
@@ -715,8 +740,12 @@ export function alreadyDoneResult(d: Extract<VerifyDecision, { decision: "alread
   return { status: "success", outputs: { confirmationRef: d.confirmationRef }, evidenceRef: d.evidenceRef ?? "verify", recoveredBy: "verify" };
 }
 
-/** `rote jobs reverify` accepts needs_human jobs with these outcomes: the "could not tell" ones. Never `ambiguous`. */
-export const REVERIFIABLE_OUTCOMES = ["commit_uncertain", "unreadable", "verify_unavailable", "verify_exhausted"] as const;
+/**
+ * `rote jobs reverify` accepts needs_human jobs with these outcomes: the "could not tell" ones. Never `ambiguous`.
+ * `crash_limit` (D58) took over `verify_exhausted`'s role (a needs_human crash_limit is always past its intent);
+ * `verify_exhausted` stays for the jobs Step 9-10a escalated.
+ */
+export const REVERIFIABLE_OUTCOMES = ["commit_uncertain", "unreadable", "verify_unavailable", "verify_exhausted", "crash_limit"] as const;
 
 // ---------------------------------------------------------------------------------------------------
 // The reconcile pass (Step 10: docs/plans/step-10.md section 2; reviewer decisions 3 and 5; D50; widened by

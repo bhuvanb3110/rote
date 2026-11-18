@@ -9,8 +9,12 @@
 //                     resubmitted, then a [0, 0] on the last own attempt). Since D57 a kill before the intent
 //                     uses no attempt, so Step 8's failed / lease_expired cannot happen and fails the run.
 //                     ANY job left for a human fails it, a reconcile's duplicate_suspected /
-//                     unrecorded_commit_suspected included.
-//   bank-fault-only   no kills, no pause; the bank down 30 s and slow 60 s (seeded). Retries back off (D49),
+//                     unrecorded_commit_suspected included -- with ONE exception (the reviewer decision during
+//                     10b, 2026-11-18, decision 3; D58): needs_human / crash_limit (the crash cap reached after
+//                     an intent) when EVERY death in its history matches a scheduled kill or pause of that worker
+//                     and the ledger has at most 1 row for it (src/chaos/attribution.ts). Each such job is listed
+//                     as "escalated by crash cap (attributed)" and is never counted as a plain pass.
+//   bank-fault-only  no kills, no pause; the bank down 30 s and slow 60 s (seeded). Retries back off (D49),
 //                     verifies and reconciles defer (D44): every job succeeds. 0 failed, 0 needs_human.
 //   bank-fault-kills  everything at once: the standard kills and pause plus the bank events. The reviewer
 //                     requires the same as bank-fault-only: 0 duplicates, 0 lost, 0 needs_human, 0 failed
@@ -27,6 +31,8 @@
 // a pause cannot be aimed between the intent and the click. It is `verify-scenarios --family zombie`
 // (evidence/zombie-window-limit/, D52), whose judge states its one expected duplicate and its detection.
 
+import type { CrashLimitVerdict } from "./attribution.js";
+
 export const CHAOS_FAMILIES = ["standard", "bank-fault-only", "bank-fault-kills"] as const;
 export type ChaosFamily = (typeof CHAOS_FAMILIES)[number];
 
@@ -39,9 +45,17 @@ export interface FamilySpec {
   bankFaults: boolean;
   /** Every "state/outcome" a job may end in; anything else fails the run (needs_human appears only if listed). */
   allowedFinal: readonly string[];
+  /**
+   * needs_human / crash_limit is accepted for a job whose every death is attributed to a scheduled kill or pause
+   * and that has at most 1 ledger row (D58); any other needs_human / crash_limit fails the run.
+   */
+  acceptAttributedCrashLimit: boolean;
   /** The outage must have hit work (a requeue after a failure, or a verify / reconcile deferral). */
   requireFaultExercised: boolean;
 }
+
+/** The one final state an attributed escalation may end in (D58). */
+export const CRASH_LIMIT_ESCALATION = "needs_human/crash_limit";
 
 const SUCCEEDED = ["succeeded/success", "succeeded/already_done"] as const;
 
@@ -53,6 +67,7 @@ export const FAMILY_SPECS: Record<ChaosFamily, FamilySpec> = {
     pause: true,
     bankFaults: false,
     allowedFinal: [...SUCCEEDED, "failed/crash_limit", "failed/not_committed_attempts_exhausted"],
+    acceptAttributedCrashLimit: true,
     requireFaultExercised: false,
   },
   "bank-fault-only": {
@@ -62,6 +77,7 @@ export const FAMILY_SPECS: Record<ChaosFamily, FamilySpec> = {
     pause: false,
     bankFaults: true,
     allowedFinal: [...SUCCEEDED],
+    acceptAttributedCrashLimit: false,
     requireFaultExercised: true,
   },
   "bank-fault-kills": {
@@ -71,6 +87,7 @@ export const FAMILY_SPECS: Record<ChaosFamily, FamilySpec> = {
     pause: true,
     bankFaults: true,
     allowedFinal: [...SUCCEEDED],
+    acceptAttributedCrashLimit: false,
     requireFaultExercised: true,
   },
 };
@@ -100,6 +117,13 @@ export interface RunObservation {
   /** Attempts that failed and were requeued with a backoff (D49), and verify / reconcile deferrals. */
   requeuedAfterFailure: number;
   deferrals: number;
+  /** The verdict on every needs_human / crash_limit job (src/chaos/attribution.ts, D58); [] when there is none. */
+  crashLimitEscalations: readonly CrashLimitVerdict[];
+}
+
+/** The needs_human / crash_limit jobs the family accepts: every death attributed, at most 1 ledger row (D58). */
+export function acceptedEscalations(spec: FamilySpec, o: Pick<RunObservation, "crashLimitEscalations">): CrashLimitVerdict[] {
+  return spec.acceptAttributedCrashLimit ? o.crashLimitEscalations.filter((v) => v.attributed) : [];
 }
 
 /** [] = the run passes its family; otherwise every reason it does not. */
@@ -109,8 +133,17 @@ export function judgeFamily(spec: FamilySpec, o: RunObservation): string[] {
     const bad = Object.entries(o.oracleBad).filter(([, n]) => n > 0);
     problems.push(`the oracle failed (${bad.map(([v, n]) => `${v} ${n}`).join(", ") || "see check.txt"})`);
   }
+  const accepted = acceptedEscalations(spec, o).length;
   for (const [final, n] of Object.entries(o.finals).sort()) {
-    if (n > 0 && !spec.allowedFinal.includes(final)) problems.push(`${n} job(s) ended ${final}, which the ${spec.family} family does not allow (allowed: ${spec.allowedFinal.join(", ")})`);
+    if (n === 0 || spec.allowedFinal.includes(final)) continue;
+    if (final === CRASH_LIMIT_ESCALATION && spec.acceptAttributedCrashLimit) {
+      if (n > accepted) {
+        const why = o.crashLimitEscalations.filter((v) => !v.attributed).map((v) => `${v.jobId}: ${v.reasons.join("; ")}`);
+        problems.push(`${n - accepted} job(s) ended ${final} without an attributed history (${why.join(" | ") || "no verdict recorded"})`);
+      }
+      continue;
+    }
+    problems.push(`${n} job(s) ended ${final}, which the ${spec.family} family does not allow (allowed: ${spec.allowedFinal.join(", ")})`);
   }
   if (o.notSettled > 0) problems.push(`${o.notSettled} job(s) not settled after the drain${o.drainTimedOut ? " (the drain timed out)" : ""}`);
   if (o.leaks.length > 0) problems.push(`credential values found in the output: ${o.leaks.join(", ")}`);

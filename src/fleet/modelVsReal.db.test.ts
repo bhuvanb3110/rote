@@ -1,7 +1,7 @@
 // Model vs real (Step 8 reviewer addition R1; Step 9 adds T5, T7, T8, the verify claims T6.4-T6.7 and
 // the reverify hand-off): fast-check model-based (command) testing that runs the SAME random command
 // sequences against the pure model (src/fleet/model.ts) and the real SQL on a test Postgres schema, and
-// compares, after EVERY command, each job's state, fencing token, owner, attempt, crashes (D57), outcome and lease, its
+// compares, after EVERY command, each job's state, fencing token, owner, attempt, crashes and lease crashes (D57, D58), outcome and lease, its
 // verify cycle as VERIFY_CYCLE_SQL derives it from job_verifications (phases, dead phases, deferrals,
 // deferred-for, prior status, the newest phase's decision), its requeue backoff (not_before, Step 10 D49),
 // its reconcile marks (reconcile_after, reconciled_at; D50), plus each command's own answer (leased which
@@ -140,6 +140,7 @@ interface RealJob {
   state: string;
   attempt: number;
   crashes: number;
+  lease_crashes: number;
   fencing_token: number;
   lease_owner: string | null;
   outcome: string | null;
@@ -154,7 +155,7 @@ interface RealJob {
 async function readReal(pool: Pool): Promise<RealJob[]> {
   return (
     await pool.query<RealJob>(
-      `SELECT id, state, attempt, crashes, fencing_token, lease_owner, outcome,
+      `SELECT id, state, attempt, crashes, lease_crashes, fencing_token, lease_owner, outcome,
               EXTRACT(EPOCH FROM (lease_expires_at - now()))::float8 AS remaining,
               EXTRACT(EPOCH FROM (not_before - now()))::float8 AS not_before_in,
               EXTRACT(EPOCH FROM (reconcile_after - now()))::float8 AS reconcile_in,
@@ -175,10 +176,11 @@ async function compare(m: Model, r: Real, after: string): Promise<void> {
   for (const [i, mj] of m.db.jobs.entries()) {
     const rj = real[i]!;
     const where = `${after}: job ${i}`;
-    expect({ state: rj.state, attempt: rj.attempt, crashes: rj.crashes, token: rj.fencing_token, owner: rj.lease_owner, outcome: rj.outcome }, where).toEqual({
+    expect({ state: rj.state, attempt: rj.attempt, crashes: rj.crashes, leaseCrashes: rj.lease_crashes, token: rj.fencing_token, owner: rj.lease_owner, outcome: rj.outcome }, where).toEqual({
       state: mj.state,
       attempt: mj.attempt,
       crashes: mj.crashes,
+      leaseCrashes: mj.leaseCrashes,
       token: mj.token,
       owner: mj.owner,
       outcome: mj.outcome,
@@ -689,10 +691,14 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
       fc.asyncProperty(
         fc.record({
           maxAttempts: fc.constantFrom(1, 2, 3),
+          // D58: small caps so a death after the intent can reach the crash cap (T6.6, needs_human / crash_limit).
+          maxCrashes: fc.constantFrom(1, 2, 5),
           jobs: fc.constantFrom(1, 2),
           prior: fc.constantFrom<keyof typeof PRIOR_RESULTS>("failure", "business_outcome"),
           // committing: the T6.4 claim (an expired commit) is one tick + one recovery away; it no longer depends on luck.
-          start: fc.constantFrom<"committing" | "verifying">("committing", "verifying"),
+          // expired (D58): the commit's lease has already passed, so the next recovery is the attempt's death --
+          // T6.4, or with a cap of 1 the crash cap after the intent (T6.6, needs_human / crash_limit).
+          start: fc.constantFrom<"committing" | "verifying" | "expired">("committing", "verifying", "expired"),
         }),
         fc.commands(commandArbs, { maxCommands: 15, size: "max" }),
         async (cfg, cmds) => {
@@ -700,15 +706,18 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
           await pool.query("UPDATE tenants SET max_concurrent = 2 WHERE id = $1", [TENANT]);
           const jobs: ModelJob[] = [];
           for (let i = 0; i < cfg.jobs; i += 1) {
-            const { job } = await enqueue(pool, { capability: CAP, tenantId: TENANT, idempotencyKey: `mvr-v-${i}`, params: { memberId: "1" }, maxAttempts: cfg.maxAttempts });
-            jobs.push(newJob({ id: job.id, tenant: TENANT, seq: i + 1, maxAttempts: cfg.maxAttempts }));
+            const { job } = await enqueue(pool, { capability: CAP, tenantId: TENANT, idempotencyKey: `mvr-v-${i}`, params: { memberId: "1" }, maxAttempts: cfg.maxAttempts, maxCrashes: cfg.maxCrashes });
+            jobs.push(newJob({ id: job.id, tenant: TENANT, seq: i + 1, maxAttempts: cfg.maxAttempts, maxCrashes: cfg.maxCrashes }));
           }
           const model = { db: { now: 0, jobs, caps: { [TENANT]: 2 } }, held: {} } as Model;
           const real = { pool, tokens: new Map<string, number>(), lastSync: Date.now() } as Real;
           // The prefix, through the same commands (so it is compared too): wA takes job 0 and writes its intent,
           // or verifies it.
-          const second = cfg.start === "committing" ? new IntentCmd("wA") : new CompleteIntoVerifyCmd("wA", cfg.prior);
-          for (const c of [new DequeueCmd("wA"), second].map(synced)) await c.run(model, real);
+          const prefix: Cmd[] =
+            cfg.start === "verifying"
+              ? [new DequeueCmd("wA"), new CompleteIntoVerifyCmd("wA", cfg.prior)]
+              : [new DequeueCmd("wA"), new IntentCmd("wA"), ...(cfg.start === "expired" ? [new TickCmd(31)] : [])];
+          for (const c of prefix.map(synced)) await c.run(model, real);
           await fc.asyncModelRun(() => ({ model, real }), cmds);
         },
       ),
@@ -759,7 +768,7 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
       "T7:already_done:recorded", "T7:resubmitted:recorded", "T7:exhausted:recorded", "T7:not_committed_final:recorded", "T7:escalated:recorded",
       "T7:resubmitted:check_violation",
       "T8:recorded", "T8:fenced", "T8:illegal_transition",
-      "recover:T6.1", "recover:T6.2", "recover:T6.4", "recover:T6.5", "recover:T6.7",
+      "recover:T6.1", "recover:T6.2", "recover:T6.4", "recover:T6.5", "recover:T6.6", "recover:T6.7", // T6.6: the crash cap after the intent (D58)
       "dequeue:held_back_by_not_before",
       "dequeue:lease_beyond_max_attempts", // D57: crashes did not use the attempts
       "R1:claimed", "R1:none", "batchClaim:claimed", "batchClaim:refused",

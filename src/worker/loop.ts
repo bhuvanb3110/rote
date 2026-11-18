@@ -289,7 +289,7 @@ export class Worker {
         const outcome = jobOutcomeFor(run.end, {
           attempt: job.attempt,
           maxAttempts: job.max_attempts,
-          crashes: job.crashes,
+          leaseCrashes: job.lease_crashes,
           irreversibleStarted,
           redact: this.options.redact,
         });
@@ -299,7 +299,7 @@ export class Worker {
       const computed = jobOutcomeFor(run.end, {
         attempt: job.attempt,
         maxAttempts: job.max_attempts,
-        crashes: job.crashes,
+        leaseCrashes: job.lease_crashes,
         irreversibleStarted: run.irreversibleStarted,
         redact: this.options.redact,
       });
@@ -312,12 +312,12 @@ export class Worker {
         return;
       }
       // A requeue backs off (D49): the next attempt waits on the database clock, so an outage does not
-      // burn every attempt in seconds. Keyed on the job's OWN attempt that failed (D57): crashes before it
+      // burn every attempt in seconds. Keyed on the job's OWN attempt that failed (D57): lease crashes before it
       // do not lengthen the wait.
       const requeueAfterSeconds =
         outcome.state === "queued"
           ? (this.options.requeueBackoff ?? ((attempt: number) => requeueBackoffSeconds(attempt, this.options.random ?? Math.random)))(
-              ownAttempts(job.attempt, job.crashes),
+              ownAttempts(job.attempt, job.lease_crashes),
             )
           : null;
       const completion = await completeJobWithRetry(
@@ -397,7 +397,7 @@ export class Worker {
     if (this.current?.graceTimer) clearTimeout(this.current.graceTimer);
     this.current = null;
     await this.verifyPhase({
-      job: { id: job.id, tenant_id: job.tenant_id, params: job.params, memo_key: job.memo_key, attempt: job.attempt, max_attempts: job.max_attempts, crashes: job.crashes },
+      job: { id: job.id, tenant_id: job.tenant_id, params: job.params, memo_key: job.memo_key, attempt: job.attempt, max_attempts: job.max_attempts, crashes: job.crashes, lease_crashes: job.lease_crashes },
       fencingToken: moved.fencingToken,
       label: "T5",
       priorStatus: outcome.priorStatus ?? null,

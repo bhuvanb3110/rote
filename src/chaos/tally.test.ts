@@ -122,6 +122,31 @@ describe("buildTally", () => {
     expect(t.totals).toMatchObject({ requeuedAfterCrash: 100, claimedToVerify: 20, already_done: 20 });
   });
 
+  it("a seed with an escalation by crash cap (attributed) is never a plain pass: its own result, the job and its kill timestamps listed, the batch result named (D58)", () => {
+    const escalated = summary(22, {
+      finals: { "succeeded/success": 499, "needs_human/crash_limit": 1 },
+      needsHuman: [{ id: "job-x", outcome: "crash_limit" }],
+      escalatedByCrashCapAttributed: [
+        {
+          jobId: "job-x",
+          crashes: 2,
+          ledgerRows: 1,
+          deaths: [
+            { row: "attempt", n: 1, holder: "h1-7-a", recovery: "T6.4", event: { kind: "kill", container: "rote-worker-3", at: "t", tMs: 139_500 } },
+            { row: "verify phase", n: 2, holder: "h2-7-b", recovery: "T6.6", event: { kind: "pause", container: "rote-worker-2", at: "t", tMs: 588_860 } },
+          ],
+        },
+      ],
+    });
+    const t = tally([summary(11), escalated]);
+    expect(t).toMatchObject({ result: "PASS_WITH_ATTRIBUTED_ESCALATIONS", passed: 2 });
+    expect(t.escalations).toEqual([{ index: 2, seed: 22, jobId: "job-x", deaths: 2, events: ["kill of rote-worker-3 at 139.5 s", "pause of rote-worker-2 at 588.9 s"] }]);
+    expect(t.markdown).toContain("| PASS with 1 escalated by crash cap (attributed): not a plain pass |");
+    expect(t.markdown).toContain("- seed 2 (22): job `job-x`, 2 deaths: kill of rote-worker-3 at 139.5 s, pause of rote-worker-2 at 588.9 s");
+    expect(t.markdown.trim().split("\n").at(-1)).toMatch(/^RESULT: PASS WITH 1 ESCALATION\(S\) BY CRASH CAP \(ATTRIBUTED\) \(2\/2 seeds .* not a plain pass\)$/);
+    expect(tally([summary(11)]).markdown).toContain("## Escalated by crash cap (attributed)\n\nA job the crash cap");
+  });
+
   it("INCOMPLETE while seeds are still to run (a partial tally is written after every seed)", () => {
     const t = tally([summary(11), null, null]);
     expect(t.result).toBe("INCOMPLETE");

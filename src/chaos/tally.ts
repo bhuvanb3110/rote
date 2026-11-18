@@ -21,7 +21,7 @@ export interface RecoveryKinds {
   reclaimedVerify: number;
   /** T6.7: a deferred (or handed-off) verify resumed. */
   resumedVerify: number;
-  /** T6.6: three dead verify phases: needs_human / verify_exhausted. */
+  /** T6.6: the crash cap reached after the intent: needs_human / crash_limit (D58; before D58: 3 dead verify phases, verify_exhausted). */
   escalatedByRecovery: number;
   /** T5: the live owner verified its own uncertain run. */
   ownVerify: number;
@@ -47,7 +47,7 @@ export const RECOVERY_KIND_LABELS: Record<keyof RecoveryKinds, string> = {
   claimedToVerify: "expired commit claimed to verify (T6.4)",
   reclaimedVerify: "dead verifier re-claimed (T6.5)",
   resumedVerify: "deferred verify resumed (T6.7)",
-  escalatedByRecovery: "verify exhausted by dead phases (T6.6)",
+  escalatedByRecovery: "escalated at the crash cap after the intent (T6.6 crash_limit, D58)",
   ownVerify: "own uncertain run verified (T5)",
   already_done: "verify: already_done",
   resubmitted: "verify: resubmitted",
@@ -138,6 +138,16 @@ export interface SeedSummary {
   recoveries: RecoveryKinds;
   /** The two budgets (D57), from jobs; absent in summaries written before D57. */
   crashBudget?: { jobsWithCrashes: number; totalCrashes: number; maxCrashesOnOneJob: number; jobsLeasedPastMaxAttempts: number; crashLimit: number };
+  /**
+   * The needs_human / crash_limit jobs the family accepted because every death was attributed to a scheduled kill
+   * or pause and the ledger has at most 1 row (D58). A seed with any is never a plain pass. Absent before D58.
+   */
+  escalatedByCrashCapAttributed?: Array<{
+    jobId: string;
+    crashes: number;
+    ledgerRows: number;
+    deaths: Array<{ row: string; n: number; holder: string; recovery: string; event: { kind: string; container: string; at: string; tMs: number | null } | null }>;
+  }>;
   workerProtections: Record<string, number>;
   leaks: string[];
   oom: string[];
@@ -162,7 +172,19 @@ export interface Tally {
   totals: RecoveryKinds;
   finished: number;
   passed: number;
-  result: "PASS" | "FAIL" | "INCOMPLETE";
+  /**
+   * PASS_WITH_ATTRIBUTED_ESCALATIONS: every seed passed its family judge, and at least one job was accepted as
+   * "escalated by crash cap (attributed)" (D58). Never reported as a plain PASS (the reviewer decision during
+   * 10b, decision 3).
+   */
+  result: "PASS" | "PASS_WITH_ATTRIBUTED_ESCALATIONS" | "FAIL" | "INCOMPLETE";
+  /** Every accepted escalation across the finished seeds, with its seed. */
+  escalations: Array<{ index: number; seed: number; jobId: string; deaths: number; events: string[] }>;
+}
+
+/** "kill of rote-worker-3 at 139.5 s" for each death of an accepted escalation. */
+function eventsOf(e: NonNullable<SeedSummary["escalatedByCrashCapAttributed"]>[number]): string[] {
+  return e.deaths.map((d) => (d.event ? `${d.event.kind} of ${d.event.container} at ${d.event.tMs === null ? d.event.at : `${(d.event.tMs / 1000).toFixed(1)} s`}` : "(unattributed)"));
 }
 
 const sec = (ms: number | null) => (ms === null ? "-" : `${Math.round(ms / 1000)} s`);
@@ -182,7 +204,11 @@ export function buildTally(input: TallyInput): Tally {
     }
   }
   const failedSeeds = finished.filter((d) => !d.s!.pass);
-  const result: Tally["result"] = failedSeeds.length > 0 ? "FAIL" : finished.length < input.seeds.length ? "INCOMPLETE" : "PASS";
+  const escalations = finished.flatMap((d) =>
+    (d.s!.escalatedByCrashCapAttributed ?? []).map((e) => ({ index: d.index, seed: d.seed, jobId: e.jobId, deaths: e.deaths.length, events: eventsOf(e) })),
+  );
+  const result: Tally["result"] =
+    failedSeeds.length > 0 ? "FAIL" : finished.length < input.seeds.length ? "INCOMPLETE" : escalations.length > 0 ? "PASS_WITH_ATTRIBUTED_ESCALATIONS" : "PASS";
   const c = input.config;
   const lines: string[] = [];
   lines.push("# Day-2 exit: chaos at scale -- the tally");
@@ -195,24 +221,28 @@ export function buildTally(input: TallyInput): Tally {
       "family judge (D56). The seeds were drawn once, up front, and saved in `seeds.json`; none is ever re-drawn or dropped.",
   );
   lines.push("");
-  lines.push("| # | seed | commit | kills | ok | DUPLICATE | LOST | needs_human | failed | not settled | T6.1 | T6.4 | already_done | resubmitted | reconciled | flagged by reconcile | work | wall | result |");
-  lines.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  lines.push(
+    "| # | seed | commit | kills | ok | DUPLICATE | LOST | needs_human | of which escalated by crash cap (attributed) | failed | not settled | T6.1 | T6.4 | already_done | resubmitted | reconciled | flagged by reconcile | work | wall | result |",
+  );
+  lines.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const d of done) {
     const s = d.s;
     if (!s) {
-      lines.push(`| ${d.index} | ${d.seed} | | | | | | | | | | | | | | | | | not run yet |`);
+      lines.push(`| ${d.index} | ${d.seed} | | | | | | | | | | | | | | | | | | not run yet |`);
       continue;
     }
     if (!s.completed) {
-      lines.push(`| ${d.index} | [${d.seed}](${dirName(d.index, d.seed)}/check.txt) | ${s.commit} | | | | | | | | | | | | | | | ${sec(s.wallMs)} | **FAIL**: the run did not complete (${s.error ?? "?"}) |`);
+      lines.push(`| ${d.index} | [${d.seed}](${dirName(d.index, d.seed)}/check.txt) | ${s.commit} | | | | | | | | | | | | | | | | ${sec(s.wallMs)} | **FAIL**: the run did not complete (${s.error ?? "?"}) |`);
       continue;
     }
     const r = s.recoveries;
     const flagged = r.duplicate_suspected + r.unrecorded_commit_suspected + r.reconcile_unreadable;
+    const escalated = s.escalatedByCrashCapAttributed?.length ?? 0;
+    const verdict = !s.pass ? `**FAIL**: ${s.problems.join("; ")}` : escalated > 0 ? `PASS with ${escalated} escalated by crash cap (attributed): not a plain pass` : "PASS";
     lines.push(
       `| ${d.index} | [${d.seed}](${dirName(d.index, d.seed)}/check.txt) | ${s.commit} | ${s.kills} | ${okJobs(s)} | ${s.oracle.counts.DUPLICATE ?? 0} | ${s.oracle.counts.LOST ?? 0} | ` +
-        `${s.needsHuman.length} | ${s.failed.length} | ${s.notSettled} | ${r.requeuedAfterCrash} | ${r.claimedToVerify} | ${r.already_done} | ${r.resubmitted} | ${r.reconciled} | ${flagged} | ` +
-        `${sec(s.workMs)} | ${sec(s.wallMs)} | ${s.pass ? "PASS" : `**FAIL**: ${s.problems.join("; ")}`} |`,
+        `${s.needsHuman.length} | ${escalated} | ${s.failed.length} | ${s.notSettled} | ${r.requeuedAfterCrash} | ${r.claimedToVerify} | ${r.already_done} | ${r.resubmitted} | ${r.reconciled} | ${flagged} | ` +
+        `${sec(s.workMs)} | ${sec(s.wallMs)} | ${verdict} |`,
     );
   }
   lines.push("");
@@ -231,6 +261,17 @@ export function buildTally(input: TallyInput): Tally {
           "Submit, a window of milliseconds). It is covered elsewhere: the crash matrix's `before-submit` scenarios (`evidence/crash-matrix/`), " +
           "`src/worker/crashSubmit.db.test.ts` in `npm test` and CI, and `verify-scenarios` (`evidence/zombie-window-limit/`, `evidence/verify-bank-outage-30s/`).",
   );
+  lines.push("");
+  lines.push("## Escalated by crash cap (attributed)");
+  lines.push("");
+  lines.push(
+    "A job the crash cap sent to `needs_human` / `crash_limit` after its commit intent is accepted by the standard family only when every death " +
+      "in its history matches a scheduled kill or pause of that worker and the ledger shows at most 1 row for it (D58). Each one is listed here; " +
+      "a seed with any is never a plain pass.",
+  );
+  lines.push("");
+  if (escalations.length === 0) lines.push("None.");
+  for (const e of escalations) lines.push(`- seed ${e.index} (${e.seed}): job \`${e.jobId}\`, ${e.deaths} deaths: ${e.events.join(", ")}`);
   if (input.interruptions.length > 0) {
     lines.push("");
     lines.push("## Interrupted runs (re-run with the same seed; the partial evidence was set aside, not deleted)");
@@ -241,11 +282,14 @@ export function buildTally(input: TallyInput): Tally {
   lines.push(
     result === "PASS"
       ? `RESULT: PASS (${passed}/${input.seeds.length} seeds passed their family judge: 0 DUPLICATE, 0 LOST, 0 needs_human, every job settled)`
-      : result === "INCOMPLETE"
-        ? `RESULT: INCOMPLETE (${finished.length} of ${input.seeds.length} seeds finished, all passed so far; resume with the same command)`
-        : `RESULT: FAIL (${failedSeeds.length} of ${finished.length} finished seeds failed: ${failedSeeds.map((d) => `#${d.index} seed ${d.seed}`).join(", ")}; each stays in this tally and is investigated)`,
+      : result === "PASS_WITH_ATTRIBUTED_ESCALATIONS"
+        ? `RESULT: PASS WITH ${escalations.length} ESCALATION(S) BY CRASH CAP (ATTRIBUTED) (${passed}/${input.seeds.length} seeds passed their family judge: ` +
+          "0 DUPLICATE, 0 LOST, every job settled, no other needs_human; the escalations are listed above; not a plain pass)"
+        : result === "INCOMPLETE"
+          ? `RESULT: INCOMPLETE (${finished.length} of ${input.seeds.length} seeds finished, all passed so far; resume with the same command)`
+          : `RESULT: FAIL (${failedSeeds.length} of ${finished.length} finished seeds failed: ${failedSeeds.map((d) => `#${d.index} seed ${d.seed}`).join(", ")}; each stays in this tally and is investigated)`,
   );
-  return { markdown: lines.join("\n") + "\n", totals, finished: finished.length, passed, result };
+  return { markdown: lines.join("\n") + "\n", totals, finished: finished.length, passed, result, escalations };
 }
 
 /** A seed's evidence folder name inside the batch's out dir. */
