@@ -540,6 +540,41 @@ using attempts**, with these details:
 - The mutation check gets a new planted bug: **a crash requeue that consumes an attempt again**. It must be
   caught.
 
+Built as D57 (`04ee739`); mutant 11 caught (`90009c0`); the same seed 41379566 re-run: RESULT: PASS, 0 failed;
+`bank-fault-only` re-run: PASS (`4f05b8b`; before / after in `evidence/chaos/bank-fault-kills-seed-41379566/README.md`).
+
+### Open question during 10b: `verify_exhausted` in the standard family (2026-11-18)
+
+The 2-seed proof of `chaos-seeds` (500 jobs each, `evidence/chaos/day2-exit/`, `ee6589b`) is **RESULT: FAIL (1
+of 2)**. Seed 2 passed. Seed 1 had ok=500, 0 duplicates and 0 lost, but **one job ended `needs_human` /
+`verify_exhausted`**. Its worker was killed 2.5 s after the commit intent, and then each of its **three
+verifiers** was killed mid-verify (2.7 s, 11.1 s and 10.7 s into their phases), so T6.6 escalated it after 3
+dead phases, as D45 specifies. The transfer had happened once (its row is in the ledger). The standard family
+allows no `needs_human` at all (decision 7), so the run fails.
+
+It is structural, not a fluke. Each replica is killed about every 40 s, and in these runs 20–27% of verify
+phases die mid-verify. Three in a row is then 0.8–1.6% of verify cycles. A 500-job seed has 7–10 cycles, so
+**a 20-seed batch should expect 1–2.5 such jobs (P(at least one) ≈ 70–90%)**. This is the shape of the
+bank-fault+kills failure on the other side of the intent: a cap meant to stop a poison job, reached by
+chaos-level bad luck.
+
+Options:
+1. **The dead-verifier cap becomes the job's crash cap (recommended)**: T6.6 escalates after `max_crashes` (5)
+   dead verify phases in a cycle instead of `MAX_VERIFY_PHASES` (3). This is D57's rule after the intent: worker
+   deaths are the fleet's problem, capped for poison protection, with one configurable number. Deaths before the
+   intent still do not count against the verify, and a verifier that keeps dying is still escalated, after
+   2 × 30 s more. Per cycle 0.03–0.1%; **20 seeds: 0.05–0.16 expected, P(at least one) ≈ 5–15%**. The work:
+   `recoveryAction` (the verifying branch takes `maxCrashes`), the model, the property tests (the dead-verifier
+   template reaches 5; a property that bad luck below the cap is never escalated), model vs real, a mutant,
+   D-entry; then the 5 / 2 matrix and the chaos seeds re-run.
+2. **Keep the cap at 3 and state it as the standard family's one expected escalation**: allow
+   `needs_human/verify_exhausted` only when each of its dead phases ends at a scheduled kill of its holder (the
+   judge checks `events.jsonl`) and the job has at most 1 ledger row; any other `needs_human` still fails. No
+   code change; the 20-seed tally would show these jobs, each explained.
+3. **Change nothing**: the 20-seed batch most likely reports FAIL on this alone; each seed is investigated.
+
+Option 1 and 2 can be combined (the cap of 5, and the judge's attributed escalation for the rare residue).
+
 ### Follow-ups
 
 - **Lookup 1.3.0** (read every matching transfer's Reference, so a `duplicate_suspected` job carries both
