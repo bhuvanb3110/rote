@@ -1,0 +1,2677 @@
+
+> rote@0.1.0 mutation-check
+> tsx scripts/mutation-check.ts
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 27 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 1: no duplicate unless a zombie clicked (frozen across its own lease expiry) or the history lag exceeds the settle period
+Error: Property failed after 14 tests
+{ seed: 20261111, path: "13:1:4:1:1:6:12:19:22:23:21:21:25:24:28:25:25:28:27:31:24", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"intent","w":1},{"k":"click","w":1,"commits":true},{"k":"pause","w":1},{"k":"tick","dt":18},{"k":"tick","dt":12}]}]
+Shrunk 20 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:871:8
+    869| describe("fleet state machine, pure model (Step 9: verify, settle, his…
+    870|   it("property 1: no duplicate unless a zombie clicked (frozen across …
+    871|     fc.assert(
+       |        ^
+    872|       fc.property(scenarioArb, (s) => {
+    873|         const { world, found } = simulate(s);
+
+Caused by: AssertionError: expected [ 'drain: 2 ledger rows' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "drain: 2 ledger rows",
++ ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:874:53
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:871:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 2: no duplicate at all when no pause spans lease + settle (no click lands that long after its lease was extended) and there is no history lag
+Error: Property failed after 14 tests
+{ seed: 20261111, path: "13:1:4:1:1:6:12:19:22:23:21:21:25:24:28:25:25:28:27:31:24", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"intent","w":1},{"k":"click","w":1,"commits":true},{"k":"pause","w":1},{"k":"tick","dt":18},{"k":"tick","dt":12}]}]
+Shrunk 20 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:902:8
+    900|
+    901|   it("property 2: no duplicate at all when no pause spans lease + sett…
+    902|     fc.assert(
+       |        ^
+    903|       fc.property(scenarioArb, (s) => {
+    904|         const { world, found } = simulate(s);
+
+Caused by: AssertionError: expected [ 'drain: 2 ledger rows' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "drain: 2 ledger rows",
++ ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:905:53
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:902:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+Error: Property failed after 4 tests
+{ seed: 20261111, path: "3:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"dequeue","w":2},{"k":"intent","w":2},{"k":"click","w":2,"commits":true},{"k":"finish","w":2,"how":"ok"},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true}]}]
+Shrunk 16 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:934:8
+    932|
+    933|   it("property 5: no blind retry after the intent -- every requeue of …
+    934|     fc.assert(
+       |        ^
+    935|       fc.property(scenarioArb, (s) => {
+    936|         expect(simulate(s).found.blindRetryAfterIntent).toEqual([]);
+
+Caused by: AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "event 4 {\"k\":\"dequeue\",\"w\":1}: committing/1 -> queued/2 (phase null)",
++ ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:936:57
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:934:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal
+Error: Property failed after 14 tests
+{ seed: 20261111, path: "13:1:4:1:1:6:12:19:22:23:21:21:25:24:28:25:25:28:27:31:24", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"intent","w":1},{"k":"click","w":1,"commits":true},{"k":"pause","w":1},{"k":"tick","dt":18},{"k":"tick","dt":12}]}]
+Shrunk 20 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:943:8
+    941|
+    942|   it("property 6: the oracle agrees with the model -- PASS whenever pr…
+    943|     fc.assert(
+       |        ^
+    944|       fc.property(scenarioArb, (s) => {
+    945|         const { world } = simulate(s);
+
+Caused by: AssertionError: Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 2; drain timed out: yes
+job states: succeeded=1
+verdicts: ok=0, DUPLICATE=1, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 1; lost: 0 (of which after commit: 0); orphan rows: 0
+findings (1):
+  DUPLICATE         00000000-0000-4000-8000-000000000001 tenant-a succeeded attempt=2 rows=2: 2 ledger rows (TXN-000001, TXN-000002) for one job
+RESULT: FAIL: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/fleet/stateMachine.property.test.ts:947:62
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:943:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50)
+Error: Property failed after 8 tests
+{ seed: 20261111, path: "7:1:2:2:1:1:2:3:1:1:1:1:1:1", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"click","w":0,"commits":true},{"k":"crash","w":0},{"k":"bank","up":false},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"crash","w":1},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"tick","dt":21},{"k":"dequeue","w":2},{"k":"lookup","w":2},{"k":"decide","w":2},{"k":"tick","dt":21},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"tick","dt":21}]}]
+Shrunk 13 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:959:8
+
+
+Caused by: AssertionError: 2 rows, job succeeded/success, last reconciled read at null saw null, rows [["TXN-000001",0],["TXN-000002",125]]: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/fleet/stateMachine.property.test.ts:962:289
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:959:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read
+Error: Property failed after 128 tests
+{ seed: 20261111, path: "127:1:1:1:1:1:1:1:4:3:3", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true},{"k":"finish","w":1,"how":"ok"}]}]
+Shrunk 10 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:969:8
+
+
+Caused by: AssertionError: 1 rows, job failed/failure, phases [], last reconciled read saw null: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/fleet/stateMachine.property.test.ts:972:257
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:969:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed
+Error: Property failed after 8 tests
+{ seed: 20261111, path: "7:1:2:2:1:1:2:3:1:1:1:1:1:1", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"click","w":0,"commits":true},{"k":"crash","w":0},{"k":"bank","up":false},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"crash","w":1},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"tick","dt":21},{"k":"dequeue","w":2},{"k":"lookup","w":2},{"k":"decide","w":2},{"k":"tick","dt":21},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"tick","dt":21}]}]
+Shrunk 13 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:979:8
+
+
+Caused by: AssertionError: 2 rows, job succeeded/success: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/fleet/stateMachine.property.test.ts:983:156
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:979:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 10's cases are real: fast-check finds an unrecorded commit that the workers' pass flagged, and every one of them had a [0, 0] verify (no other path leaves a row on a job that says no money moved)
+Error: Property failed after 128 tests
+{ seed: 20261111, path: "127:1:1:1:1:1:1:1:4:3:3", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true},{"k":"finish","w":1,"how":"ok"}]}]
+Shrunk 10 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:996:8
+    994|     );
+    995|     expect(flagged.failed, "fast-check never reached unrecorded_commit…
+    996|     fc.assert(
+       |        ^
+    997|       fc.property(scenarioArb, (s) => {
+    998|         const { world } = simulate(s);
+
+Caused by: AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/fleet/stateMachine.property.test.ts:1000:149
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:996:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 8's exemption is real (fast-check finds a duplicate that the workers' pass read too early), and the reconcile is what flags duplicates (without it, one stays succeeded)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/fleet/stateMachine.property.test.ts:1018:31
+    1016|     const [shrunk] = late.counterexample!;
+    1017|     const { world } = simulate(shrunk);
+    1018|     expect(world.zombieClick).toBe(true);
+       |                               ^
+    1019|     expect(lateRow(world)).toBe(true);
+    1020|   }, PROPERTY_TIMEOUT_MS);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) > over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+AssertionError: never reached: decision:duplicate_suspected; reached: business_outcome->business_outcome, committing->queued, committing->succeeded, committing->verifying, decision:already_done, decision:deferred, decision:escalated:ambiguous, decision:escalated:verify_unavailable, decision:exhausted, decision:not_committed_final, decision:reconcile_deferred, decision:reconciled, decision:resubmitted, decision:unrecorded_commit_suspected, failed->failed, failed->needs_human, final:business_outcome/business_outcome, final:failed/crash_limit, final:failed/failure, final:failed/not_committed_attempts_exhausted, final:needs_human/ambiguous, final:needs_human/unrecorded_commit_suspected, final:needs_human/verify_exhausted, final:needs_human/verify_unavailable, final:succeeded/already_done, final:succeeded/success, lookups:[0,1], phase:crashed, queued->running, rows:0, rows:1, rows:2, running->business_outcome, running->committing, running->failed, running->queued, succeeded->succeeded, verifying->business_outcome, verifying->failed, verifying->needs_human, verifying->queued, verifying->succeeded, verifying->verifying: expected [ 'queued->running', …(42) ] to include 'decision:duplicate_suspected'
+ ❯ src/fleet/stateMachine.property.test.ts:1130:91
+    1128|       "rows:2", // the zombie window or a lag over the settle period: …
+    1129|     ]) {
+    1130|       expect(seen, `never reached: ${expected}; reached: ${[...seen].s…
+       |                                                                                           ^
+    1131|     }
+    1132|   }, PROPERTY_TIMEOUT_MS);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed > a lease that expires AFTER the intent is not a crash: T6.4 verifies [0, 0] and resubmits as an own attempt (crashes stays 0)
+AssertionError: expected { …(18) } to match object { state: 'queued', attempt: 1, …(1) }
+(15 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "attempt": 1,
++   "attempt": 2,
+    "crashes": 0,
+-   "state": "queued",
++   "state": "running",
+  }
+
+ ❯ src/fleet/stateMachine.property.test.ts:1182:24
+    1180|       { maxAttempts: 2 },
+    1181|     );
+    1182|     expect(job(world)).toMatchObject({ state: "queued", attempt: 1, cr…
+       |                        ^
+    1183|     expect(job(world).phases.map((p) => p.decision)).toEqual(["resubmi…
+    1184|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > crash after the click: T6.4 claims the job, verify [1] -> succeeded / already_done with the row's id; 1 row, attempt 1
+AssertionError: expected { …(18) } to match object { state: 'succeeded', …(2) }
+(18 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "attempt": 1,
+-   "outcome": "already_done",
++   "attempt": 2,
++   "outcome": "success",
+    "state": "succeeded",
+  }
+
+ ❯ src/fleet/stateMachine.property.test.ts:1240:24
+    1238|       { k: "decide", w: 1 },
+    1239|     ]);
+    1240|     expect(job(world)).toMatchObject({ state: "succeeded", outcome: "a…
+       |                        ^
+    1241|     expect((job(world).result as { outputs: { confirmationRef: string …
+    1242|     expect(world.decisions).toEqual(["already_done:[1]"]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > crash after the intent, before the click: verify [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row
+AssertionError: expected [] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+- [
+-   "resubmitted:[0,0]",
+-   "reconciled:[1]",
+- ]
++ []
+
+ ❯ src/fleet/stateMachine.property.test.ts:1262:29
+    1260|       { k: "finish", w: 2, how: "ok" },
+    1261|     ]);
+    1262|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1263|     expect(job(world)).toMatchObject({ state: "succeeded", outcome: "s…
+    1264|     expect(job(world).reconciledAt).not.toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > the settle period: a second lookup before SETTLE seconds have passed is not taken
+AssertionError: expected [] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+- [
+-   "resubmitted:[0,0]",
+-   "reconciled:[1]",
+- ]
++ []
+
+ ❯ src/fleet/stateMachine.property.test.ts:1282:29
+    1280|     ]);
+    1281|     // Only the drain decided, after the settle period (then its recon…
+    1282|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1283|   });
+    1284|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE -- and the reconcile pass flags it: needs_human / duplicate_suspected
+AssertionError: expected [] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+- [
+-   "resubmitted:[0,0]",
+-   "duplicate_suspected:[2]",
+- ]
++ []
+
+ ❯ src/fleet/stateMachine.property.test.ts:1351:29
+    1349|     expect(world.maxClickStaleness).toBeGreaterThanOrEqual(LEASE + SET…
+    1350|     expect(rows(world)).toBe(2);
+    1351|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "duplicate_s…
+       |                             ^
+    1352|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1353|     expect(oracleFor(world).findings[0]!.verdict).toBe("DUPLICATE");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > the reconcile pass's limit: a zombie still frozen when the reconcile READ the history clicks after it -- the duplicate stays succeeded (property 8's exemption); the end-of-day batch then flags it
+AssertionError: expected [] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+- [
+-   "resubmitted:[0,0]",
+-   "reconciled:[1]",
+- ]
++ []
+
+ ❯ src/fleet/stateMachine.property.test.ts:1379:29
+    1377|       { k: "click", w: 0, commits: true }, // after the read: the hist…
+    1378|     ]);
+    1379|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1380|     expect(rows(world)).toBe(2);
+    1381|     expect(job(world)).toMatchObject({ state: "succeeded", attempt: 2 …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55, the reviewer's case: a resubmitted job that ends FAILED (attempt 2 fails before Submit), then the zombie's row -> the reconcile reads 1 where failed promises 0 -> needs_human / unrecorded_commit_suspected
+AssertionError: expected 2 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ src/fleet/stateMachine.property.test.ts:1415:25
+    1413|     );
+    1414|     expect(world.zombieClick).toBe(true);
+    1415|     expect(rows(world)).toBe(1);
+       |                         ^
+    1416|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "unrecorded_…
+    1417|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55: the same with attempt 2 refused before Submit (business_outcome), or its worker dying at the crash cap (T6.2 crash_limit, D57): flagged the same way
+AssertionError: [{"k":"finish","w":2,"how":"refused"}]: expected undefined to be 'unrecorded_commit_suspected:[1]' // Object.is equality
+
+- Expected:
+"unrecorded_commit_suspected:[1]"
+
++ Received:
+undefined
+
+ ❯ src/fleet/stateMachine.property.test.ts:1429:59
+    1427|     ] as const) {
+    1428|       const { world } = run([...zombieAfterResubmit, ...end, { k: "res…
+    1429|       expect(world.decisions.at(-1), JSON.stringify(end)).toBe("unreco…
+       |                                                           ^
+    1430|       expect(job(world)).toMatchObject({ state: "needs_human", outcome…
+    1431|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D57: under the default crash cap, attempt 2's worker dying is a crash (T6.1), not its last attempt -- the job runs again and succeeds, and the zombie's row makes it a duplicate the reconcile flags
+AssertionError: expected undefined to be 'duplicate_suspected:[2]' // Object.is equality
+
+- Expected:
+"duplicate_suspected:[2]"
+
++ Received:
+undefined
+
+ ❯ src/fleet/stateMachine.property.test.ts:1439:36
+    1437|       { maxAttempts: 2 },
+    1438|     );
+    1439|     expect(world.decisions.at(-1)).toBe("duplicate_suspected:[2]");
+       |                                    ^
+    1440|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1441|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55: with no zombie, the resubmitted job that ended failed is reconciled with 0 rows and stays failed (settled)
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/fleet/stateMachine.property.test.ts:1445:25
+    1443|   it("D55: with no zombie, the resubmitted job that ended failed is re…
+    1444|     const { world } = run([...zombieAfterResubmit, { k: "finish", w: 2…
+    1445|     expect(rows(world)).toBe(0);
+       |                         ^
+    1446|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+    1447|     expect(job(world)).toMatchObject({ state: "failed", attempt: 2 });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55, the honest limit and the batch: the zombie still frozen when the reconcile READ the failed job's history clicks after it -- the row stays silent (property 10's exemption); the end-of-day batch flags it
+AssertionError: expected [] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+- [
+-   "resubmitted:[0,0]",
+-   "reconciled:[0]",
+- ]
++ []
+
+ ❯ src/fleet/stateMachine.property.test.ts:1489:29
+    1487|       { maxAttempts: 2 },
+    1488|     );
+    1489|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1490|     expect(job(world).state).toBe("failed");
+    1491|     expect(unrecordedCommit(world)).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > frozen after the intent, and its heartbeat fires first on waking: the run is aborted, no click; verify resubmits; 1 row
+AssertionError: expected [] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+- [
+-   "resubmitted:[0,0]",
+-   "reconciled:[1]",
+- ]
++ []
+
+ ❯ src/fleet/stateMachine.property.test.ts:1510:29
+    1508|     expect(rows(world)).toBe(1); // only the resubmitted attempt's
+    1509|     expect(job(world)).toMatchObject({ state: "succeeded", attempt: 2 …
+    1510|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1511|   });
+    1512|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > the bank down during the verify: deferred (T8), resumed after the backoff (T6.7) while still down, then the outage ends -> [1] already_done; deferrals never exhaust the 3-phase cap
+AssertionError: expected [] to deeply equal [ 'deferred', 'deferred', …(3) ]
+
+- Expected
++ Received
+
+- [
+-   "deferred",
+-   "deferred",
+-   "deferred",
+-   "deferred",
+-   "already_done:[1]",
+- ]
++ []
+
+ ❯ src/fleet/stateMachine.property.test.ts:1548:29
+    1546|       { k: "decide", w: 1 },
+    1547|     ]);
+    1548|     expect(world.decisions).toEqual(["deferred", "deferred", "deferred…
+       |                             ^
+    1549|     expect(job(world)).toMatchObject({ state: "succeeded", outcome: "a…
+    1550|     expect(job(world).phases.map((p) => p.decision)).toEqual(["deferre…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > the bank down for longer than the deferral budget: needs_human / verify_unavailable (and only after looking once more)
+AssertionError: expected undefined to be 'escalated:verify_unavailable:[null]' // Object.is equality
+
+- Expected:
+"escalated:verify_unavailable:[null]"
+
++ Received:
+undefined
+
+ ❯ src/fleet/stateMachine.property.test.ts:1568:36
+    1566|       ]).flat(),
+    1567|     ]);
+    1568|     expect(world.decisions.at(-1)).toBe("escalated:verify_unavailable:…
+       |                                    ^
+    1569|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1570|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > three verifiers die in a row: T6.6 escalates needs_human / verify_exhausted
+AssertionError: expected { …(18) } to match object { state: 'needs_human', …(1) }
+(19 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "outcome": "verify_exhausted",
+-   "state": "needs_human",
++   "outcome": "success",
++   "state": "succeeded",
+  }
+
+ ❯ src/fleet/stateMachine.property.test.ts:1591:24
+    1589|       { k: "dequeue", w: 1 }, // the cycle has 3 dead phases: T6.6
+    1590|     ]);
+    1591|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+       |                        ^
+    1592|     expect(job(world).phases.map((p) => p.decision)).toEqual(["crashed…
+    1593|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows; D57's crash budget) > committing -> T6.4 claim to verify (Step 9 replaces Step 8's T6.3 escalate), whatever the attempts; NOT a crash (past the intent, D57)
+AssertionError: expected { Object (kind, label, ...) } to match object { kind: 'verify', label: 'T6.4', …(4) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "crash": false,
+-   "kind": "verify",
+-   "label": "T6.4",
+-   "outcome": "commit_uncertain",
+-   "reason": "lease_expired_in_committing",
+-   "to": "verifying",
++   "kind": "requeue",
++   "label": "T6.1",
++   "outcome": null,
++   "to": "queued",
+  }
+
+ ❯ src/fleet/stateMachine.test.ts:96:17
+     94|     for (const attempt of [1, 2, 3]) {
+     95|       const a = recoveryAction({ state: "committing", attempt, maxAtte…
+     96|       expect(a).toMatchObject({ kind: "verify", label: "T6.4", to: "ve…
+       |                 ^
+     97|       expect(a.error).toMatch(/after the commit intent: the Submit may…
+     98|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows; D57's crash budget) > no input ever yields queued without an own attempt left or at the crash cap, or queued from past the intent; only a lease before the intent is a crash
+AssertionError: expected 'committing' to be 'running' // Object.is equality
+
+Expected: "running"
+Received: "committing"
+
+ ❯ src/fleet/stateMachine.test.ts:146:33
+    144|                 expect(a.crash).toBe(state === "running");
+    145|                 if (a.to === "queued") {
+    146|                   expect(state).toBe("running");
+       |                                 ^
+    147|                   expect(ownAttempts(attempt, crashes + 1)).toBeLessTh…
+    148|                   expect(crashes + 1).toBeLessThan(maxCrashes); // job…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/27]⎯
+
+== 01 01-t6-requeues-committing.patch: Step 8 / Step 9's M2: recovery requeues an expired `committing` job (a blind retry after the intent)
+tests: src/fleet/stateMachine.property.test.ts, src/fleet/stateMachine.test.ts
+verdict: caught (6.4 s)
+vitest exit 1; 27 of 88 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 1: no duplicate unless a zombie clicked (frozen across its own lease expiry) or the history lag exceeds the settle period
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 2: no duplicate at all when no pause spans lease + settle (no click lands that long after its lease was extended) and there is no history lag
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50)
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 10's cases are real: fast-check finds an unrecorded commit that the workers' pass flagged, and every one of them had a [0, 0] verify (no other path leaves a row on a job that says no money moved)
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 8's exemption is real (fast-check finds a duplicate that the workers' pass read too early), and the reconcile is what flags duplicates (without it, one stays succeeded)
+  x src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+  x src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed a lease that expires AFTER the intent is not a crash: T6.4 verifies [0, 0] and resubmits as an own attempt (crashes stays 0)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) crash after the click: T6.4 claims the job, verify [1] -> succeeded / already_done with the row's id; 1 row, attempt 1
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) crash after the intent, before the click: verify [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the settle period: a second lookup before SETTLE seconds have passed is not taken
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE -- and the reconcile pass flags it: needs_human / duplicate_suspected
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the reconcile pass's limit: a zombie still frozen when the reconcile READ the history clicks after it -- the duplicate stays succeeded (property 8's exemption); the end-of-day batch then flags it
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55, the reviewer's case: a resubmitted job that ends FAILED (attempt 2 fails before Submit), then the zombie's row -> the reconcile reads 1 where failed promises 0 -> needs_human / unrecorded_commit_suspected
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55: the same with attempt 2 refused before Submit (business_outcome), or its worker dying at the crash cap (T6.2 crash_limit, D57): flagged the same way
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D57: under the default crash cap, attempt 2's worker dying is a crash (T6.1), not its last attempt -- the job runs again and succeeds, and the zombie's row makes it a duplicate the reconcile flags
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55: with no zombie, the resubmitted job that ended failed is reconciled with 0 rows and stays failed (settled)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55, the honest limit and the batch: the zombie still frozen when the reconcile READ the failed job's history clicks after it -- the row stays silent (property 10's exemption); the end-of-day batch flags it
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) frozen after the intent, and its heartbeat fires first on waking: the run is aborted, no click; verify resubmits; 1 row
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the bank down during the verify: deferred (T8), resumed after the backoff (T6.7) while still down, then the outage ends -> [1] already_done; deferrals never exhaust the 3-phase cap
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the bank down for longer than the deferral budget: needs_human / verify_unavailable (and only after looking once more)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) three verifiers die in a row: T6.6 escalates needs_human / verify_exhausted
+  x src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows; D57's crash budget) committing -> T6.4 claim to verify (Step 9 replaces Step 8's T6.3 escalate), whatever the attempts; NOT a crash (past the intent, D57)
+  x src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows; D57's crash budget) no input ever yields queued without an own attempt left or at the crash cap, or queued from past the intent; only a lease before the intent is a crash
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema > 200 seeded command sequences agree after every command
+Error: Property failed after 58 tests
+{ seed: 1111, path: "57:0:8:3", endOnFailure: true }
+Counterexample: [{"cap":1,"maxAttempts":1,"maxCrashes":1,"jobs":1},dequeue(wB),tick(45),heartbeat(wB) /*replayPath="EJG:F"*/]
+Shrunk 3 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ asyncThrowIfFailed node_modules/fast-check/lib/fast-check.js:2481:8
+
+Caused by: AssertionError: heartbeat(wB): expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ HeartbeatCmd.run src/fleet/modelVsReal.db.test.ts:268:35
+ ❯ Object.run src/fleet/modelVsReal.db.test.ts:135:76
+ ❯ runAsync node_modules/fast-check/lib/fast-check.js:9591:27
+ ❯ internalAsyncModelRun node_modules/fast-check/lib/fast-check.js:9593:9
+ ❯ Module.asyncModelRun node_modules/fast-check/lib/fast-check.js:9621:2
+ ❯ src/fleet/modelVsReal.db.test.ts:677:11
+ ❯ AsyncProperty.run node_modules/fast-check/lib/fast-check.js:1217:19
+ ❯ asyncPropertyExecution node_modules/fast-check/lib/fast-check.js:2564:14
+ ❯ asyncRunIt node_modules/fast-check/lib/fast-check.js:2557:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |unit-db| src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema > 100 more sequences that START with a job in committing (a real dequeue + T3) or in verifying (+ T5): the expired-commit claim, the verify writes, re-claims and deferrals
+Error: Property failed after 18 tests
+{ seed: 1112, path: "17:0:0", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"jobs":1,"prior":"failure","start":"committing"},tick(45),heartbeat(wA) /*replayPath="ABF:C"*/]
+Shrunk 2 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ asyncThrowIfFailed node_modules/fast-check/lib/fast-check.js:2481:8
+
+Caused by: AssertionError: heartbeat(wA): expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ HeartbeatCmd.run src/fleet/modelVsReal.db.test.ts:268:35
+ ❯ Object.run src/fleet/modelVsReal.db.test.ts:135:76
+ ❯ runAsync node_modules/fast-check/lib/fast-check.js:9591:27
+ ❯ internalAsyncModelRun node_modules/fast-check/lib/fast-check.js:9593:9
+ ❯ Module.asyncModelRun node_modules/fast-check/lib/fast-check.js:9621:2
+ ❯ src/fleet/modelVsReal.db.test.ts:712:11
+ ❯ AsyncProperty.run node_modules/fast-check/lib/fast-check.js:1217:19
+ ❯ asyncPropertyExecution node_modules/fast-check/lib/fast-check.js:2564:14
+ ❯ asyncRunIt node_modules/fast-check/lib/fast-check.js:2557:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |unit-db| src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema > 160 more sequences that START with a job that turned terminal after a [0, 0] verify -- succeeded, failed or business_outcome after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4), or failed by T7 exhausted (D55): the reconcile pass; then every Step 9 and Step 10 path was exercised
+AssertionError: never happened: recover:T6.2; seen {"reverify:refused":187,"T8:illegal_transition":33,"T5:recorded":193,"T7:escalated:recorded":5,"reverify:moved":2,"T5:fenced":38,"T7:exhausted:illegal_transition":16,"T5:illegal_transition":54,"T7:not_committed_final:recorded":4,"T7:already_done:illegal_transition":4,"recover:T6.1":1,"dequeue:lease_beyond_max_attempts":1,"T7:escalated:illegal_transition":10,"recover:T6.7":2,"T7:already_done:fenced":10,"T7:resubmitted:check_violation":1,"recover:T6.5":2,"T8:recorded":5,"T8:fenced":23,"T7:escalated:fenced":7,"T7:already_done:recorded":3,"T7:exhausted:recorded":34,"recover:T6.4":1,"T7:not_committed_final:illegal_transition":13,"T7:resubmitted:recorded":128,"R2:duplicate_suspected:fenced":8,"R1:none":80,"T7:exhausted:fenced":9,"R1:claimed":43,"R1:claimed:failed":18,"R2:reconcile_deferred:illegal_transition":7,"batchClaim:refused":24,"R2:wrong_state:fenced":7,"R1:claimed:business_outcome":6,"R2:reconciled:fenced":7,"batchClaim:claimed":23,"R2:reconciled:recorded":6,"R1:claimed:succeeded":19,"T7:resubmitted:illegal_transition":4,"R2:duplicate_suspected:illegal_transition":9,"R2:unrecorded_commit_suspected:illegal_transition":5,"R2:duplicate_suspected:recorded":4,"T7:resubmitted:fenced":5,"R2:wrong_state:illegal_transition":9,"R2:reconcile_deferred:recorded":4,"R2:unrecorded_commit_suspected:recorded":1,"R2:reconcile_unreadable:fenced":4,"T7:not_committed_final:fenced":4,"R2:reconcile_deferred:fenced":10,"R2:reconcile_unreadable:illegal_transition":4,"R2:reconcile_unreadable:recorded":5,"R2:reconciled:illegal_transition":1,"R2:unrecorded_commit_suspected:fenced":3}: expected 0 to be greater than 0
+ ❯ src/fleet/modelVsReal.db.test.ts:771:74
+    769|       "reverify:moved", "reverify:refused",
+    770|     ]) {
+    771|       expect(hits.get(key) ?? 0, `never happened: ${key}; seen ${seen}…
+       |                                                                          ^
+    772|     }
+    773|     const t7Any = (suffix: string) => [...hits.keys()].some((k) => k.s…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+== 02 02-t2-revives-expired-lease.patch: Step 8: the heartbeat (T2) extends a lease that already expired (no `lease_expires_at > now()`)
+tests: src/fleet/modelVsReal.db.test.ts
+verdict: caught (27.3 s)
+vitest exit 1; 3 of 3 tests failed:
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 200 seeded command sequences agree after every command
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 100 more sequences that START with a job in committing (a real dequeue + T3) or in verifying (+ T5): the expired-commit claim, the verify writes, re-claims and deferrals
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 160 more sequences that START with a job that turned terminal after a [0, 0] verify -- succeeded, failed or business_outcome after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4), or failed by T7 exhausted (D55): the reconcile pass; then every Step 9 and Step 10 path was exercised
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema > 200 seeded command sequences agree after every command
+Error: Property failed after 13 tests
+{ seed: 1111, path: "12:0:3:5:4:4:3", endOnFailure: true }
+Counterexample: [{"cap":1,"maxAttempts":1,"maxCrashes":1,"jobs":1},dequeue(wA),tick(31),recover(wA) /*replayPath="BDABCADCABFZ:qq"*/]
+Shrunk 6 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ asyncThrowIfFailed node_modules/fast-check/lib/fast-check.js:2481:8
+
+Caused by: AssertionError: recover(wA): expected [ Array(1) ] to deeply equal [ Array(1) ]
+
+- Expected
++ Received
+
+  [
+-   "39b23aba-2586-4c39-b467-97c969595f5a:fail:T6.2:2",
++   "39b23aba-2586-4c39-b467-97c969595f5a:fail:T6.2:1",
+  ]
+
+ ❯ RecoverCmd.run src/fleet/modelVsReal.db.test.ts:363:61
+ ❯ Object.run src/fleet/modelVsReal.db.test.ts:135:76
+ ❯ runAsync node_modules/fast-check/lib/fast-check.js:9591:27
+ ❯ internalAsyncModelRun node_modules/fast-check/lib/fast-check.js:9593:9
+ ❯ Module.asyncModelRun node_modules/fast-check/lib/fast-check.js:9621:2
+ ❯ src/fleet/modelVsReal.db.test.ts:677:11
+ ❯ AsyncProperty.run node_modules/fast-check/lib/fast-check.js:1217:19
+ ❯ asyncPropertyExecution node_modules/fast-check/lib/fast-check.js:2564:14
+ ❯ asyncRunIt node_modules/fast-check/lib/fast-check.js:2557:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |unit-db| src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema > 160 more sequences that START with a job that turned terminal after a [0, 0] verify -- succeeded, failed or business_outcome after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4), or failed by T7 exhausted (D55): the reconcile pass; then every Step 9 and Step 10 path was exercised
+AssertionError: never happened: recover:T6.1; seen {"reverify:refused":201,"T8:illegal_transition":41,"T5:recorded":233,"T7:escalated:recorded":5,"reverify:moved":1,"T5:fenced":47,"T7:exhausted:illegal_transition":17,"T5:illegal_transition":59,"T7:not_committed_final:recorded":6,"T7:already_done:illegal_transition":13,"T8:recorded":31,"T7:already_done:recorded":8,"T7:exhausted:recorded":36,"T8:fenced":25,"recover:T6.7":5,"recover:T6.4":1,"T7:not_committed_final:illegal_transition":17,"recover:T6.5":3,"T7:resubmitted:check_violation":1,"T7:escalated:illegal_transition":11,"T7:resubmitted:illegal_transition":8,"T7:resubmitted:recorded":131,"T7:not_committed_final:fenced":5,"T7:already_done:fenced":10,"R2:duplicate_suspected:fenced":8,"R1:none":80,"T7:exhausted:fenced":9,"R1:claimed":43,"R1:claimed:failed":18,"R2:reconcile_deferred:illegal_transition":7,"batchClaim:refused":24,"R2:wrong_state:fenced":7,"R1:claimed:business_outcome":6,"R2:reconciled:fenced":7,"batchClaim:claimed":23,"R2:reconciled:recorded":6,"R1:claimed:succeeded":19,"R2:duplicate_suspected:illegal_transition":9,"R2:unrecorded_commit_suspected:illegal_transition":5,"R2:duplicate_suspected:recorded":4,"T7:resubmitted:fenced":5,"R2:wrong_state:illegal_transition":9,"T7:escalated:fenced":6,"R2:reconcile_deferred:recorded":4,"R2:unrecorded_commit_suspected:recorded":1,"R2:reconcile_unreadable:fenced":4,"R2:reconcile_deferred:fenced":10,"R2:reconcile_unreadable:illegal_transition":4,"R2:reconcile_unreadable:recorded":5,"R2:reconciled:illegal_transition":1,"R2:unrecorded_commit_suspected:fenced":3}: expected 0 to be greater than 0
+ ❯ src/fleet/modelVsReal.db.test.ts:771:74
+    769|       "reverify:moved", "reverify:refused",
+    770|     ]) {
+    771|       expect(hits.get(key) ?? 0, `never happened: ${key}; seen ${seen}…
+       |                                                                          ^
+    772|     }
+    773|     const t7Any = (suffix: string) => [...hits.keys()].some((k) => k.s…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+== 03 03-t6-no-token-bump.patch: Step 8: recovery (T6.1/T6.2/T6.6) does not bump the fencing token
+tests: src/fleet/modelVsReal.db.test.ts
+verdict: caught (31.7 s)
+vitest exit 1; 2 of 3 tests failed:
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 200 seeded command sequences agree after every command
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 160 more sequences that START with a job that turned terminal after a [0, 0] verify -- succeeded, failed or business_outcome after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4), or failed by T7 exhausted (D55): the reconcile pass; then every Step 9 and Step 10 path was exercised
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+Error: Property failed after 4 tests
+{ seed: 20261111, path: "3:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"dequeue","w":2},{"k":"intent","w":2},{"k":"click","w":2,"commits":true},{"k":"finish","w":2,"how":"ok"},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true}]}]
+Shrunk 16 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:934:8
+    932|
+    933|   it("property 5: no blind retry after the intent -- every requeue of …
+    934|     fc.assert(
+       |        ^
+    935|       fc.property(scenarioArb, (s) => {
+    936|         expect(simulate(s).found.blindRetryAfterIntent).toEqual([]);
+
+Caused by: AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "event 8 {\"k\":\"decide\",\"w\":1}: verifying/2 -> queued/2 (phase {\"token\":2,\"owner\":\"w1#0\",\"reason\":\"lease_expired_in_committing\",\"priorStatus\":null,\"decision\":\"resubmitted\",\"endedAt\":36,\"lookups\":[0]})",
++ ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:936:57
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:934:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) > over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+AssertionError: never reached: lookups:[0,1]; reached: business_outcome->business_outcome, business_outcome->needs_human, committing->succeeded, committing->verifying, decision:already_done, decision:deferred, decision:duplicate_suspected, decision:escalated:ambiguous, decision:escalated:verify_unavailable, decision:exhausted, decision:not_committed_final, decision:reconcile_deferred, decision:reconciled, decision:resubmitted, decision:unrecorded_commit_suspected, failed->failed, failed->needs_human, final:business_outcome/business_outcome, final:failed/crash_limit, final:failed/failure, final:failed/not_committed_attempts_exhausted, final:needs_human/ambiguous, final:needs_human/duplicate_suspected, final:needs_human/unrecorded_commit_suspected, final:needs_human/verify_exhausted, final:needs_human/verify_unavailable, final:succeeded/already_done, final:succeeded/success, phase:crashed, queued->running, rows:0, rows:1, rows:2, running->business_outcome, running->committing, running->failed, running->queued, succeeded->needs_human, succeeded->succeeded, verifying->business_outcome, verifying->failed, verifying->needs_human, verifying->queued, verifying->succeeded, verifying->verifying: expected [ 'queued->running', …(44) ] to include 'lookups:[0,1]'
+ ❯ src/fleet/stateMachine.property.test.ts:1130:91
+    1128|       "rows:2", // the zombie window or a lag over the settle period: …
+    1129|     ]) {
+    1130|       expect(seen, `never reached: ${expected}; reached: ${[...seen].s…
+       |                                                                                           ^
+    1131|     }
+    1132|   }, PROPERTY_TIMEOUT_MS);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > crash after the intent, before the click: verify [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row
+AssertionError: expected [ 'resubmitted:[0]', 'reconciled:[1]' ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "resubmitted:[0,0]",
++   "resubmitted:[0]",
+    "reconciled:[1]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1262:29
+    1260|       { k: "finish", w: 2, how: "ok" },
+    1261|     ]);
+    1262|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1263|     expect(job(world)).toMatchObject({ state: "succeeded", outcome: "s…
+    1264|     expect(job(world).reconciledAt).not.toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > the settle period: a second lookup before SETTLE seconds have passed is not taken
+AssertionError: expected [ 'resubmitted:[0]', 'reconciled:[1]' ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "resubmitted:[0,0]",
++   "resubmitted:[0]",
+    "reconciled:[1]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1282:29
+    1280|     ]);
+    1281|     // Only the drain decided, after the settle period (then its recon…
+    1282|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1283|   });
+    1284|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > history lag 3 s < settle 5 s, the bank's answer lost after it committed (T5 verifies at once): [0, 1] -> already_done, 1 row
+AssertionError: expected [ 'resubmitted:[0]', …(1) ] to deeply equal [ 'already_done:[0,1]' ]
+
+- Expected
++ Received
+
+  [
+-   "already_done:[0,1]",
++   "resubmitted:[0]",
++   "duplicate_suspected:[2]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1299:29
+    1297|       { lag: 3 },
+    1298|     );
+    1299|     expect(world.decisions).toEqual(["already_done:[0,1]"]);
+       |                             ^
+    1300|     expect(job(world)).toMatchObject({ state: "succeeded", outcome: "a…
+    1301|     expect(rows(world)).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > history lag 8 s > settle 5 s, the same crash: [0, 0] -> resubmitted -> a second transfer: DUPLICATE (the settle must exceed the lag) -- and the reconcile pass flags it (D47's backstop)
+AssertionError: expected [ 'resubmitted:[0]', …(1) ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "resubmitted:[0,0]",
++   "resubmitted:[0]",
+    "duplicate_suspected:[2]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1323:29
+    1321|       { lag: 8 },
+    1322|     );
+    1323|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "duplicate_s…
+       |                             ^
+    1324|     expect(rows(world)).toBe(2);
+    1325|     expect(world.zombieClick).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE -- and the reconcile pass flags it: needs_human / duplicate_suspected
+AssertionError: expected [ 'resubmitted:[0]', …(1) ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "resubmitted:[0,0]",
++   "resubmitted:[0]",
+    "duplicate_suspected:[2]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1351:29
+    1349|     expect(world.maxClickStaleness).toBeGreaterThanOrEqual(LEASE + SET…
+    1350|     expect(rows(world)).toBe(2);
+    1351|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "duplicate_s…
+       |                             ^
+    1352|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1353|     expect(oracleFor(world).findings[0]!.verdict).toBe("DUPLICATE");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > the reconcile pass's limit: a zombie still frozen when the reconcile READ the history clicks after it -- the duplicate stays succeeded (property 8's exemption); the end-of-day batch then flags it
+AssertionError: expected [ 'resubmitted:[0]', 'reconciled:[1]' ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "resubmitted:[0,0]",
++   "resubmitted:[0]",
+    "reconciled:[1]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1379:29
+    1377|       { k: "click", w: 0, commits: true }, // after the read: the hist…
+    1378|     ]);
+    1379|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1380|     expect(rows(world)).toBe(2);
+    1381|     expect(job(world)).toMatchObject({ state: "succeeded", attempt: 2 …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55, the reviewer's case: a resubmitted job that ends FAILED (attempt 2 fails before Submit), then the zombie's row -> the reconcile reads 1 where failed promises 0 -> needs_human / unrecorded_commit_suspected
+AssertionError: expected [ 'resubmitted:[0]', …(1) ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "resubmitted:[0,0]",
++   "resubmitted:[0]",
+    "unrecorded_commit_suspected:[1]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1416:29
+    1414|     expect(world.zombieClick).toBe(true);
+    1415|     expect(rows(world)).toBe(1);
+    1416|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "unrecorded_…
+       |                             ^
+    1417|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1418|     expect(job(world).result).toMatchObject({ reconcile: { decision: "…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55: with no zombie, the resubmitted job that ended failed is reconciled with 0 rows and stays failed (settled)
+AssertionError: expected [ 'resubmitted:[0]', 'reconciled:[0]' ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "resubmitted:[0,0]",
++   "resubmitted:[0]",
+    "reconciled:[0]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1446:29
+    1444|     const { world } = run([...zombieAfterResubmit, { k: "finish", w: 2…
+    1445|     expect(rows(world)).toBe(0);
+    1446|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1447|     expect(job(world)).toMatchObject({ state: "failed", attempt: 2 });
+    1448|     expect(job(world).reconciledAt).not.toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55, why `exhausted` is a trigger too: on the LAST attempt, T6.4 verifies [0, 0] and fails the job while its own worker is still frozen -- no resubmit ever happened, so the reviewer's rule alone would leave the zombie's row silent; it is flagged
+AssertionError: expected [ 'exhausted:[0]', …(1) ] to deeply equal [ 'exhausted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "exhausted:[0,0]",
++   "exhausted:[0]",
+    "unrecorded_commit_suspected:[1]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1470:29
+    1468|     );
+    1469|     expect(job(world).phases.some((p) => p.decision === "resubmitted")…
+    1470|     expect(world.decisions).toEqual(["exhausted:[0,0]", "unrecorded_co…
+       |                             ^
+    1471|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1472|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55, the honest limit and the batch: the zombie still frozen when the reconcile READ the failed job's history clicks after it -- the row stays silent (property 10's exemption); the end-of-day batch flags it
+AssertionError: expected [ 'resubmitted:[0]', 'reconciled:[0]' ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "resubmitted:[0,0]",
++   "resubmitted:[0]",
+    "reconciled:[0]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1489:29
+    1487|       { maxAttempts: 2 },
+    1488|     );
+    1489|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1490|     expect(job(world).state).toBe("failed");
+    1491|     expect(unrecordedCommit(world)).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/13]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > frozen after the intent, and its heartbeat fires first on waking: the run is aborted, no click; verify resubmits; 1 row
+AssertionError: expected [ 'resubmitted:[0]', 'reconciled:[1]' ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "resubmitted:[0,0]",
++   "resubmitted:[0]",
+    "reconciled:[1]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1510:29
+    1508|     expect(rows(world)).toBe(1); // only the resubmitted attempt's
+    1509|     expect(job(world)).toMatchObject({ state: "succeeded", attempt: 2 …
+    1510|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "reconciled:…
+       |                             ^
+    1511|   });
+    1512|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/13]⎯
+
+== 04 04-m1-single-zero-decides.patch: Step 9's M1: one 0-match lookup decides (no settle, no second lookup)
+tests: src/fleet/stateMachine.property.test.ts
+verdict: caught (10.9 s)
+vitest exit 1; 13 of 45 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+  x src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) crash after the intent, before the click: verify [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the settle period: a second lookup before SETTLE seconds have passed is not taken
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) history lag 3 s < settle 5 s, the bank's answer lost after it committed (T5 verifies at once): [0, 1] -> already_done, 1 row
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) history lag 8 s > settle 5 s, the same crash: [0, 0] -> resubmitted -> a second transfer: DUPLICATE (the settle must exceed the lag) -- and the reconcile pass flags it (D47's backstop)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE -- and the reconcile pass flags it: needs_human / duplicate_suspected
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the reconcile pass's limit: a zombie still frozen when the reconcile READ the history clicks after it -- the duplicate stays succeeded (property 8's exemption); the end-of-day batch then flags it
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55, the reviewer's case: a resubmitted job that ends FAILED (attempt 2 fails before Submit), then the zombie's row -> the reconcile reads 1 where failed promises 0 -> needs_human / unrecorded_commit_suspected
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55: with no zombie, the resubmitted job that ended failed is reconciled with 0 rows and stays failed (settled)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55, why `exhausted` is a trigger too: on the LAST attempt, T6.4 verifies [0, 0] and fails the job while its own worker is still frozen -- no resubmit ever happened, so the reviewer's rule alone would leave the zombie's row silent; it is flagged
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55, the honest limit and the batch: the zombie still frozen when the reconcile READ the failed job's history clicks after it -- the row stays silent (property 10's exemption); the end-of-day batch flags it
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) frozen after the intent, and its heartbeat fires first on waking: the run is aborted, no click; verify resubmits; 1 row
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+Error: Property failed after 118 tests
+{ seed: 20261111, path: "117:1:1:3:1:1:1:1:1:1:1:1:4:1", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"crash","w":1},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"dequeue","w":2},{"k":"intent","w":2},{"k":"click","w":2,"commits":true},{"k":"finish","w":2,"how":"ok"},{"k":"lookup","w":2},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true}]}]
+Shrunk 13 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:934:8
+    932|
+    933|   it("property 5: no blind retry after the intent -- every requeue of …
+    934|     fc.assert(
+       |        ^
+    935|       fc.property(scenarioArb, (s) => {
+    936|         expect(simulate(s).found.blindRetryAfterIntent).toEqual([]);
+
+Caused by: AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "drain: verifying/2 -> queued/2 (phase {\"token\":2,\"owner\":\"w2#0\",\"reason\":\"lease_expired_in_committing\",\"priorStatus\":null,\"decision\":\"resubmitted\",\"endedAt\":41,\"lookups\":[0,1]})",
++ ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:936:57
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:934:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > history lag 3 s < settle 5 s, the bank's answer lost after it committed (T5 verifies at once): [0, 1] -> already_done, 1 row
+AssertionError: expected [ 'resubmitted:[0,1]', …(1) ] to deeply equal [ 'already_done:[0,1]' ]
+
+- Expected
++ Received
+
+  [
+-   "already_done:[0,1]",
++   "resubmitted:[0,1]",
++   "duplicate_suspected:[2]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1299:29
+    1297|       { lag: 3 },
+    1298|     );
+    1299|     expect(world.decisions).toEqual(["already_done:[0,1]"]);
+       |                             ^
+    1300|     expect(job(world)).toMatchObject({ state: "succeeded", outcome: "a…
+    1301|     expect(rows(world)).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+== 05 05-m3-zero-one-not-committed.patch: Step 9's M3: lookups [0, 1] read as not committed
+tests: src/fleet/stateMachine.property.test.ts
+verdict: caught (13.5 s)
+vitest exit 1; 2 of 45 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) history lag 3 s < settle 5 s, the bank's answer lost after it committed (T5 verifies at once): [0, 1] -> already_done, 1 row
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) > over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+AssertionError: never reached: verifying->business_outcome; reached: business_outcome->business_outcome, business_outcome->needs_human, committing->succeeded, committing->verifying, decision:already_done, decision:deferred, decision:duplicate_suspected, decision:escalated:ambiguous, decision:escalated:verify_unavailable, decision:exhausted, decision:reconcile_deferred, decision:reconciled, decision:resubmitted, decision:unrecorded_commit_suspected, failed->failed, failed->needs_human, final:business_outcome/business_outcome, final:failed/crash_limit, final:failed/failure, final:failed/not_committed_attempts_exhausted, final:needs_human/ambiguous, final:needs_human/duplicate_suspected, final:needs_human/unrecorded_commit_suspected, final:needs_human/verify_exhausted, final:needs_human/verify_unavailable, final:succeeded/already_done, final:succeeded/success, lookups:[0,1], phase:crashed, queued->running, rows:0, rows:1, rows:2, running->business_outcome, running->committing, running->failed, running->queued, succeeded->needs_human, succeeded->succeeded, verifying->failed, verifying->needs_human, verifying->queued, verifying->succeeded, verifying->verifying: expected [ 'queued->running', …(43) ] to include 'verifying->business_outcome'
+ ❯ src/fleet/stateMachine.property.test.ts:1130:91
+    1128|       "rows:2", // the zombie window or a lag over the settle period: …
+    1129|     ]) {
+    1130|       expect(seen, `never reached: ${expected}; reached: ${[...seen].s…
+       |                                                                                           ^
+    1131|     }
+    1132|   }, PROPERTY_TIMEOUT_MS);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+== 06 06-m4-refusal-retried.patch: Step 9's M4: a refusal shown after Submit is retried instead of final
+tests: src/fleet/stateMachine.property.test.ts
+verdict: caught (10.9 s)
+vitest exit 1; 1 of 45 tests failed:
+  x src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50)
+Error: Property failed after 4 tests
+{ seed: 20261111, path: "3:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"dequeue","w":2},{"k":"intent","w":2},{"k":"click","w":2,"commits":true},{"k":"finish","w":2,"how":"ok"},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true}]}]
+Shrunk 16 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:959:8
+
+
+Caused by: AssertionError: 2 rows, job succeeded/success, last reconciled read at 98 saw ["TXN-000001","TXN-000002"], rows [["TXN-000001",36],["TXN-000002",36]]: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/fleet/stateMachine.property.test.ts:962:289
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:959:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed
+Error: Property failed after 4 tests
+{ seed: 20261111, path: "3:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1", endOnFailure: true }
+Counterexample: [{"maxAttempts":2,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"dequeue","w":2},{"k":"intent","w":2},{"k":"click","w":2,"commits":true},{"k":"finish","w":2,"how":"ok"},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true}]}]
+Shrunk 16 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:979:8
+
+
+Caused by: AssertionError: 2 rows, job succeeded/success: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/fleet/stateMachine.property.test.ts:983:156
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:979:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 8's exemption is real (fast-check finds a duplicate that the workers' pass read too early), and the reconcile is what flags duplicates (without it, one stays succeeded)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/fleet/stateMachine.property.test.ts:1019:28
+    1017|     const { world } = simulate(shrunk);
+    1018|     expect(world.zombieClick).toBe(true);
+    1019|     expect(lateRow(world)).toBe(true);
+       |                            ^
+    1020|   }, PROPERTY_TIMEOUT_MS);
+    1021|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) > over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+AssertionError: never reached: decision:duplicate_suspected; reached: business_outcome->business_outcome, business_outcome->needs_human, committing->succeeded, committing->verifying, decision:already_done, decision:deferred, decision:escalated:ambiguous, decision:escalated:verify_unavailable, decision:exhausted, decision:not_committed_final, decision:reconcile_deferred, decision:reconciled, decision:resubmitted, decision:unrecorded_commit_suspected, failed->failed, failed->needs_human, final:business_outcome/business_outcome, final:failed/crash_limit, final:failed/failure, final:failed/not_committed_attempts_exhausted, final:needs_human/ambiguous, final:needs_human/unrecorded_commit_suspected, final:needs_human/verify_exhausted, final:needs_human/verify_unavailable, final:succeeded/already_done, final:succeeded/success, lookups:[0,1], phase:crashed, queued->running, rows:0, rows:1, rows:2, running->business_outcome, running->committing, running->failed, running->queued, succeeded->succeeded, verifying->business_outcome, verifying->failed, verifying->needs_human, verifying->queued, verifying->succeeded, verifying->verifying: expected [ 'queued->running', …(42) ] to include 'decision:duplicate_suspected'
+ ❯ src/fleet/stateMachine.property.test.ts:1130:91
+    1128|       "rows:2", // the zombie window or a lag over the settle period: …
+    1129|     ]) {
+    1130|       expect(seen, `never reached: ${expected}; reached: ${[...seen].s…
+       |                                                                                           ^
+    1131|     }
+    1132|   }, PROPERTY_TIMEOUT_MS);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > history lag 8 s > settle 5 s, the same crash: [0, 0] -> resubmitted -> a second transfer: DUPLICATE (the settle must exceed the lag) -- and the reconcile pass flags it (D47's backstop)
+AssertionError: expected [ 'resubmitted:[0,0]', …(1) ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+    "resubmitted:[0,0]",
+-   "duplicate_suspected:[2]",
++   "reconciled:[2]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1323:29
+    1321|       { lag: 8 },
+    1322|     );
+    1323|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "duplicate_s…
+       |                             ^
+    1324|     expect(rows(world)).toBe(2);
+    1325|     expect(world.zombieClick).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE -- and the reconcile pass flags it: needs_human / duplicate_suspected
+AssertionError: expected [ 'resubmitted:[0,0]', …(1) ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+    "resubmitted:[0,0]",
+-   "duplicate_suspected:[2]",
++   "reconciled:[2]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1351:29
+    1349|     expect(world.maxClickStaleness).toBeGreaterThanOrEqual(LEASE + SET…
+    1350|     expect(rows(world)).toBe(2);
+    1351|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "duplicate_s…
+       |                             ^
+    1352|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1353|     expect(oracleFor(world).findings[0]!.verdict).toBe("DUPLICATE");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > the reconcile pass's limit: a zombie still frozen when the reconcile READ the history clicks after it -- the duplicate stays succeeded (property 8's exemption); the end-of-day batch then flags it
+AssertionError: expected 'reconciled:[2]' to be 'duplicate_suspected:[2]' // Object.is equality
+
+Expected: "duplicate_suspected:[2]"
+Received: "reconciled:[2]"
+
+ ❯ src/fleet/stateMachine.property.test.ts:1386:36
+    1384|     expect(found.terminalMoved).toEqual([]);
+    1385|     endOfDayBatch(world);
+    1386|     expect(world.decisions.at(-1)).toBe("duplicate_suspected:[2]");
+       |                                    ^
+    1387|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1388|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D57: under the default crash cap, attempt 2's worker dying is a crash (T6.1), not its last attempt -- the job runs again and succeeds, and the zombie's row makes it a duplicate the reconcile flags
+AssertionError: expected 'reconciled:[2]' to be 'duplicate_suspected:[2]' // Object.is equality
+
+Expected: "duplicate_suspected:[2]"
+Received: "reconciled:[2]"
+
+ ❯ src/fleet/stateMachine.property.test.ts:1439:36
+    1437|       { maxAttempts: 2 },
+    1438|     );
+    1439|     expect(world.decisions.at(-1)).toBe("duplicate_suspected:[2]");
+       |                                    ^
+    1440|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1441|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.test.ts > reconcileDecision (Step 10 section 2, R2's table; D50; every terminal state, D55) > 2+ matches -> duplicate_suspected: needs_human, with the count and the first match's reference
+AssertionError: expected { decision: 'reconciled', …(5) } to match object { …(5) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "decision": "duplicate_suspected",
++   "decision": "reconciled",
+    "firstMatchRef": "TXN-000001",
+-   "matches": 2,
+-   "outcome": "duplicate_suspected",
+-   "to": "needs_human",
++   "matches": 1,
++   "outcome": null,
++   "to": "succeeded",
+  }
+
+ ❯ src/fleet/stateMachine.test.ts:399:54
+    397|
+    398|   it("2+ matches -> duplicate_suspected: needs_human, with the count a…
+    399|     for (const n of [2, 3]) expect(decide(count(n))).toMatchObject({ d…
+       |                                                      ^
+    400|     expect(decide(count(2)).error).toMatch(/reconcile found 2 transfer…
+    401|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.test.ts > reconcileDecision (Step 10 section 2, R2's table; D50; every terminal state, D55) > result.reconcile carries the decision, the count, the first match's reference and the job's own confirmationRef
+AssertionError: expected { decision: 'reconciled', …(4) } to deeply equal { …(5) }
+
+- Expected
++ Received
+
+  {
+-   "decision": "duplicate_suspected",
++   "decision": "reconciled",
+    "evidenceRef": "e",
+    "firstMatchRef": "TXN-000001",
+    "jobConfirmationRef": "TXN-000002",
+-   "matches": 2,
++   "matches": 1,
+  }
+
+ ❯ src/fleet/stateMachine.test.ts:418:71
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯
+
+== 07 07-reconcile-ignores-duplicates.patch: Step 10: the reconcile pass reads 2+ matches as reconciled (the duplicate stays silent)
+tests: src/fleet/stateMachine.property.test.ts, src/fleet/stateMachine.test.ts
+verdict: caught (9.9 s)
+vitest exit 1; 10 of 88 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50)
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 8's exemption is real (fast-check finds a duplicate that the workers' pass read too early), and the reconcile is what flags duplicates (without it, one stays succeeded)
+  x src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) history lag 8 s > settle 5 s, the same crash: [0, 0] -> resubmitted -> a second transfer: DUPLICATE (the settle must exceed the lag) -- and the reconcile pass flags it (D47's backstop)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) frozen AFTER the intent past lease + settle (the section-6 window): verify [0, 0] resubmits, the zombie's late click lands too -- the honest limit, a DUPLICATE -- and the reconcile pass flags it: needs_human / duplicate_suspected
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) the reconcile pass's limit: a zombie still frozen when the reconcile READ the history clicks after it -- the duplicate stays succeeded (property 8's exemption); the end-of-day batch then flags it
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D57: under the default crash cap, attempt 2's worker dying is a crash (T6.1), not its last attempt -- the job runs again and succeeds, and the zombie's row makes it a duplicate the reconcile flags
+  x src/fleet/stateMachine.test.ts > reconcileDecision (Step 10 section 2, R2's table; D50; every terminal state, D55) 2+ matches -> duplicate_suspected: needs_human, with the count and the first match's reference
+  x src/fleet/stateMachine.test.ts > reconcileDecision (Step 10 section 2, R2's table; D50; every terminal state, D55) result.reconcile carries the decision, the count, the first match's reference and the job's own confirmationRef
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema > 200 seeded command sequences agree after every command
+Error: Property failed after 62 tests
+{ seed: 1111, path: "61:1:1:1:4:4", endOnFailure: true }
+Counterexample: [{"cap":1,"maxAttempts":3,"maxCrashes":1,"jobs":1},dequeue(wB),complete(wB, queued, backoff 10.5) /*replayPath="FADDBAAACCBDAE:qqC"*/]
+Shrunk 5 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ asyncThrowIfFailed node_modules/fast-check/lib/fast-check.js:2481:8
+
+Caused by: AssertionError: complete(wB, queued, backoff 10.5): job 0: not_before: expected null not to be null
+ ❯ compare src/fleet/modelVsReal.db.test.ts:196:60
+ ❯ CompleteCmd.run src/fleet/modelVsReal.db.test.ts:340:5
+ ❯ Object.run src/fleet/modelVsReal.db.test.ts:135:76
+ ❯ runAsync node_modules/fast-check/lib/fast-check.js:9591:27
+ ❯ internalAsyncModelRun node_modules/fast-check/lib/fast-check.js:9593:9
+ ❯ Module.asyncModelRun node_modules/fast-check/lib/fast-check.js:9621:2
+ ❯ src/fleet/modelVsReal.db.test.ts:677:11
+ ❯ AsyncProperty.run node_modules/fast-check/lib/fast-check.js:1217:19
+ ❯ asyncPropertyExecution node_modules/fast-check/lib/fast-check.js:2564:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |unit-db| src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema > 160 more sequences that START with a job that turned terminal after a [0, 0] verify -- succeeded, failed or business_outcome after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4), or failed by T7 exhausted (D55): the reconcile pass; then every Step 9 and Step 10 path was exercised
+AssertionError: never happened: recover:T6.2; seen {"reverify:refused":263,"T8:illegal_transition":48,"T5:recorded":245,"T7:escalated:recorded":9,"reverify:moved":2,"T5:fenced":48,"T7:exhausted:illegal_transition":18,"T5:illegal_transition":63,"T7:not_committed_final:recorded":7,"T7:already_done:illegal_transition":13,"recover:T6.1":1,"dequeue:lease_beyond_max_attempts":1,"T7:escalated:illegal_transition":12,"recover:T6.7":6,"T7:already_done:fenced":11,"T7:resubmitted:check_violation":2,"recover:T6.5":4,"T8:recorded":34,"T8:fenced":27,"T7:escalated:fenced":8,"T7:exhausted:recorded":37,"T7:resubmitted:illegal_transition":28,"T7:already_done:recorded":8,"recover:T6.4":1,"T7:not_committed_final:illegal_transition":17,"T7:resubmitted:recorded":131,"T7:not_committed_final:fenced":5,"R2:duplicate_suspected:fenced":8,"R1:none":80,"T7:exhausted:fenced":9,"R1:claimed":43,"R1:claimed:failed":18,"R2:reconcile_deferred:illegal_transition":7,"batchClaim:refused":24,"R2:wrong_state:fenced":7,"R1:claimed:business_outcome":6,"R2:reconciled:fenced":7,"batchClaim:claimed":23,"R2:reconciled:recorded":6,"R1:claimed:succeeded":19,"R2:duplicate_suspected:illegal_transition":9,"R2:unrecorded_commit_suspected:illegal_transition":5,"R2:duplicate_suspected:recorded":4,"T7:resubmitted:fenced":5,"R2:wrong_state:illegal_transition":9,"R2:reconcile_deferred:recorded":4,"R2:unrecorded_commit_suspected:recorded":1,"R2:reconcile_unreadable:fenced":4,"R2:reconcile_deferred:fenced":10,"R2:reconcile_unreadable:illegal_transition":4,"R2:reconcile_unreadable:recorded":5,"R2:reconciled:illegal_transition":1,"R2:unrecorded_commit_suspected:fenced":3}: expected 0 to be greater than 0
+ ❯ src/fleet/modelVsReal.db.test.ts:771:74
+    769|       "reverify:moved", "reverify:refused",
+    770|     ]) {
+    771|       expect(hits.get(key) ?? 0, `never happened: ${key}; seen ${seen}…
+       |                                                                          ^
+    772|     }
+    773|     const t7Any = (suffix: string) => [...hits.keys()].some((k) => k.s…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |unit-db| src/worker/complete.db.test.ts > completeJob (fenced) > a requeue with a backoff (D49): not_before = now() + the seconds, by the DATABASE clock; no dequeue before it; then attempt 2 with not_before cleared
+TypeError: actual value must be number or bigint, received "object"
+ ❯ src/worker/complete.db.test.ts:79:26
+     77|     const { rows } = await pool.query("SELECT state, EXTRACT(EPOCH FRO…
+     78|     expect(rows[0].state).toBe("queued");
+     79|     expect(rows[0].secs).toBeGreaterThan(9.5);
+       |                          ^
+     80|     expect(rows[0].secs).toBeLessThanOrEqual(10.5);
+     81|     expect(await dequeue(pool, { workerId: "w2", leaseSeconds: 300 }))…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+== 08 08-t4-requeue-without-not-before.patch: Step 10: T4's requeue after a failure sets no not_before (retries do not back off)
+tests: src/fleet/modelVsReal.db.test.ts, src/worker/complete.db.test.ts
+verdict: caught (37.1 s)
+vitest exit 1; 3 of 16 tests failed:
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 200 seeded command sequences agree after every command
+  x src/fleet/modelVsReal.db.test.ts > model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T8, reverify and the reconcile pass (R1/R2, the batch claim) on a test Postgres schema 160 more sequences that START with a job that turned terminal after a [0, 0] verify -- succeeded, failed or business_outcome after a resubmit (dequeue, T5, T7 resubmitted, dequeue, T4), or failed by T7 exhausted (D55): the reconcile pass; then every Step 9 and Step 10 path was exercised
+  x src/worker/complete.db.test.ts > completeJob (fenced) a requeue with a backoff (D49): not_before = now() + the seconds, by the DATABASE clock; no dequeue before it; then attempt 2 with not_before cleared
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read
+Error: Property failed after 30 tests
+{ seed: 20261111, path: "29:1:0:2:0:0:0:0:0:0:0:0", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"dequeue","w":2},{"k":"finish","w":2,"how":"refused"},{"k":"tick","dt":31},{"k":"recover","w":1},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true}]}]
+Shrunk 11 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:969:8
+
+
+Caused by: AssertionError: 1 rows, job failed/not_committed_attempts_exhausted, phases ["exhausted","reconciled"], last reconciled read saw ["TXN-000001"]: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/fleet/stateMachine.property.test.ts:972:257
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:969:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed
+Error: Property failed after 30 tests
+{ seed: 20261111, path: "29:0:0:2:0:0:0:0:0:0:0:0", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"dequeue","w":2},{"k":"finish","w":2,"how":"refused"},{"k":"tick","dt":31},{"k":"recover","w":1},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true}]}]
+Shrunk 11 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:979:8
+
+
+Caused by: AssertionError: 1 rows, job failed/not_committed_attempts_exhausted: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/fleet/stateMachine.property.test.ts:984:119
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:979:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 10's cases are real: fast-check finds an unrecorded commit that the workers' pass flagged, and every one of them had a [0, 0] verify (no other path leaves a row on a job that says no money moved)
+AssertionError: fast-check never reached unrecorded_commit_suspected: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/fleet/stateMachine.property.test.ts:995:84
+    993|       params,
+    994|     );
+    995|     expect(flagged.failed, "fast-check never reached unrecorded_commit…
+       |                                                                                    ^
+    996|     fc.assert(
+    997|       fc.property(scenarioArb, (s) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) > over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+AssertionError: never reached: decision:unrecorded_commit_suspected; reached: business_outcome->business_outcome, committing->succeeded, committing->verifying, decision:already_done, decision:deferred, decision:duplicate_suspected, decision:escalated:ambiguous, decision:escalated:verify_unavailable, decision:exhausted, decision:not_committed_final, decision:reconcile_deferred, decision:reconciled, decision:resubmitted, failed->failed, final:business_outcome/business_outcome, final:failed/crash_limit, final:failed/failure, final:failed/not_committed_attempts_exhausted, final:needs_human/ambiguous, final:needs_human/duplicate_suspected, final:needs_human/verify_exhausted, final:needs_human/verify_unavailable, final:succeeded/already_done, final:succeeded/success, lookups:[0,1], phase:crashed, queued->running, rows:0, rows:1, rows:2, running->business_outcome, running->committing, running->failed, running->queued, succeeded->needs_human, succeeded->succeeded, verifying->business_outcome, verifying->failed, verifying->needs_human, verifying->queued, verifying->succeeded, verifying->verifying: expected [ 'queued->running', …(41) ] to include 'decision:unrecorded_commit_suspected'
+ ❯ src/fleet/stateMachine.property.test.ts:1130:91
+    1128|       "rows:2", // the zombie window or a lag over the settle period: …
+    1129|     ]) {
+    1130|       expect(seen, `never reached: ${expected}; reached: ${[...seen].s…
+       |                                                                                           ^
+    1131|     }
+    1132|   }, PROPERTY_TIMEOUT_MS);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55, the reviewer's case: a resubmitted job that ends FAILED (attempt 2 fails before Submit), then the zombie's row -> the reconcile reads 1 where failed promises 0 -> needs_human / unrecorded_commit_suspected
+AssertionError: expected [ 'resubmitted:[0,0]', …(1) ] to deeply equal [ 'resubmitted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+    "resubmitted:[0,0]",
+-   "unrecorded_commit_suspected:[1]",
++   "reconciled:[1]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1416:29
+    1414|     expect(world.zombieClick).toBe(true);
+    1415|     expect(rows(world)).toBe(1);
+    1416|     expect(world.decisions).toEqual(["resubmitted:[0,0]", "unrecorded_…
+       |                             ^
+    1417|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1418|     expect(job(world).result).toMatchObject({ reconcile: { decision: "…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55: the same with attempt 2 refused before Submit (business_outcome), or its worker dying at the crash cap (T6.2 crash_limit, D57): flagged the same way
+AssertionError: [{"k":"finish","w":2,"how":"refused"}]: expected 'reconciled:[1]' to be 'unrecorded_commit_suspected:[1]' // Object.is equality
+
+Expected: "unrecorded_commit_suspected:[1]"
+Received: "reconciled:[1]"
+
+ ❯ src/fleet/stateMachine.property.test.ts:1429:59
+    1427|     ] as const) {
+    1428|       const { world } = run([...zombieAfterResubmit, ...end, { k: "res…
+    1429|       expect(world.decisions.at(-1), JSON.stringify(end)).toBe("unreco…
+       |                                                           ^
+    1430|       expect(job(world)).toMatchObject({ state: "needs_human", outcome…
+    1431|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55, why `exhausted` is a trigger too: on the LAST attempt, T6.4 verifies [0, 0] and fails the job while its own worker is still frozen -- no resubmit ever happened, so the reviewer's rule alone would leave the zombie's row silent; it is flagged
+AssertionError: expected [ 'exhausted:[0,0]', 'reconciled:[1]' ] to deeply equal [ 'exhausted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+    "exhausted:[0,0]",
+-   "unrecorded_commit_suspected:[1]",
++   "reconciled:[1]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1470:29
+    1468|     );
+    1469|     expect(job(world).phases.some((p) => p.decision === "resubmitted")…
+    1470|     expect(world.decisions).toEqual(["exhausted:[0,0]", "unrecorded_co…
+       |                             ^
+    1471|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1472|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55, the honest limit and the batch: the zombie still frozen when the reconcile READ the failed job's history clicks after it -- the row stays silent (property 10's exemption); the end-of-day batch flags it
+AssertionError: expected 'reconciled:[1]' to be 'unrecorded_commit_suspected:[1]' // Object.is equality
+
+Expected: "unrecorded_commit_suspected:[1]"
+Received: "reconciled:[1]"
+
+ ❯ src/fleet/stateMachine.property.test.ts:1494:36
+    1492|     expect(silentUnrecorded(world)).toBe(false); // exempt: the row ca…
+    1493|     endOfDayBatch(world);
+    1494|     expect(world.decisions.at(-1)).toBe("unrecorded_commit_suspected:[…
+       |                                    ^
+    1495|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1496|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.test.ts > reconcileDecision (Step 10 section 2, R2's table; D50; every terminal state, D55) > failed / business_outcome, 1+ matches -> unrecorded_commit_suspected: needs_human, with the count and the first match's reference
+AssertionError: failed 1: expected { decision: 'reconciled', …(5) } to match object { …(5) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "decision": "unrecorded_commit_suspected",
++   "decision": "reconciled",
+    "firstMatchRef": "TXN-000001",
+-   "matches": 1,
+-   "outcome": "unrecorded_commit_suspected",
+-   "to": "needs_human",
++   "matches": 0,
++   "outcome": null,
++   "to": "failed",
+  }
+
+ ❯ src/fleet/stateMachine.test.ts:380:59
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯
+
+== 09 09-reconcile-ignores-unrecorded-commits.patch: Step 10b (D55): the reconcile reads 1+ matches on a failed / business_outcome job as reconciled (the unrecorded commit stays silent)
+tests: src/fleet/stateMachine.property.test.ts, src/fleet/stateMachine.test.ts
+verdict: caught (11.3 s)
+vitest exit 1; 9 of 88 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 10's cases are real: fast-check finds an unrecorded commit that the workers' pass flagged, and every one of them had a [0, 0] verify (no other path leaves a row on a job that says no money moved)
+  x src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55, the reviewer's case: a resubmitted job that ends FAILED (attempt 2 fails before Submit), then the zombie's row -> the reconcile reads 1 where failed promises 0 -> needs_human / unrecorded_commit_suspected
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55: the same with attempt 2 refused before Submit (business_outcome), or its worker dying at the crash cap (T6.2 crash_limit, D57): flagged the same way
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55, why `exhausted` is a trigger too: on the LAST attempt, T6.4 verifies [0, 0] and fails the job while its own worker is still frozen -- no resubmit ever happened, so the reviewer's rule alone would leave the zombie's row silent; it is flagged
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55, the honest limit and the batch: the zombie still frozen when the reconcile READ the failed job's history clicks after it -- the row stays silent (property 10's exemption); the end-of-day batch flags it
+  x src/fleet/stateMachine.test.ts > reconcileDecision (Step 10 section 2, R2's table; D50; every terminal state, D55) failed / business_outcome, 1+ matches -> unrecorded_commit_suspected: needs_human, with the count and the first match's reference
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read
+Error: Property failed after 41 tests
+{ seed: 20261111, path: "40:0:0:0:0:0:0:0:0:0:0:0:0", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true}]}]
+Shrunk 12 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:969:8
+
+
+Caused by: AssertionError: 1 rows, job failed/not_committed_attempts_exhausted, phases ["exhausted"], last reconciled read saw null: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/fleet/stateMachine.property.test.ts:972:257
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:969:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed
+Error: Property failed after 41 tests
+{ seed: 20261111, path: "40:0:0:0:0:0:0:0:0:0:0:0:0", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"intent","w":0},{"k":"pause","w":0},{"k":"tick","dt":31},{"k":"dequeue","w":1},{"k":"lookup","w":1},{"k":"tick","dt":5},{"k":"lookup","w":1},{"k":"decide","w":1},{"k":"resume","w":0,"beatFirst":false},{"k":"click","w":0,"commits":true}]}]
+Shrunk 12 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:979:8
+
+
+Caused by: AssertionError: 1 rows, job failed/not_committed_attempts_exhausted: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/fleet/stateMachine.property.test.ts:984:119
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+ ❯ runIt node_modules/fast-check/lib/fast-check.js:2542:15
+ ❯ check node_modules/fast-check/lib/fast-check.js:2655:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2660:14
+ ❯ src/fleet/stateMachine.property.test.ts:979:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D55, why `exhausted` is a trigger too: on the LAST attempt, T6.4 verifies [0, 0] and fails the job while its own worker is still frozen -- no resubmit ever happened, so the reviewer's rule alone would leave the zombie's row silent; it is flagged
+AssertionError: expected [ 'exhausted:[0,0]' ] to deeply equal [ 'exhausted:[0,0]', …(1) ]
+
+- Expected
++ Received
+
+  [
+    "exhausted:[0,0]",
+-   "unrecorded_commit_suspected:[1]",
+  ]
+
+ ❯ src/fleet/stateMachine.property.test.ts:1470:29
+    1468|     );
+    1469|     expect(job(world).phases.some((p) => p.decision === "resubmitted")…
+    1470|     expect(world.decisions).toEqual(["exhausted:[0,0]", "unrecorded_co…
+       |                             ^
+    1471|     expect(job(world)).toMatchObject({ state: "needs_human", outcome: …
+    1472|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+== 10 10-reconcile-marks-only-resubmitted.patch: Step 10b (D55): only a `resubmitted` verify marks a terminal job for the reconcile pass (a T6.4 [0, 0] that fails the job outright, `exhausted`, is never re-read)
+tests: src/fleet/stateMachine.property.test.ts
+verdict: caught (10.5 s)
+vitest exit 1; 3 of 45 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D55, why `exhausted` is a trigger too: on the LAST attempt, T6.4 verifies [0, 0] and fails the job while its own worker is still frozen -- no resubmit ever happened, so the reviewer's rule alone would leave the zombie's row silent; it is flagged
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 27 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 1: no duplicate unless a zombie clicked (frozen across its own lease expiry) or the history lag exceeds the settle period
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:871:8
+    869| describe("fleet state machine, pure model (Step 9: verify, settle, his…
+    870|   it("property 1: no duplicate unless a zombie clicked (frozen across …
+    871|     fc.assert(
+       |        ^
+    872|       fc.property(scenarioArb, (s) => {
+    873|         const { world, found } = simulate(s);
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:873:34
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 2: no duplicate at all when no pause spans lease + settle (no click lands that long after its lease was extended) and there is no history lag
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:902:8
+    900|
+    901|   it("property 2: no duplicate at all when no pause spans lease + sett…
+    902|     fc.assert(
+       |        ^
+    903|       fc.property(scenarioArb, (s) => {
+    904|         const { world, found } = simulate(s);
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:904:34
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 3: no lost job -- after the bank is back, everyone wakes and the leases pass, recovery + verify + clean workers reach a terminal state, and it is SETTLED (its reconcile, if one was due, ran)
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:912:8
+
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:914:27
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 4: terminal states are final -- except the reconcile pass's succeeded -> needs_human (duplicate_suspected / reconcile_unreadable; reviewer decision 3); rote jobs reverify is not modelled -- and queued always has an attempt left (D21)
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:923:8
+
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:925:27
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:934:8
+    932|
+    933|   it("property 5: no blind retry after the intent -- every requeue of …
+    934|     fc.assert(
+       |        ^
+    935|       fc.property(scenarioArb, (s) => {
+    936|         expect(simulate(s).found.blindRetryAfterIntent).toEqual([]);
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:936:16
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:943:8
+    941|
+    942|   it("property 6: the oracle agrees with the model -- PASS whenever pr…
+    943|     fc.assert(
+       |        ^
+    944|       fc.property(scenarioArb, (s) => {
+    945|         const { world } = simulate(s);
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:945:27
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50)
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:959:8
+
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:961:27
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:969:8
+
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:971:27
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:979:8
+
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:981:27
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 10's cases are real: fast-check finds an unrecorded commit that the workers' pass flagged, and every one of them had a [0, 0] verify (no other path leaves a row on a job that says no money moved)
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:996:8
+    994|     );
+    995|     expect(flagged.failed, "fast-check never reached unrecorded_commit…
+    996|     fc.assert(
+       |        ^
+    997|       fc.property(scenarioArb, (s) => {
+    998|         const { world } = simulate(s);
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:998:27
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > property 8's exemption is real (fast-check finds a duplicate that the workers' pass read too early), and the reconcile is what flags duplicates (without it, one stays succeeded)
+ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:1017:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > R2a: at most one worker holds a valid lease (owner + token match, lease_expires_at > now), and it is the one that took the job last
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:1023:8
+    1021|
+    1022|   it("R2a: at most one worker holds a valid lease (owner + token match…
+    1023|     fc.assert(
+       |        ^
+    1024|       fc.property(scenarioArb, (s) => {
+    1025|         expect(simulate(s).found.twoHolders).toEqual([]);
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:1025:16
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property > R2b: the fencing token never decreases
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:1032:8
+    1030|
+    1031|   it("R2b: the fencing token never decreases", () => {
+    1032|     fc.assert(
+       |        ^
+    1033|       fc.property(scenarioArb, (s) => {
+    1034|         expect(simulate(s).found.tokenDecreased).toEqual([]);
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:1034:16
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > the two budgets (Step 10b, D57): crashes stop using attempts > property 11: a job is never failed by fewer than max_attempts own failures unless it hit the crash cap -- over the Step 9/10 sequences (cap 5) AND crash-heavy ones (caps 1-5), queued always within both budgets
+Error: Property failed after 10 tests
+{ seed: 20261111, path: "9:4:0:1:2:1:1:1:1", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"maxCrashes":2,"lag":0,"events":[{"k":"dequeue","w":0},{"k":"crash","w":0},{"k":"tick","dt":31},{"k":"restart","w":0}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:1043:8
+
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 2) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:1045:27
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) > over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+Error: Property failed after 15 tests
+{ seed: 20261111, path: "14:1:1:1:0:3:6:5:7", endOnFailure: true }
+Counterexample: [{"maxAttempts":1,"lag":0,"events":[{"k":"dequeue","w":1},{"k":"crash","w":1}]}]
+Shrunk 8 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+ ❯ buildError node_modules/fast-check/lib/fast-check.js:2469:16
+ ❯ throwIfFailed node_modules/fast-check/lib/fast-check.js:2476:8
+ ❯ reportRunDetails node_modules/fast-check/lib/fast-check.js:2492:14
+ ❯ Module.assert node_modules/fast-check/lib/fast-check.js:2662:7
+ ❯ src/fleet/stateMachine.property.test.ts:1080:8
+    1078|   it("over the same sequences: every verify decision, deferrals and th…
+    1079|     const seen = new Set<string>();
+    1080|     fc.assert(
+       |        ^
+    1081|       fc.property(scenarioArb, (s) => {
+    1082|         const { world } = simulate(s);
+
+Caused by: ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 1, crashes 0 (own 1/1, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ dequeue src/fleet/stateMachine.property.test.ts:568:7
+ ❯ quiesce src/fleet/stateMachine.property.test.ts:836:5
+ ❯ simulate src/fleet/stateMachine.property.test.ts:737:3
+ ❯ src/fleet/stateMachine.property.test.ts:1082:27
+ ❯ Property.predicate node_modules/fast-check/lib/fast-check.js:1355:99
+ ❯ Property.run node_modules/fast-check/lib/fast-check.js:1324:24
+ ❯ propertyExecution node_modules/fast-check/lib/fast-check.js:2549:23
+ ❯ run node_modules/fast-check/lib/fast-check.js:2639:91
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed > job 076e7ccd (1:crashed 2:crashed 3:failure) is no longer failed: two crashes and ONE own failure leave it queued, with 2 own attempts left
+AssertionError: expected { …(18) } to match object { state: 'queued', attempt: 3, …(2) }
+(20 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "attempt": 3,
+-   "crashes": 2,
+-   "outcome": null,
+-   "state": "queued",
++   "crashes": 0,
++   "outcome": "failure",
++   "state": "failed",
+  }
+
+ ❯ src/fleet/stateMachine.property.test.ts:1144:24
+    1142|   it("job 076e7ccd (1:crashed 2:crashed 3:failure) is no longer failed…
+    1143|     const { world, found } = run([...crash(0), ...crash(1), ...fail(2)…
+    1144|     expect(job(world)).toMatchObject({ state: "queued", attempt: 3, cr…
+       |                        ^
+    1145|     expect(Object.values(found).flat()).toEqual([]);
+    1146|     // Step 8's rule failed it here (failed / failure, attempt 3/3). I…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed > job 93c77857 (1:crashed 2:failure 3:crashed) is no longer failed / lease_expired: the third lease's death is a crash (T6.1), not its last attempt
+ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 3, crashes 0 (own 3/3, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ apply src/fleet/stateMachine.property.test.ts:680:44
+ ❯ src/fleet/stateMachine.property.test.ts:749:5
+ ❯ runEvents src/fleet/stateMachine.property.test.ts:747:12
+ ❯ run src/fleet/stateMachine.property.test.ts:1136:91
+ ❯ src/fleet/stateMachine.property.test.ts:1153:30
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed > own failures still fail the job at max_attempts, however many crashes came between them (failed / failure after 3 own failures, attempt 5)
+AssertionError: expected { …(18) } to match object { state: 'failed', …(3) }
+(20 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "attempt": 5,
+-   "crashes": 2,
++   "attempt": 3,
++   "crashes": 0,
+    "outcome": "failure",
+    "state": "failed",
+  }
+
+ ❯ src/fleet/stateMachine.property.test.ts:1162:24
+    1160|   it("own failures still fail the job at max_attempts, however many cr…
+    1161|     const { world, found } = run([...fail(0), ...crash(1), ...fail(2),…
+    1162|     expect(job(world)).toMatchObject({ state: "failed", outcome: "fail…
+       |                        ^
+    1163|     expect(found.failedEarly).toEqual([]);
+    1164|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed > the crash cap: a poison job's 5th worker death before the intent fails it / crash_limit (T6.2), 0 rows; a cap of 2 fails it at the 2nd
+ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 3, crashes 0 (own 3/3, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ apply src/fleet/stateMachine.property.test.ts:680:44
+ ❯ src/fleet/stateMachine.property.test.ts:749:5
+ ❯ runEvents src/fleet/stateMachine.property.test.ts:747:12
+ ❯ run src/fleet/stateMachine.property.test.ts:1136:91
+ ❯ src/fleet/stateMachine.property.test.ts:1167:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed > verify counts own attempts too: two crashes, then the third lease reaches its intent and dies; [0, 0] resubmits (Step 8's count would say exhausted)
+AssertionError: expected { …(18) } to match object { state: 'queued', attempt: 3, …(1) }
+(15 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "attempt": 3,
+-   "crashes": 2,
+-   "state": "queued",
++   "crashes": 0,
++   "state": "failed",
+  }
+
+ ❯ src/fleet/stateMachine.property.test.ts:1200:24
+    1198|       { k: "decide", w: 0 },
+    1199|     ]);
+    1200|     expect(job(world)).toMatchObject({ state: "queued", attempt: 3, cr…
+       |                        ^
+    1201|     expect(job(world).phases.map((p) => p.decision)).toEqual(["resubmi…
+    1202|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) > D57: under the default crash cap, attempt 2's worker dying is a crash (T6.1), not its last attempt -- the job runs again and succeeds, and the zombie's row makes it a duplicate the reconcile flags
+ModelCheckViolation: model: T6.1 on job 00000000-0000-4000-8000-000000000001: requeue at attempt 2, crashes 0 (own 2/2, crash cap 5) would violate a jobs CHECK (23514)
+ ❯ modelRecover src/fleet/model.ts:484:13
+
+ ❯ recover src/fleet/stateMachine.property.test.ts:497:27
+ ❯ apply src/fleet/stateMachine.property.test.ts:680:44
+ ❯ src/fleet/stateMachine.property.test.ts:749:5
+ ❯ runEvents src/fleet/stateMachine.property.test.ts:747:12
+ ❯ simulate src/fleet/stateMachine.property.test.ts:734:17
+ ❯ run src/fleet/stateMachine.property.test.ts:1207:5
+ ❯ src/fleet/stateMachine.property.test.ts:1435:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows; D57's crash budget) > running, under the crash cap -> T6.1 requeue, counted as a CRASH, not an attempt (no intent: nothing irreversible happened)
+AssertionError: expected { Object (kind, label, ...) } to match object { Object (kind, label, ...) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "crash": true,
++   "crash": false,
+    "kind": "requeue",
+    "label": "T6.1",
+    "outcome": null,
+    "to": "queued",
+  }
+
+ ❯ src/fleet/stateMachine.test.ts:62:15
+     60|   it("running, under the crash cap -> T6.1 requeue, counted as a CRASH…
+     61|     const a = recoveryAction({ state: "running", attempt: 1, maxAttemp…
+     62|     expect(a).toMatchObject({ kind: "requeue", label: "T6.1", to: "que…
+       |               ^
+     63|     expect(a.error).toMatch(/lease expired while running, before any c…
+     64|     expect(recoveryAction({ state: "running", attempt: 2, maxAttempts:…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows; D57's crash budget) > running on the job's LAST own attempt -> still T6.1 requeue: a crash never uses an attempt (the bank-fault+kills failure, D57)
+AssertionError: attempt 3/3, crashes 0: expected { Object (kind, label, ...) } to match object { Object (kind, label, ...) }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "crash": true,
++   "crash": false,
+    "kind": "requeue",
+    "label": "T6.1",
+    "to": "queued",
+  }
+
+ ❯ src/fleet/stateMachine.test.ts:76:74
+     74|     ] as const) {
+     75|       const a = recoveryAction({ state: "running", attempt, maxAttempt…
+     76|       expect(a, `attempt ${attempt}/${maxAttempts}, crashes ${crashes}…
+       |                                                                          ^
+     77|     }
+     78|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/27]⎯
+
+ FAIL  |unit-db| src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows; D57's crash budget) > no input ever yields queued without an own attempt left or at the crash cap, or queued from past the intent; only a lease before the intent is a crash
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/fleet/stateMachine.test.ts:144:33
+    142|               for (const verify of [cycle({}), cycle({ deadPhases: 3 }…
+    143|                 const a = recoveryAction({ state, attempt, maxAttempts…
+    144|                 expect(a.crash).toBe(state === "running");
+       |                                 ^
+    145|                 if (a.to === "queued") {
+    146|                   expect(state).toBe("running");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/27]⎯
+
+ FAIL  |unit-db| src/worker/recover.db.test.ts > T6: one row per line of the recovery table > running -> T6.1 requeue, a CRASH (D57): queued, token + 1, crashes + 1, lease cleared, the dead attempt 'crashed'; the next dequeue is lease 2 but still own attempt 1
+AssertionError: expected { …(11) } to match object { …(7) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+@@ -1,12 +1,12 @@
+  {
+    "action": {
+-     "crash": true,
++     "crash": false,
+      "kind": "requeue",
+      "label": "T6.1",
+    },
+-   "crashes": 1,
++   "crashes": 0,
+    "deadOwner": "dead-worker",
+    "fencingToken": 2,
+    "from": "running",
+    "jobId": "c16b6605-6ef9-4cfb-aad4-41047315ea0f",
+    "previousToken": 1,
+
+ ❯ src/worker/recover.db.test.ts:72:15
+     70|     await expire(job.id);
+     71|     const r = await recover();
+     72|     expect(r).toMatchObject({ jobId: job.id, from: "running", action: …
+       |               ^
+     73|     expect(r!.claim).toBeUndefined();
+     74|     const after = await row(job.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/27]⎯
+
+ FAIL  |unit-db| src/worker/recover.db.test.ts > T6: one row per line of the recovery table > running on the job's LAST own attempt -> still T6.1 requeue (D57: the crash uses no attempt; Step 8 failed it / lease_expired); the next lease is past max_attempts
+error: new row for relation "jobs" violates check constraint "jobs_queued_has_attempts_left"
+ ❯ node_modules/pg/lib/client.js:694:17
+ ❯ src/worker/recover.ts:179:11
+    177|             note,
+    178|           ])
+    179|         : await client.query<{ fencing_token: number }>(RECOVER_JOB_SQ…
+       |           ^
+    180|             row.id,
+    181|             row.fencing_token,
+ ❯ withTransaction src/queue/db.ts:86:20
+ ❯ src/worker/recover.db.test.ts:91:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/27]⎯
+
+ FAIL  |unit-db| src/worker/recover.db.test.ts > T6: one row per line of the recovery table > running, the crash that reaches the cap -> T6.2 fail / crash_limit (a poison job), crashes = max_crashes, never queued
+AssertionError: expected { …(25) } to match object { …(3) }
+(23 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "attempt": 2,
+-   "crashes": 1,
++   "crashes": 0,
+    "id": "199bbdf6-8124-428b-abc2-7379a5281bd7",
+  }
+
+ ❯ src/worker/recover.db.test.ts:102:20
+    100|     expect((await recover())!.action).toMatchObject({ kind: "requeue",…
+    101|     const second = await dequeue(pool, { workerId: "dead-2", leaseSeco…
+    102|     expect(second).toMatchObject({ id: job.id, attempt: 2, crashes: 1 …
+       |                    ^
+    103|     await expire(job.id);
+    104|     const r = await recover();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/27]⎯
+
+== 11 11-crash-requeue-uses-an-attempt.patch: Step 10b (D57): a crash requeue (T6.1) is not counted as a crash, so the dead lease consumes one of the job's attempts again (the bank-fault+kills failure)
+tests: src/fleet/stateMachine.property.test.ts, src/fleet/stateMachine.test.ts, src/worker/recover.db.test.ts
+verdict: caught (5.5 s)
+vitest exit 1; 27 of 106 tests failed:
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 1: no duplicate unless a zombie clicked (frozen across its own lease expiry) or the history lag exceeds the settle period
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 2: no duplicate at all when no pause spans lease + settle (no click lands that long after its lease was extended) and there is no history lag
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 3: no lost job -- after the bank is back, everyone wakes and the leases pass, recovery + verify + clean workers reach a terminal state, and it is SETTLED (its reconcile, if one was due, ran)
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 4: terminal states are final -- except the reconcile pass's succeeded -> needs_human (duplicate_suspected / reconcile_unreadable; reviewer decision 3); rote jobs reverify is not modelled -- and queued always has an attempt left (D21)
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 8: after the drain past the reconcile delay, a duplicate never stays silently succeeded -- unless a row became visible only after the reconcile's read (a zombie clicking after the pass: the honest limit, D50)
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 10 (D55): after the drain past the reconcile delay, an unrecorded commit (a row against a job that ended failed / business_outcome) never stays silent -- unless a row became visible only after the reconcile's read
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 9: with the end-of-day batch (rote reconcile --since, D51) after the drain, NO duplicate stays succeeded and NO unrecorded commit stays failed / business_outcome -- the honest limit of properties 8 and 10 is closed
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 10's cases are real: fast-check finds an unrecorded commit that the workers' pass flagged, and every one of them had a [0, 0] verify (no other path leaves a row on a job that says no money moved)
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property property 8's exemption is real (fast-check finds a duplicate that the workers' pass read too early), and the reconcile is what flags duplicates (without it, one stays succeeded)
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property R2a: at most one worker holds a valid lease (owner + token match, lease_expires_at > now), and it is the one that took the job last
+  x src/fleet/stateMachine.property.test.ts > fleet state machine, pure model (Step 9: verify, settle, history lag, bank outages), 10 000 sequences per property R2b: the fencing token never decreases
+  x src/fleet/stateMachine.property.test.ts > the two budgets (Step 10b, D57): crashes stop using attempts property 11: a job is never failed by fewer than max_attempts own failures unless it hit the crash cap -- over the Step 9/10 sequences (cap 5) AND crash-heavy ones (caps 1-5), queued always within both budgets
+  x src/fleet/stateMachine.property.test.ts > the simulation reaches the interesting states (so the properties are not vacuous) over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate
+  x src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed job 076e7ccd (1:crashed 2:crashed 3:failure) is no longer failed: two crashes and ONE own failure leave it queued, with 2 own attempts left
+  x src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed job 93c77857 (1:crashed 2:failure 3:crashed) is no longer failed / lease_expired: the third lease's death is a crash (T6.1), not its last attempt
+  x src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed own failures still fail the job at max_attempts, however many crashes came between them (failed / failure after 3 own failures, attempt 5)
+  x src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed the crash cap: a poison job's 5th worker death before the intent fails it / crash_limit (T6.2), 0 rows; a cap of 2 fails it at the 2nd
+  x src/fleet/stateMachine.property.test.ts > deterministic: the two budgets (Step 10b, D57) -- the bank-fault+kills run's two failed jobs, replayed verify counts own attempts too: two crashes, then the third lease reaches its intent and dies; [0, 0] resubmits (Step 8's count would say exhausted)
+  x src/fleet/stateMachine.property.test.ts > deterministic scenarios (docs/plans/step-08.md section 6; step-09 reviewer decisions 4 and 5) D57: under the default crash cap, attempt 2's worker dying is a crash (T6.1), not its last attempt -- the job runs again and succeeds, and the zombie's row makes it a duplicate the reconcile flags
+  x src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows; D57's crash budget) running, under the crash cap -> T6.1 requeue, counted as a CRASH, not an attempt (no intent: nothing irreversible happened)
+  x src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows; D57's crash budget) running on the job's LAST own attempt -> still T6.1 requeue: a crash never uses an attempt (the bank-fault+kills failure, D57)
+  x src/fleet/stateMachine.test.ts > recoveryAction (section 4's table; Step 9 rows; D57's crash budget) no input ever yields queued without an own attempt left or at the crash cap, or queued from past the intent; only a lease before the intent is a crash
+  x src/worker/recover.db.test.ts > T6: one row per line of the recovery table running -> T6.1 requeue, a CRASH (D57): queued, token + 1, crashes + 1, lease cleared, the dead attempt 'crashed'; the next dequeue is lease 2 but still own attempt 1
+  x src/worker/recover.db.test.ts > T6: one row per line of the recovery table running on the job's LAST own attempt -> still T6.1 requeue (D57: the crash uses no attempt; Step 8 failed it / lease_expired); the next lease is past max_attempts
+  x src/worker/recover.db.test.ts > T6: one row per line of the recovery table running, the crash that reaches the cap -> T6.2 fail / crash_limit (a poison job), crashes = max_crashes, never queued
+
+# Mutation check: 2026-11-18T00:47:20.187Z
+
+Each planted bug is a patch in `scripts/mutations/`; it must turn its tests red, and the tree must be exactly as before afterwards.
+
+| Mutant | What it plants | Tests run | Verdict | Failing tests |
+| --- | --- | --- | --- | --- |
+| 01 `01-t6-requeues-committing.patch` | Step 8 / Step 9's M2: recovery requeues an expired `committing` job (a blind retry after the intent) | `stateMachine.property.test.ts`, `stateMachine.test.ts` | caught | 27 |
+| 02 `02-t2-revives-expired-lease.patch` | Step 8: the heartbeat (T2) extends a lease that already expired (no `lease_expires_at > now()`) | `modelVsReal.db.test.ts` | caught | 3 |
+| 03 `03-t6-no-token-bump.patch` | Step 8: recovery (T6.1/T6.2/T6.6) does not bump the fencing token | `modelVsReal.db.test.ts` | caught | 2 |
+| 04 `04-m1-single-zero-decides.patch` | Step 9's M1: one 0-match lookup decides (no settle, no second lookup) | `stateMachine.property.test.ts` | caught | 13 |
+| 05 `05-m3-zero-one-not-committed.patch` | Step 9's M3: lookups [0, 1] read as not committed | `stateMachine.property.test.ts` | caught | 2 |
+| 06 `06-m4-refusal-retried.patch` | Step 9's M4: a refusal shown after Submit is retried instead of final | `stateMachine.property.test.ts` | caught | 1 |
+| 07 `07-reconcile-ignores-duplicates.patch` | Step 10: the reconcile pass reads 2+ matches as reconciled (the duplicate stays silent) | `stateMachine.property.test.ts`, `stateMachine.test.ts` | caught | 10 |
+| 08 `08-t4-requeue-without-not-before.patch` | Step 10: T4's requeue after a failure sets no not_before (retries do not back off) | `modelVsReal.db.test.ts`, `complete.db.test.ts` | caught | 3 |
+| 09 `09-reconcile-ignores-unrecorded-commits.patch` | Step 10b (D55): the reconcile reads 1+ matches on a failed / business_outcome job as reconciled (the unrecorded commit stays silent) | `stateMachine.property.test.ts`, `stateMachine.test.ts` | caught | 9 |
+| 10 `10-reconcile-marks-only-resubmitted.patch` | Step 10b (D55): only a `resubmitted` verify marks a terminal job for the reconcile pass (a T6.4 [0, 0] that fails the job outright, `exhausted`, is never re-read) | `stateMachine.property.test.ts` | caught | 3 |
+| 11 `11-crash-requeue-uses-an-attempt.patch` | Step 10b (D57): a crash requeue (T6.1) is not counted as a crash, so the dead lease consumes one of the job's attempts again (the bank-fault+kills failure) | `stateMachine.property.test.ts`, `stateMachine.test.ts`, `recover.db.test.ts` | caught | 27 |
+
+Caught: 11/11.
+
+RESULT: PASS
+
