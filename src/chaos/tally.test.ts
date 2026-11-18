@@ -48,6 +48,23 @@ describe("recoveryKinds: each kind, from the job_attempts / job_verifications ro
     });
     expect(Object.keys(EMPTY_RECOVERY_KINDS).sort()).toEqual(Object.keys(RECOVERY_KIND_LABELS).sort());
   });
+
+  it("a paused worker that wakes after T6.1 re-labels its own attempt lease_lost, keeping recovery's note: still a crash requeue (bank-fault-kills 41379566 after D57: 15 crashes, 14 crashed rows)", () => {
+    const k = recoveryKinds(
+      [
+        {
+          outcome: "lease_lost",
+          error:
+            "lease lost during the run (heartbeat); nothing recorded on the job. lease lost: ... [recovery had recorded: lease expired in running; recovered by w-3 (T6.1 requeue)]",
+        },
+        { outcome: "lease_lost", error: "lease lost during the run (heartbeat); nothing recorded on the job. [recovery had recorded: lease expired in running; recovered by w-1 (T6.2 fail)]" },
+        // A worker fenced out with no recovery note (its own heartbeat lost the lease first): not counted.
+        { outcome: "lease_lost", error: "lease lost during the run (heartbeat); nothing recorded on the job." },
+      ],
+      [],
+    );
+    expect(k).toMatchObject({ requeuedAfterCrash: 1, failedByRecovery: 1 });
+  });
 });
 
 const summary = (seed: number, over: Partial<SeedSummary> = {}): SeedSummary => ({

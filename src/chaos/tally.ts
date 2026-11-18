@@ -79,8 +79,11 @@ export function recoveryKinds(attempts: readonly AttemptRowLike[], phases: reado
   const k: RecoveryKinds = { ...EMPTY_RECOVERY_KINDS };
   for (const a of attempts) {
     // recover.ts closes the dead holder's attempt "... (T6.x kind)"; jobOutcomeFor's requeue says "(retrying)".
-    if (a.outcome === "crashed" && a.error?.includes("(T6.1 requeue)")) k.requeuedAfterCrash += 1;
-    if (a.outcome === "crashed" && a.error?.includes("(T6.2 fail)")) k.failedByRecovery += 1;
+    // A frozen (paused) holder that wakes after the recovery re-labels its own attempt lease_lost, keeping
+    // recovery's note ("[recovery had recorded: ...]", MARK_LEASE_LOST_SQL): still that recovery.
+    const recovered = a.outcome === "crashed" || a.outcome === "lease_lost";
+    if (recovered && a.error?.includes("(T6.1 requeue)")) k.requeuedAfterCrash += 1;
+    if (recovered && a.error?.includes("(T6.2 fail)")) k.failedByRecovery += 1;
     if ((a.outcome === "failure" || a.outcome === "aborted") && a.error?.includes("(retrying)")) k.requeuedAfterFailure += 1;
   }
   for (const p of phases) {
