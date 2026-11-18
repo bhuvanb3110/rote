@@ -1,0 +1,144 @@
+[
+  {
+    "id": 1,
+    "job_id": "d1fa497b-6a92-48ec-ba5a-16dfe8061928",
+    "fencing_token": 2,
+    "worker_id": "d4dbfd1a450d-7-b2c2",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-18T01:08:57.717Z",
+    "ended_at": "2026-11-18T01:09:11.738Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 2,
+    "job_id": "1ba81fdf-1644-404d-a644-7314afddd597",
+    "fencing_token": 2,
+    "worker_id": "828771f3daa5-7-e5b4",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-18T01:10:46.586Z",
+    "ended_at": "2026-11-18T01:11:20.001Z",
+    "lookups": null,
+    "decision": "crashed",
+    "error": "lease expired in verifying; recovered by 828771f3daa5-7-4213 (T6.5 verify)"
+  },
+  {
+    "id": 3,
+    "job_id": "1ba81fdf-1644-404d-a644-7314afddd597",
+    "fencing_token": 3,
+    "worker_id": "828771f3daa5-7-4213",
+    "reason": "lease_expired_in_verifying",
+    "prior_status": null,
+    "started_at": "2026-11-18T01:11:20.001Z",
+    "ended_at": "2026-11-18T01:11:50.326Z",
+    "lookups": null,
+    "decision": "crashed",
+    "error": "lease expired in verifying; recovered by 6c42b3e6387b-7-5024 (T6.5 verify)"
+  },
+  {
+    "id": 4,
+    "job_id": "1ba81fdf-1644-404d-a644-7314afddd597",
+    "fencing_token": 4,
+    "worker_id": "6c42b3e6387b-7-5024",
+    "reason": "lease_expired_in_verifying",
+    "prior_status": null,
+    "started_at": "2026-11-18T01:11:50.326Z",
+    "ended_at": "2026-11-18T01:12:20.809Z",
+    "lookups": null,
+    "decision": "crashed",
+    "error": "lease expired in verifying; recovered by 6c42b3e6387b-7-4152 (T6.6 escalate)"
+  },
+  {
+    "id": 5,
+    "job_id": "8426457b-351c-4fa7-bdd4-872310c796a7",
+    "fencing_token": 2,
+    "worker_id": "d4dbfd1a450d-7-b4f2",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-18T01:13:41.810Z",
+    "ended_at": "2026-11-18T01:13:46.007Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 6,
+    "job_id": "e37f38b2-8606-474c-8f0a-1b0976263c66",
+    "fencing_token": 2,
+    "worker_id": "d4dbfd1a450d-6-c3d5",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-18T01:14:12.288Z",
+    "ended_at": "2026-11-18T01:14:42.360Z",
+    "lookups": null,
+    "decision": "crashed",
+    "error": "lease expired in verifying; recovered by 6c42b3e6387b-7-b2b4 (T6.5 verify)"
+  },
+  {
+    "id": 7,
+    "job_id": "3e2daa2d-5bf3-4a98-b1b3-01c18c810d61",
+    "fencing_token": 2,
+    "worker_id": "828771f3daa5-7-0c18",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-18T01:14:16.868Z",
+    "ended_at": "2026-11-18T01:14:26.830Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 8,
+    "job_id": "e37f38b2-8606-474c-8f0a-1b0976263c66",
+    "fencing_token": 3,
+    "worker_id": "6c42b3e6387b-7-b2b4",
+    "reason": "lease_expired_in_verifying",
+    "prior_status": null,
+    "started_at": "2026-11-18T01:14:42.360Z",
+    "ended_at": "2026-11-18T01:14:47.321Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 9,
+    "job_id": "cd914686-0872-4397-9bd1-e91f2a74f697",
+    "fencing_token": 2,
+    "worker_id": "d4dbfd1a450d-7-b4a9",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-18T01:15:14.350Z",
+    "ended_at": "2026-11-18T01:15:17.377Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 10,
+    "job_id": "9dcf382a-be17-4e44-bf75-f3fbe24f7b50",
+    "fencing_token": 2,
+    "worker_id": "d4dbfd1a450d-6-97ae",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-18T01:20:17.735Z",
+    "ended_at": "2026-11-18T01:20:20.641Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  }
+]
