@@ -519,6 +519,27 @@ long it should take, how to resume it, and where its tally will be.
 Memory: an 8 GB laptop with as little as 0.65 GB free during runs. Never run the full suite while the fleet is
 up; stop the fleet containers when not in use; run the chaos seeds with nothing else running.
 
+### Reviewer decision during 10b: the bank-fault+kills failure (2026-11-17)
+
+The first `bank-fault-kills` run (seed 41379566, 100 jobs, `evidence/chaos/bank-fault-kills-seed-41379566/`)
+failed the "0 failed" rule: 0 duplicates, 0 lost, 0 needs_human, but 2 jobs ended `failed` with 0 rows, because
+kills and the 30 s outage together used up their 3 attempts (every crash requeue uses an attempt, D21). The
+outage alone fails nothing (`bank-fault-only`, seed 2130356189: 0 failed). **Option 1 approved: crashes stop
+using attempts**, with these details:
+- Only crash requeues **before** the intent (T6.1) count as crashes instead of attempts. Anything after the
+  intent keeps going through verify exactly as now.
+- **A crash cap, default 5, configurable.** Hitting it → `failed` with outcome **`crash_limit`** (distinct from
+  `lease_expired`), so a poison job is visible as such.
+- A D-entry explaining the two budgets: **attempts** = the job's own failures; **crashes** = worker deaths,
+  capped for poison-job protection.
+- The model, the property tests (a new property: **a job is never failed by fewer than max_attempts own
+  failures unless it hit the crash cap**) and the model-vs-real test.
+- The failing run stays committed as evidence, with a README explaining why it failed and what changed. Then
+  re-run `bank-fault-kills` on the **same seed 41379566** and re-run `bank-fault-only`, and show both
+  before / after.
+- The mutation check gets a new planted bug: **a crash requeue that consumes an attempt again**. It must be
+  caught.
+
 ### Follow-ups
 
 - **Lookup 1.3.0** (read every matching transfer's Reference, so a `duplicate_suspected` job carries both
