@@ -94,6 +94,12 @@ export const MUTANTS: Mutant[] = [
     what: "Step 10b (D55): only a `resubmitted` verify marks a terminal job for the reconcile pass (a T6.4 [0, 0] that fails the job outright, `exhausted`, is never re-read)",
     tests: ["src/fleet/stateMachine.property.test.ts"],
   },
+  {
+    id: "11",
+    patch: "11-crash-requeue-uses-an-attempt.patch",
+    what: "Step 10b (D57): a crash requeue (T6.1) is not counted as a crash, so the dead lease consumes one of the job's attempts again (the bank-fault+kills failure)",
+    tests: ["src/fleet/stateMachine.property.test.ts", "src/fleet/stateMachine.test.ts", "src/worker/recover.db.test.ts"],
+  },
 ];
 
 function argValue(name: string): string | undefined {

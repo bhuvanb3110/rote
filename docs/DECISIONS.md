@@ -1940,3 +1940,83 @@ worker could still have clicked, the system must look again and say so as loudly
 reason, be found, and be re-run unchanged; and if each scenario says in advance what it expects.
 
 **Date.** 2026-11-17
+
+## D57: Two budgets: attempts are the job's own failures, crashes are worker deaths before the intent (capped, `crash_limit`) (amends D21, D49, D55, D56)
+
+(Step 10b; the reviewer decision during 10b on the bank-fault+kills failure, 2026-11-17: option 1.)
+
+**What failed.** The first `bank-fault-kills` run (seed 41379566, 100 jobs,
+`evidence/chaos/bank-fault-kills-seed-41379566/`) had 0 duplicates, 0 lost and 0 needs_human, but **2 jobs ended
+`failed` with 0 rows**: `076e7ccd` (attempts `1:crashed 2:crashed 3:failure`) and `93c77857` (`1:crashed
+2:failure 3:crashed`, failed / `lease_expired`). Since Step 8 every crash requeue (T6.1) used one of the job's 3
+attempts, so two kills plus one bank-outage failure exhausted a job that had failed once on its own. The outage
+alone fails nothing (`bank-fault-only`, seed 2130356189: 0 failed): the backoff (D49) is sized for the job's own
+failures, and kills were eating the same budget.
+
+**Decision.** A job has two budgets.
+- **Attempts** (`max_attempts`, default 3) are the job's **own failures**: a run that failed before its intent
+  (T4: requeued with the backoff, or failed), or an attempt that reached its intent and was verified not
+  committed (T7 `resubmitted` / `exhausted`). The job's own attempts = `attempt − crashes`
+  (`ownAttempts`); `jobs.attempt` still counts every lease, because `job_attempts.attempt` is the lease's number
+  (unique per job).
+- **Crashes** (`max_crashes`, **default 5**) are **worker deaths before the intent**: a lease that expired in
+  `running`, recovered by T6.1. They use no attempt. Only these count: a lease that expires **after** the intent
+  (`committing`: T6.4; `verifying`: T6.5–T6.7) goes through verify exactly as before, and its attempt stays one of
+  the job's own. The pure `recoveryAction` says which (`crash: true` on T6.1 / T6.2 only), and
+  `RECOVER_JOB_SQL` adds it (`crashes = crashes + $8`).
+- **The cap.** The crash that reaches `max_crashes` fails the job with outcome **`crash_limit`** (T6.2), not
+  `lease_expired`, so a poison job (one that kills every worker that runs it) is visible as such. Step 8's T6.2
+  (`lease_expired` on the last attempt) no longer exists; old rows keep their label.
+- **Configurable** per job like `max_attempts`: `EnqueueInput.maxCrashes` (default `DEFAULT_MAX_CRASHES` = 5, the
+  column default), stored as `jobs.max_crashes` (1–20). `GET /jobs/:id` shows `crashes` and `maxCrashes`.
+- **Migration `0006_crash_budget.sql`** (0001–0005 are never edited): the two columns; `jobs_crashes_are_leases`
+  (`crashes <= attempt`); 0001's `jobs_queued_has_attempts_left` re-stated as `attempt − crashes < max_attempts`
+  (same name), plus `jobs_queued_under_crash_cap` (`crashes < max_crashes`): every queued job is still
+  dequeueable (reviewer decision 6 of Step 5). The dequeue's pick repeats both.
+
+**Beyond the decision as written (for the reviewer).**
+- **Verify counts own attempts too.** `verifyDecision`'s `[0, 0]` → `resubmitted` / `exhausted` uses
+  `ownAttempts(attempt, crashes)`. Otherwise a job with 2 crashes whose third lease reached its intent and read
+  `[0, 0]` would be failed `exhausted` after **one** own failure, which the reviewer's new property forbids
+  (the deterministic test "verify counts own attempts too"). The verify path itself is unchanged.
+- **The backoff is keyed on the own attempt that failed** (D49's table now reads "own attempt that failed"):
+  crashes before a failure do not lengthen the wait. The bank-outage property (property 7) is unchanged (it has
+  no crashes).
+- **The `standard` chaos family** (D56) allowed `failed/lease_expired` ("kills alone used up its attempts").
+  That cannot happen any more; it now allows `failed/crash_limit` (five kills on one job before its intent) and,
+  as before, `failed/not_committed_attempts_exhausted`. The bank-fault families still allow no `failed` at all,
+  `crash_limit` included.
+
+**Tests.** Unit: `ownAttempts`; T6.1 on the last own attempt requeues (the run's two jobs' sequences), the cap
+fails / `crash_limit`, T6.4–T6.7 are never crashes; an exhaustive "never queued outside both budgets" sweep;
+`jobOutcomeFor` and `verifyDecision` on own attempts. **Property 11** (the reviewer's): *a job is never failed by
+fewer than `max_attempts` own failures unless it hit the crash cap*, with leases and crashes counted by the
+**simulation** from the transitions (a dequeue; a recovery of a `running` lease with the token bumped), never
+from the model's counters, over the Step 9/10 sequences (cap 5) and new crash-heavy ones (caps 1–5: lease runs
+of crash / failure / throw / ok, and poison-job loops); "property 11's cases are real" (fast-check reaches
+`crash_limit`, and a job that crashed `max_attempts` times or more still succeeds); property 4's queued check in
+both budgets; deterministic replays of the run's two failed jobs (both now queued, then succeed on lease 4), own
+failures still failing at 3 with crashes between them, the cap at 5 and at 2, a post-intent expiry that is not a
+crash, and D55's T6.2 case re-pointed at the cap (`maxCrashes: 1`). The model mirrors 0006 and throws where
+Postgres would refuse T6. **Model vs real** compares `crashes` after every command; the first family draws
+`max_crashes` from 1, 2, 5, and "recover:T6.2" (now `crash_limit`) and "a lease past `max_attempts`" must both
+happen. DB: T6.1 / T6.2 rows and notes, the CHECKs. **Mutant 11** (`11-crash-requeue-uses-an-attempt.patch`:
+T6.1 not counted as a crash, so the dead lease uses an attempt again) joins D54's check; 01 and 03 were
+regenerated (their context moved).
+
+**Alternatives considered.**
+- **More attempts** (`max_attempts` 5): the outage's retries and the kills still share one budget, so enough
+  kills fail a job anyway, and a genuinely failing job takes longer to give up.
+- **No cap on crashes**: a job that crashes its worker every time (a browser-killing page, a memory blow-up)
+  would cycle forever, taking a worker down each time.
+- **Counting crashes in `attempt` and attempts separately** (renaming the lease counter): `job_attempts.attempt`
+  is the lease's number and unique per job; rewriting it would change every existing row's meaning.
+- **A worker-side setting for the cap** (an env var): different workers could disagree, and the queued CHECK
+  could not state it; a column can.
+- **Counting a post-intent expiry as a crash too**: that lease reached its intent and is verified; whether it
+  used an attempt is verify's call (`resubmitted` counts it), as the reviewer specified.
+
+**Why.** The retry budget exists for what the job and the bank do; a worker dying is the fleet's problem, and
+the fleet must not charge it to the job, while still stopping a job that keeps killing its workers.
+
+**Date.** 2026-11-17

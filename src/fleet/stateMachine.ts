@@ -8,9 +8,10 @@
 //   completionAllowed which state T4 may write from which (Step 8: requeue/fail only from `running`)
 //   requeueBackoffSeconds  how long T4's requeue after a failure waits before the job may be dequeued
 //                     again (Step 10, D49: retries back off)
-//   recoveryAction    what T6 does with an expired lease (T6.1 requeue, T6.2 fail; Step 9: T6.4 claim a
-//                     `committing` job to verify, T6.5 re-claim a dead verifier's job, T6.6 escalate after
-//                     3 dead verify phases, T6.7 resume a deferred or handed-off verify)
+//   recoveryAction    what T6 does with an expired lease (T6.1 requeue, T6.2 fail at the crash cap; Step 9:
+//                     T6.4 claim a `committing` job to verify, T6.5 re-claim a dead verifier's job, T6.6
+//                     escalate after 3 dead verify phases, T6.7 resume a deferred or handed-off verify)
+//   ownAttempts       the job's own attempts: its leases minus its crashes (Step 10b, D57: two budgets)
 //   classifyLookup    what one history lookup said: a count, the bank unavailable, transient, unreadable
 //   verifyDecision    what a verify phase concludes from its lookups (Step 9, docs/plans/step-08.md
 //                     section 5, plus step-09 reviewer decisions 4-5: deferral)
@@ -24,10 +25,11 @@
 //     may have been -- written) is never retried blindly: the live owner moves it straight into its own
 //     verify phase (T5, Step 9), which reads the bank's history (a retry is the one thing that can
 //     duplicate a transfer);
-//   - a failure before anything irreversible is retried while attempts are left (D10), else failed;
+//   - a failure before anything irreversible is retried while attempts are left (D10), else failed --
+//     counting the job's OWN attempts: a worker's death before the intent is a crash, not an attempt (D57);
 //   - a job that can never run (unknown capability, bad params, missing override) fails at once.
 import type { ReplayResult } from "../artifact/index.js";
-import { TERMINAL_STATES, type JobState } from "../queue/types.js";
+import { DEFAULT_MAX_CRASHES, TERMINAL_STATES, type JobState } from "../queue/types.js";
 import type { Redactor } from "../worker/credentials.js";
 
 export type RunEnd =
@@ -42,6 +44,12 @@ export interface OutcomeContext {
   /** This attempt's number (job.attempt after the dequeue that leased it). */
   attempt: number;
   maxAttempts: number;
+  /**
+   * The job's crashes when this attempt was leased (jobs.crashes on the dequeued row, D57): earlier leases
+   * that died before their intent (T6.1). They do not use an attempt, so the attempts left are counted on
+   * ownAttempts(attempt, crashes). Default 0.
+   */
+  crashes?: number;
   /**
    * The Submit may have been clicked in this attempt: the commit intent (T3) was written, or its
    * COMMIT failed with an unknown result (Step 8). Without a commit intent (a runJob caller that passes
@@ -80,6 +88,31 @@ export interface JobOutcome {
 
 export const MAX_ERROR_LENGTH = 2000;
 
+// ---------------------------------------------------------------------------------------------------
+// The two budgets (Step 10b: docs/plans/step-10.md, "Reviewer decision during 10b"; D57).
+//
+//   attempts  the job's OWN failures (max_attempts, default 3): a run that failed before its intent (T4),
+//             or an attempt that reached its intent and was verified not committed (T7 resubmitted /
+//             exhausted). These are about the job and the bank: what a retry with a backoff is for.
+//   crashes   worker deaths before the intent (max_crashes, default 5): a lease that expired in `running`,
+//             recovered by T6.1. They say nothing about the job, so they do not use an attempt (the first
+//             bank-fault+kills run failed two jobs whose attempts kills had used up). Capped, so a poison
+//             job -- one that kills every worker that runs it -- ends `failed` / `crash_limit`, visibly.
+//
+// jobs.attempt still counts every lease (job_attempts.attempt is its number), so own = attempt - crashes.
+// A lease that expires AFTER the intent is not a crash: it is verified (T6.4) and its attempt is an own one.
+
+/** The crash cap's default (jobs.max_crashes, 0006): the 5th worker death before the intent fails the job. */
+export { DEFAULT_MAX_CRASHES };
+
+/** The job's own attempts so far (the current lease included while it runs): its leases minus its crashes. */
+export function ownAttempts(attempt: number, crashes: number): number {
+  if (!(Number.isInteger(attempt) && Number.isInteger(crashes) && crashes >= 0 && crashes <= attempt)) {
+    throw new RangeError(`ownAttempts: need integers 0 <= crashes <= attempt (got attempt ${attempt}, crashes ${crashes})`);
+  }
+  return attempt - crashes;
+}
+
 function clip(text: string): string {
   return text.length > MAX_ERROR_LENGTH ? `${text.slice(0, MAX_ERROR_LENGTH - 1)}…` : text;
 }
@@ -103,7 +136,9 @@ function describeThrown(error: unknown): string {
 export function jobOutcomeFor(end: RunEnd, ctx: OutcomeContext): JobOutcome {
   const redact = ctx.redact ?? ((s: string) => s);
   const err = (text: string) => clip(redact(text));
-  const attemptsLeft = ctx.attempt < ctx.maxAttempts;
+  // The job's own attempts (D57): a crash requeue before the intent is not one of them.
+  const own = ownAttempts(ctx.attempt, ctx.crashes ?? 0);
+  const attemptsLeft = own < ctx.maxAttempts;
 
   if (end.kind === "invalid") {
     return {
@@ -137,7 +172,7 @@ export function jobOutcomeFor(end: RunEnd, ctx: OutcomeContext): JobOutcome {
       state: attemptsLeft ? "queued" : "failed",
       outcome: attemptsLeft ? null : end.aborted ? "aborted" : "failure",
       error: err(
-        `attempt ${ctx.attempt}/${ctx.maxAttempts} ${what} before anything irreversible` +
+        `attempt ${own}/${ctx.maxAttempts} ${what} before anything irreversible` +
           `${attemptsLeft ? " (retrying)" : " (attempts exhausted)"}: ${describeThrown(end.error)}`,
       ),
       result: null,
@@ -190,7 +225,7 @@ export function jobOutcomeFor(end: RunEnd, ctx: OutcomeContext): JobOutcome {
         state: attemptsLeft ? "queued" : "failed",
         outcome: attemptsLeft ? null : "failure",
         error: err(
-          `attempt ${ctx.attempt}/${ctx.maxAttempts}${attemptsLeft ? " (retrying)" : " (attempts exhausted)"}: ` +
+          `attempt ${own}/${ctx.maxAttempts}${attemptsLeft ? " (retrying)" : " (attempts exhausted)"}: ` +
             describeResult(result),
         ),
         result,
@@ -226,9 +261,10 @@ export function completionAllowed(from: JobState, to: CompletionTarget): boolean
 // and a job burns all of its attempts. T4 therefore sets `not_before = now() + requeueBackoffSeconds(..)`
 // (database clock, D22) and the dequeue skips a queued job until then. Each retry still consumes an
 // attempt (D21 unchanged). Only T4's requeue backs off: a crash requeue (T6.1) and a verified resubmit
-// (T7) were not the bank's doing and are picked up at once.
+// (T7) were not the bank's doing and are picked up at once. The backoff is keyed on the job's OWN attempt
+// that failed (ownAttempts, D57): crashes before it do not lengthen it.
 //
-//   attempt that failed   1      2      3      4+
+//   own attempt that failed   1      2      3      4+
 //   backoff (no jitter)   10 s   30 s   90 s   120 s (the cap)
 //
 // The jitter (x [0.8, 1.2], to the millisecond) spreads a fleet's retries after a shared outage. With
@@ -282,12 +318,18 @@ export function minRequeueScheduleSeconds(maxAttempts: number, config: RequeueBa
 // open job_verifications row) as `crashed`.
 //
 //   left in      condition                                   action                     jobs becomes
-//   running      attempt < max_attempts                      T6.1 requeue               queued (nothing irreversible happened)
-//   running      attempt >= max_attempts                     T6.2 fail                  failed / lease_expired (never queued, D21)
+//   running      crashes + 1 < max_crashes                   T6.1 requeue, crashes + 1  queued (nothing irreversible happened;
+//                                                                                       no attempt used, D57)
+//   running      crashes + 1 >= max_crashes                  T6.2 fail, crashes + 1     failed / crash_limit (a poison job, D57)
 //   committing   (the intent was written)                    T6.4 claim to verify       verifying, owned by the recoverer
 //   verifying    the newest phase was deferred / handed off  T6.7 resume                verifying, owned by the recoverer
 //   verifying    fewer than 3 dead phases in this cycle       T6.5 re-claim              verifying, owned by the recoverer
 //   verifying    3 dead phases (the verifier keeps dying)     T6.6 escalate              needs_human / verify_exhausted
+//
+// A lease that expires in `running` is a CRASH (D57): the worker died, or froze past its lease, before
+// its intent. It does not use one of the job's attempts (Step 8's T6.1/T6.2 did: `attempt < max_attempts`,
+// else failed / lease_expired; the first bank-fault+kills chaos run failed two jobs that way). The crash
+// cap fails a job that keeps killing its workers. A lease that expires after the intent is not a crash.
 //
 // Step 8's T6.3 (committing -> needs_human) is gone: an expired commit is verified, never parked. A
 // "dead" phase is one that ended without a decision: still open when its lease expired, closed
@@ -351,13 +393,20 @@ export interface RecoveryRow {
   state: RecoverableState;
   attempt: number;
   maxAttempts: number;
+  /** jobs.crashes / jobs.max_crashes (0006, D57): what a `running` lease's expiry is judged on. */
+  crashes: number;
+  maxCrashes: number;
   /** Required for `verifying` (what the cycle's phases say). */
   verify?: VerifyCycle;
 }
 
+/**
+ * `crash`: this recovery counts one crash (jobs.crashes + 1, RECOVER_JOB_SQL's $8): T6.1 and T6.2, a lease
+ * that died before its intent. Never for a lease past its intent (T6.4-T6.7): that one is verified (D57).
+ */
 export type RecoveryAction =
-  | { kind: "requeue"; label: "T6.1"; to: "queued"; outcome: null; error: string }
-  | { kind: "fail"; label: "T6.2"; to: "failed"; outcome: "lease_expired"; error: string }
+  | { kind: "requeue"; label: "T6.1"; to: "queued"; outcome: null; crash: boolean; error: string }
+  | { kind: "fail"; label: "T6.2"; to: "failed"; outcome: "crash_limit"; crash: boolean; error: string }
   /** T6.4/T6.5/T6.7: the recoverer takes the job (token + 1, its own lease) and verifies it at once. */
   | {
       kind: "verify";
@@ -365,30 +414,39 @@ export type RecoveryAction =
       to: "verifying";
       outcome: "commit_uncertain";
       reason: Exclude<VerifyReason, "commit_uncertain">;
+      crash: false;
       error: string;
     }
-  | { kind: "escalate"; label: "T6.6"; to: "needs_human"; outcome: "verify_exhausted"; error: string };
+  | { kind: "escalate"; label: "T6.6"; to: "needs_human"; outcome: "verify_exhausted"; crash: false; error: string };
 
 export function recoveryAction(row: RecoveryRow): RecoveryAction {
   switch (row.state) {
-    case "running":
-      return row.attempt < row.maxAttempts
+    case "running": {
+      // A crash (D57): it uses no attempt; it counts toward the cap.
+      const crash = row.crashes + 1;
+      const own = ownAttempts(row.attempt, row.crashes);
+      return crash < row.maxCrashes
         ? {
             kind: "requeue",
             label: "T6.1",
             to: "queued",
             outcome: null,
-            error: `lease expired while running (attempt ${row.attempt}/${row.maxAttempts}), before any commit intent; requeued`,
+            crash: true,
+            error:
+              `lease expired while running, before any commit intent: crash ${crash}/${row.maxCrashes}, not one of the job's ` +
+              `attempts (own attempts used ${own - 1}/${row.maxAttempts}); requeued`,
           }
         : {
             kind: "fail",
             label: "T6.2",
             to: "failed",
-            outcome: "lease_expired",
+            outcome: "crash_limit",
+            crash: true,
             error:
-              `lease expired on the last attempt (${row.attempt}/${row.maxAttempts}); ` +
-              "no commit intent, so nothing irreversible happened",
+              `crash limit: the lease expired while running, before any commit intent, once too often (crash ${crash}/${row.maxCrashes}): ` +
+              "a job that keeps killing its workers (a poison job?); nothing irreversible happened",
           };
+    }
     case "committing":
       return {
         kind: "verify",
@@ -396,6 +454,7 @@ export function recoveryAction(row: RecoveryRow): RecoveryAction {
         to: "verifying",
         outcome: "commit_uncertain",
         reason: "lease_expired_in_committing",
+        crash: false,
         error: "lease expired after the commit intent: the Submit may have committed; verifying in the bank's history by memo_key (T6.4)",
       };
     case "verifying": {
@@ -408,6 +467,7 @@ export function recoveryAction(row: RecoveryRow): RecoveryAction {
           to: "verifying",
           outcome: "commit_uncertain",
           reason: "resumed",
+          crash: false,
           error:
             cycle.lastDecision === "deferred"
               ? `resuming a deferred verify (deferral ${cycle.deferrals}; the bank was unavailable) (T6.7)`
@@ -420,6 +480,7 @@ export function recoveryAction(row: RecoveryRow): RecoveryAction {
           label: "T6.6",
           to: "needs_human",
           outcome: "verify_exhausted",
+          crash: false,
           error:
             `verify exhausted: ${cycle.deadPhases} verify phases died without a decision (crash or lost lease); ` +
             "the Submit may have committed; check the bank's history for memo_key",
@@ -431,6 +492,7 @@ export function recoveryAction(row: RecoveryRow): RecoveryAction {
         to: "verifying",
         outcome: "commit_uncertain",
         reason: "lease_expired_in_verifying",
+        crash: false,
         error: `a verifier's lease expired (dead verify phases in this cycle: ${cycle.deadPhases}/${MAX_VERIFY_PHASES}); re-verifying (T6.5)`,
       };
     }
@@ -542,6 +604,12 @@ export interface VerifyInput {
   priorStatus: PriorStatus;
   attempt: number;
   maxAttempts: number;
+  /**
+   * The job's crashes (jobs.crashes, D57). The attempt being verified reached its intent, so it is one of
+   * the job's own; the crashes before it are not: [0, 0] resubmits while ownAttempts(attempt, crashes) <
+   * maxAttempts. Default 0.
+   */
+  crashes?: number;
   /** From the job's verify cycle, read at decision time (database clock). */
   deferrals: number;
   deferredForSeconds: number | null;
@@ -563,7 +631,7 @@ const fmt = (readings: readonly LookupReading[]) => JSON.stringify(lookupsColumn
  *
  *   lookups          prior_status        decision               job
  *   [1] / [0, 1]     any                 already_done           succeeded / already_done, confirmationRef = firstMatchRef
- *   [0, 0]           not business_out.   resubmitted            queued (attempts left)  -- the ONLY retry after an intent
+ *   [0, 0]           not business_out.   resubmitted            queued (own attempts left, D57)  -- the ONLY retry after an intent
  *   [0, 0]           not business_out.   exhausted              failed / not_committed_attempts_exhausted
  *   [0, 0]           business_outcome    not_committed_final    business_outcome (the refusal stands), never retried
  *   [2+] / [0, 2+]   any                 escalated              needs_human / ambiguous
@@ -624,19 +692,21 @@ export function verifyDecision(input: VerifyInput): VerifyDecision {
       error: `verified not committed (lookups ${fmt(readings)}): the bank's refusal after Submit stands; never retried`,
     };
   }
-  if (input.attempt < input.maxAttempts) {
+  // The job's own attempts (D57): crashes before the intent did not use one.
+  const own = ownAttempts(input.attempt, input.crashes ?? 0);
+  if (own < input.maxAttempts) {
     return {
       decision: "resubmitted",
       to: "queued",
       outcome: null,
-      error: `verified not committed (lookups ${fmt(readings)}): resubmitting as attempt ${input.attempt + 1}/${input.maxAttempts}`,
+      error: `verified not committed (lookups ${fmt(readings)}): resubmitting as attempt ${own + 1}/${input.maxAttempts}`,
     };
   }
   return {
     decision: "exhausted",
     to: "failed",
     outcome: "not_committed_attempts_exhausted",
-    error: `verified not committed (lookups ${fmt(readings)}) on the last attempt (${input.attempt}/${input.maxAttempts}): failed, nothing moved`,
+    error: `verified not committed (lookups ${fmt(readings)}) on the last attempt (${own}/${input.maxAttempts}): failed, nothing moved`,
   };
 }
 

@@ -250,6 +250,7 @@ export async function runVerifyPhase(
       priorStatus: cycle.priorStatus,
       attempt: job.attempt,
       maxAttempts: job.max_attempts,
+      crashes: job.crashes,
       deferrals: cycle.deferrals,
       deferredForSeconds: cycle.deferredForSeconds,
       defer: ctx.defer ?? DEFAULT_DEFER_CONFIG,

@@ -83,6 +83,12 @@ export function jobView(job: JobRow) {
     state: job.state,
     attempt: job.attempt,
     maxAttempts: job.max_attempts,
+    /**
+     * Worker deaths before the intent (D57): they do not use an attempt, so the job's own attempts are
+     * attempt - crashes. At maxCrashes the job fails / crash_limit.
+     */
+    crashes: job.crashes,
+    maxCrashes: job.max_crashes,
     outcome: job.outcome,
     error: job.error,
     result: job.result,

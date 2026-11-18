@@ -9,11 +9,11 @@ import type { ChaosFamily } from "./families.js";
  * path at all -- the resubmit path above all.
  */
 export interface RecoveryKinds {
-  /** T6.1: a dead worker's job (before its intent) requeued at once. */
+  /** T6.1: a dead worker's job (before its intent) requeued at once; a crash, not an attempt (D57). */
   requeuedAfterCrash: number;
   /** T4: an attempt that failed before its intent, requeued with a backoff (D49). */
   requeuedAfterFailure: number;
-  /** T6.2: the last attempt's worker died before its intent: failed / lease_expired. */
+  /** T6.2: the crash cap (D57): the job's max_crashes-th worker death before its intent: failed / crash_limit. (Before D57: the last attempt's, lease_expired.) */
   failedByRecovery: number;
   /** T6.4: an expired commit claimed to verify. */
   claimedToVerify: number;
@@ -41,9 +41,9 @@ export interface RecoveryKinds {
 }
 
 export const RECOVERY_KIND_LABELS: Record<keyof RecoveryKinds, string> = {
-  requeuedAfterCrash: "requeued after a crash (T6.1)",
+  requeuedAfterCrash: "requeued after a crash, no attempt used (T6.1, D57)",
   requeuedAfterFailure: "requeued after a failure, with a backoff (T4, D49)",
-  failedByRecovery: "failed by recovery (T6.2: attempts used up by kills)",
+  failedByRecovery: "failed by recovery at the crash cap (T6.2 crash_limit, D57)",
   claimedToVerify: "expired commit claimed to verify (T6.4)",
   reclaimedVerify: "dead verifier re-claimed (T6.5)",
   resumedVerify: "deferred verify resumed (T6.7)",

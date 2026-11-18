@@ -20,7 +20,7 @@ import { z } from "zod";
 import { canonicalJson, type Capability } from "../artifact/index.js";
 import { inputsToZodSchema } from "../catalog/schema.js";
 import type { Queryable } from "./db.js";
-import { JobRowSchema, type JobRow } from "./types.js";
+import { DEFAULT_MAX_CRASHES, JobRowSchema, type JobRow } from "./types.js";
 
 /**
  * The input a capability with an irreversible step gets its idempotency marker in: the worker types
@@ -41,6 +41,11 @@ export interface EnqueueInput {
   params: Record<string, unknown>;
   /** Default 3. Not part of request_hash: a replay of the same request returns the existing job as is. */
   maxAttempts?: number;
+  /**
+   * The crash cap (D57): the job fails / crash_limit at its max_crashes-th worker death before the intent.
+   * Default 5 (DEFAULT_MAX_CRASHES). Not part of request_hash, like maxAttempts.
+   */
+  maxCrashes?: number;
 }
 
 export interface EnqueueResult {
@@ -154,8 +159,8 @@ export function newTraceId(): string {
 }
 
 export const ENQUEUE_SQL = `
-INSERT INTO jobs (idempotency_key, request_hash, tenant_id, capability_id, params, max_attempts, trace_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO jobs (idempotency_key, request_hash, tenant_id, capability_id, params, max_attempts, trace_id, max_crashes)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (tenant_id, idempotency_key) DO UPDATE
   SET idempotency_key = EXCLUDED.idempotency_key   -- deliberate no-op: lock + return the committed row
 RETURNING *, (xmax = 0) AS created`;
@@ -177,6 +182,7 @@ export async function enqueue(db: Queryable, input: EnqueueInput): Promise<Enque
     params,
     input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
     newTraceId(),
+    input.maxCrashes ?? DEFAULT_MAX_CRASHES,
   ]);
   const { created, ...row } = rows[0] as Record<string, unknown> & { created: boolean };
   const job = JobRowSchema.parse(row);

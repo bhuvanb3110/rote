@@ -4,8 +4,9 @@
 //   modelDequeue            src/queue/dequeue.ts     CLAIM_TENANT_SQL + PICK_JOB_SQL + LEASE_SQL (due jobs only: not_before)
 //   modelHeartbeat          src/worker/heartbeat.ts  T2  HEARTBEAT_SQL
 //   modelIntent             src/worker/intent.ts     T3  COMMIT_INTENT_SQL
-//   modelComplete           src/worker/complete.ts   T4  COMPLETE_JOB_SQL (+ the jobs_queued_has_attempts_left CHECK;
-//                                                        a requeue's not_before backoff, D49)
+//   modelComplete           src/worker/complete.ts   T4  COMPLETE_JOB_SQL (+ the jobs_queued_has_attempts_left and
+//                                                        jobs_queued_under_crash_cap CHECKs; a requeue's not_before
+//                                                        backoff, D49)
 //   modelCompleteIntoVerify src/worker/verifySql.ts  T5  COMPLETE_INTO_VERIFY_SQL + its job_verifications row
 //   modelVerifyResult       src/worker/verifySql.ts  T7  VERIFY_RESULT_SQL + the phase's decision
 //   modelVerifyDefer        src/worker/verifySql.ts  T8  VERIFY_DEFER_SQL + the phase's decision (step-09 decision 5)
@@ -35,7 +36,9 @@ import {
   completionAllowed,
   CYCLE_STARTING_REASONS,
   DEAD_PHASE_DECISIONS,
+  DEFAULT_MAX_CRASHES,
   isReconcilable,
+  ownAttempts,
   RECONCILE_TRIGGERS,
   recoveryAction,
   REVERIFIABLE_OUTCOMES,
@@ -60,8 +63,12 @@ export interface ModelJob {
   /** Creation order: the SQL orders queued work by (created_at, id). */
   readonly seq: number;
   readonly state: JobState;
+  /** Every lease (dequeue) so far, as jobs.attempt. */
   readonly attempt: number;
   readonly maxAttempts: number;
+  /** Leases that died before their intent (T6.1 / T6.2), as jobs.crashes (0006, D57): not attempts. */
+  readonly crashes: number;
+  readonly maxCrashes: number;
   readonly token: number;
   readonly owner: string | null;
   /** Seconds on the database clock; null = no lease. */
@@ -111,11 +118,13 @@ export interface LeaseRef {
 export const isActive = (state: JobState): boolean => MODEL_ACTIVE_STATES.includes(state);
 export const isTerminal = (state: JobState): boolean => MODEL_TERMINAL_STATES.includes(state);
 
-export function newJob(fields: { id: string; tenant: string; seq: number; maxAttempts: number }): ModelJob {
+export function newJob(fields: { id: string; tenant: string; seq: number; maxAttempts: number; maxCrashes?: number }): ModelJob {
   return {
     ...fields,
+    maxCrashes: fields.maxCrashes ?? DEFAULT_MAX_CRASHES,
     state: "queued",
     attempt: 0,
+    crashes: 0,
     token: 0,
     owner: null,
     leaseExpiresAt: null,
@@ -149,13 +158,28 @@ const holds = (job: ModelJob, ref: LeaseRef) => job.token === ref.token && job.o
 const due = (job: ModelJob, now: number) => job.notBefore === null || job.notBefore <= now;
 
 /**
+ * The two queued CHECKs (0006, D57) for a job about to be (or being) queued: an own attempt left
+ * (`attempt - crashes < max_attempts`) and under the crash cap (`crashes < max_crashes`). Also PICK_JOB_SQL's filter.
+ */
+export const queueable = (job: Pick<ModelJob, "attempt" | "crashes" | "maxAttempts" | "maxCrashes">): boolean =>
+  job.attempt - job.crashes < job.maxAttempts && job.crashes < job.maxCrashes;
+
+/** Thrown where Postgres would reject a statement with a CHECK violation the caller does not expect (T6, a bug). */
+export class ModelCheckViolation extends Error {
+  constructor(what: string) {
+    super(`model: ${what} would violate a jobs CHECK (23514)`);
+    this.name = "ModelCheckViolation";
+  }
+}
+
+/**
  * dequeue(): claim the tenant whose oldest DUE queued job is oldest, among tenants with due queued work
  * and fewer active jobs than max_concurrent (an expired, unrecovered lease still counts as active); lease
  * that job: running, attempt + 1, token + 1, owner, lease = now + leaseSeconds, not_before cleared.
  */
 export function modelDequeue(db: ModelDb, owner: string, leaseSeconds: number): { db: ModelDb; job: ModelJob | null } {
   const queuedOf = (tenant: string) =>
-    db.jobs.filter((j) => j.tenant === tenant && j.state === "queued" && j.attempt < j.maxAttempts && due(j, db.now)).sort((a, b) => a.seq - b.seq);
+    db.jobs.filter((j) => j.tenant === tenant && j.state === "queued" && queueable(j) && due(j, db.now)).sort((a, b) => a.seq - b.seq);
   const active = (tenant: string) => db.jobs.filter((j) => j.tenant === tenant && isActive(j.state)).length;
   const tenants = [...new Set(db.jobs.map((j) => j.tenant))]
     .filter((t) => queuedOf(t).length > 0 && active(t) < (db.caps[t] ?? 0))
@@ -226,8 +250,8 @@ const markReconcile = (job: ModelJob, to: string, now: number, due: number | und
 /**
  * T4: the holder (token + owner) records its outcome and releases the lease. Not lease-checked: a
  * holder whose lease expired but was not yet recovered is still the only one who ran the job.
- * `check_violation` = Postgres would reject the UPDATE (a requeue with no attempt left, D21). A requeue
- * backs off (not_before = now + notBeforeSeconds); any other target leaves not_before null.
+ * `check_violation` = Postgres would reject the UPDATE (a requeue with no own attempt left, D21, D57). A
+ * requeue backs off (not_before = now + notBeforeSeconds); any other target leaves not_before null.
  */
 export function modelComplete(
   db: ModelDb,
@@ -239,7 +263,7 @@ export function modelComplete(
 ): { db: ModelDb; result: ModelCompleteResult } {
   const job = find(db, ref.jobId);
   if (!(holds(job, ref) && completionAllowed(job.state, to))) return { db, result: fencedOut(job, ref) };
-  if (to === "queued" && !(job.attempt < job.maxAttempts)) return { db, result: "check_violation" };
+  if (to === "queued" && !queueable(job)) return { db, result: "check_violation" };
   const notBefore = to === "queued" && options.notBeforeSeconds != null ? db.now + options.notBeforeSeconds : null;
   const reconcileAfter = markReconcile(job, to, db.now, options.reconcileDueSeconds);
   return {
@@ -338,7 +362,7 @@ export function modelVerifyResult(
     const how = fencedOut(job, ref);
     return { db: replace(db, markPhaseFencedOut(job, ref.token, how, db.now)), result: how };
   }
-  if (decision.to === "queued" && !(job.attempt < job.maxAttempts)) return { db, result: "check_violation" };
+  if (decision.to === "queued" && !queueable(job)) return { db, result: "check_violation" };
   const next: ModelJob = closePhase(
     {
       ...job,
@@ -435,13 +459,30 @@ export function modelRecover(
     if (!job) break;
     const from = job.state as RecoverableState;
     const cycle = modelVerifyCycle(job, current.now);
-    const action = recoveryAction({ state: from, attempt: job.attempt, maxAttempts: job.maxAttempts, verify: from === "verifying" ? cycle : undefined });
+    const action = recoveryAction({
+      state: from,
+      attempt: job.attempt,
+      maxAttempts: job.maxAttempts,
+      crashes: job.crashes,
+      maxCrashes: job.maxCrashes,
+      verify: from === "verifying" ? cycle : undefined,
+    });
     const token = job.token + 1;
+    // T6.1 / T6.2 count a crash (RECOVER_JOB_SQL's crashes + $8, D57).
+    const crashes = job.crashes + (action.crash ? 1 : 0);
     // The dead verifier's open phase row (if any) is closed `crashed`.
     const closed: ModelJob = {
       ...job,
+      crashes,
       phases: job.phases.map((p) => (p.token === job.token && p.decision === null ? { ...p, decision: "crashed", endedAt: current.now } : p)),
     };
+    // The CHECKs Postgres would enforce on RECOVER_JOB_SQL: a requeue needs an own attempt left and room
+    // under the crash cap (0006); every crash is a lease. recoveryAction never asks otherwise -- unless it is
+    // wrong, and then the real recovery transaction fails, so the model throws too.
+    if (crashes > job.attempt) throw new ModelCheckViolation(`T6 on job ${job.id}: crashes ${crashes} > attempt ${job.attempt} (jobs_crashes_are_leases)`);
+    if (action.to === "queued" && !queueable(closed)) {
+      throw new ModelCheckViolation(`T6.1 on job ${job.id}: requeue at attempt ${job.attempt}, crashes ${crashes} (own ${ownAttempts(job.attempt, crashes)}/${job.maxAttempts}, crash cap ${job.maxCrashes})`);
+    }
     let next: ModelJob;
     if (action.kind === "verify") {
       const priorStatus = action.reason === "lease_expired_in_committing" ? null : cycle.priorStatus;

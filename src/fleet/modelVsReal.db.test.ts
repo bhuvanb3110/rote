@@ -1,7 +1,7 @@
 // Model vs real (Step 8 reviewer addition R1; Step 9 adds T5, T7, T8, the verify claims T6.4-T6.7 and
 // the reverify hand-off): fast-check model-based (command) testing that runs the SAME random command
 // sequences against the pure model (src/fleet/model.ts) and the real SQL on a test Postgres schema, and
-// compares, after EVERY command, each job's state, fencing token, owner, attempt, outcome and lease, its
+// compares, after EVERY command, each job's state, fencing token, owner, attempt, crashes (D57), outcome and lease, its
 // verify cycle as VERIFY_CYCLE_SQL derives it from job_verifications (phases, dead phases, deferrals,
 // deferred-for, prior status, the newest phase's decision), its requeue backoff (not_before, Step 10 D49),
 // its reconcile marks (reconcile_after, reconciled_at; D50), plus each command's own answer (leased which
@@ -139,6 +139,7 @@ interface RealJob {
   id: string;
   state: string;
   attempt: number;
+  crashes: number;
   fencing_token: number;
   lease_owner: string | null;
   outcome: string | null;
@@ -153,7 +154,7 @@ interface RealJob {
 async function readReal(pool: Pool): Promise<RealJob[]> {
   return (
     await pool.query<RealJob>(
-      `SELECT id, state, attempt, fencing_token, lease_owner, outcome,
+      `SELECT id, state, attempt, crashes, fencing_token, lease_owner, outcome,
               EXTRACT(EPOCH FROM (lease_expires_at - now()))::float8 AS remaining,
               EXTRACT(EPOCH FROM (not_before - now()))::float8 AS not_before_in,
               EXTRACT(EPOCH FROM (reconcile_after - now()))::float8 AS reconcile_in,
@@ -174,9 +175,10 @@ async function compare(m: Model, r: Real, after: string): Promise<void> {
   for (const [i, mj] of m.db.jobs.entries()) {
     const rj = real[i]!;
     const where = `${after}: job ${i}`;
-    expect({ state: rj.state, attempt: rj.attempt, token: rj.fencing_token, owner: rj.lease_owner, outcome: rj.outcome }, where).toEqual({
+    expect({ state: rj.state, attempt: rj.attempt, crashes: rj.crashes, token: rj.fencing_token, owner: rj.lease_owner, outcome: rj.outcome }, where).toEqual({
       state: mj.state,
       attempt: mj.attempt,
+      crashes: mj.crashes,
       token: mj.token,
       owner: mj.owner,
       outcome: mj.outcome,
@@ -247,6 +249,8 @@ class DequeueCmd implements Cmd {
     expect(real ? { id: real.id, token: real.fencing_token } : null, this.toString()).toEqual(job ? { id: job.id, token: job.token } : null);
     // A queued job was there but not due yet: the backoff held it back (D49).
     if (!job && m.db.jobs.some((j) => j.state === "queued" && j.notBefore !== null && j.notBefore > m.db.now)) hit("dequeue:held_back_by_not_before");
+    // D57: a lease past max_attempts, possible only because earlier leases were crashes, not attempts.
+    if (job && job.attempt > job.maxAttempts) hit("dequeue:lease_beyond_max_attempts");
     m.db = next;
     if (job) m.held[this.w] = { jobId: job.id, token: job.token };
     await compare(m, r, this.toString());
@@ -655,15 +659,16 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
     let commandsRun = 0;
     await fc.assert(
       fc.asyncProperty(
-        fc.record({ cap: fc.constantFrom(1, 2), maxAttempts: fc.constantFrom(1, 2, 3), jobs: fc.constantFrom(1, 2) }),
+        // maxCrashes (D57): small caps so T6.2 (crash_limit) is reached within 30 commands; 5 is the default.
+        fc.record({ cap: fc.constantFrom(1, 2), maxAttempts: fc.constantFrom(1, 2, 3), maxCrashes: fc.constantFrom(1, 2, 5), jobs: fc.constantFrom(1, 2) }),
         fc.commands(commandArbs, { maxCommands: 30, size: "max" }),
         async (cfg, cmds) => {
           await resetQueueTables(pool);
           await pool.query("UPDATE tenants SET max_concurrent = $1 WHERE id = $2", [cfg.cap, TENANT]);
           const jobs: ModelJob[] = [];
           for (let i = 0; i < cfg.jobs; i += 1) {
-            const { job } = await enqueue(pool, { capability: CAP, tenantId: TENANT, idempotencyKey: `mvr-${i}`, params: { memberId: "1" }, maxAttempts: cfg.maxAttempts });
-            jobs.push(newJob({ id: job.id, tenant: TENANT, seq: i + 1, maxAttempts: cfg.maxAttempts }));
+            const { job } = await enqueue(pool, { capability: CAP, tenantId: TENANT, idempotencyKey: `mvr-${i}`, params: { memberId: "1" }, maxAttempts: cfg.maxAttempts, maxCrashes: cfg.maxCrashes });
+            jobs.push(newJob({ id: job.id, tenant: TENANT, seq: i + 1, maxAttempts: cfg.maxAttempts, maxCrashes: cfg.maxCrashes }));
           }
           const setup = () => ({
             model: { db: { now: 0, jobs, caps: { [TENANT]: cfg.cap } }, held: {} } as Model,
@@ -756,6 +761,7 @@ describe("model vs real SQL (R1): dequeue, T2, T3, T4, T5, T6 (T6.1-T6.7), T7, T
       "T8:recorded", "T8:fenced", "T8:illegal_transition",
       "recover:T6.1", "recover:T6.2", "recover:T6.4", "recover:T6.5", "recover:T6.7",
       "dequeue:held_back_by_not_before",
+      "dequeue:lease_beyond_max_attempts", // D57: crashes did not use the attempts
       "R1:claimed", "R1:none", "batchClaim:claimed", "batchClaim:refused",
       "R1:claimed:succeeded", "R1:claimed:failed", "R1:claimed:business_outcome", // D55
       "R2:reconciled:recorded", "R2:duplicate_suspected:recorded", "R2:reconcile_unreadable:recorded", "R2:reconcile_deferred:recorded",

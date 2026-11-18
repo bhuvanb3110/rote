@@ -43,16 +43,19 @@ describe("judgeFamily", () => {
     }
   });
 
-  it("the standard family allows a job failed only because kills used up its attempts (T6.2, or a last-attempt [0, 0]); any other failure fails it", () => {
-    expect(judgeFamily(FAMILY_SPECS.standard, clean({ finals: { "succeeded/success": 98, "failed/lease_expired": 1, "failed/not_committed_attempts_exhausted": 1 } }))).toEqual([]);
+  it("the standard family allows a job failed only because kills exhausted a budget (the crash cap: crash_limit, D57; or a last-own-attempt [0, 0]); any other failure fails it", () => {
+    expect(judgeFamily(FAMILY_SPECS.standard, clean({ finals: { "succeeded/success": 98, "failed/crash_limit": 1, "failed/not_committed_attempts_exhausted": 1 } }))).toEqual([]);
     expect(judgeFamily(FAMILY_SPECS.standard, clean({ finals: { "failed/failure": 1 } }))).toHaveLength(1);
     expect(judgeFamily(FAMILY_SPECS.standard, clean({ finals: { "business_outcome/business_outcome": 1 } }))).toHaveLength(1);
+    // Step 8's failed / lease_expired (a crash that used the last attempt) cannot happen since D57: it fails the run.
+    expect(judgeFamily(FAMILY_SPECS.standard, clean({ finals: { "failed/lease_expired": 1 } })).join(";")).toMatch(/ended failed\/lease_expired/);
   });
 
-  it("the bank-fault families allow only succeeded: 0 failed (whatever the cause), 0 needs_human", () => {
+  it("the bank-fault families allow only succeeded: 0 failed (whatever the cause, the crash cap included), 0 needs_human", () => {
     for (const fam of ["bank-fault-only", "bank-fault-kills"] as const) {
       expect(judgeFamily(FAMILY_SPECS[fam], bankRun({ finals: { "succeeded/success": 99, "failed/failure": 1 } })).join(";")).toMatch(/ended failed\/failure/);
       expect(judgeFamily(FAMILY_SPECS[fam], bankRun({ finals: { "succeeded/success": 99, "failed/lease_expired": 1 } })).join(";")).toMatch(/ended failed\/lease_expired/);
+      expect(judgeFamily(FAMILY_SPECS[fam], bankRun({ finals: { "succeeded/success": 99, "failed/crash_limit": 1 } })).join(";")).toMatch(/ended failed\/crash_limit/);
       expect(judgeFamily(FAMILY_SPECS[fam], bankRun({ finals: { "needs_human/verify_unavailable": 1 } })).join(";")).toMatch(/needs_human\/verify_unavailable/);
     }
   });

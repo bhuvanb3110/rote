@@ -29,7 +29,7 @@ import { writeCommitIntent } from "./intent.js";
 import { LeaseLostError } from "./leaseErrors.js";
 import { redactDeep, type Redactor } from "./credentials.js";
 import { isTransientDbError } from "../queue/index.js";
-import { jobOutcomeFor, requeueBackoffSeconds, type JobOutcome } from "../fleet/stateMachine.js";
+import { jobOutcomeFor, ownAttempts, requeueBackoffSeconds, type JobOutcome } from "../fleet/stateMachine.js";
 import type { RunJobOptions, RunJobResult } from "./runJob.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
 import { NO_METRICS, type WorkerMetrics } from "./metrics.js";
@@ -116,8 +116,8 @@ export interface WorkerOptions {
   metrics?: WorkerMetrics;
   /**
    * Seconds a requeue after a failed attempt waits before the job may be dequeued again (T4's
-   * not_before; Step 10, D49). Default: requeueBackoffSeconds(attempt, random): 10 s, 30 s, 90 s, capped
-   * at 120 s, jittered x [0.8, 1.2).
+   * not_before; Step 10, D49). Called with the job's own attempt that failed (ownAttempts, D57).
+   * Default: requeueBackoffSeconds(attempt, random): 10 s, 30 s, 90 s, capped at 120 s, jittered x [0.8, 1.2).
    */
   requeueBackoff?: (attempt: number) => number;
 }
@@ -289,6 +289,7 @@ export class Worker {
         const outcome = jobOutcomeFor(run.end, {
           attempt: job.attempt,
           maxAttempts: job.max_attempts,
+          crashes: job.crashes,
           irreversibleStarted,
           redact: this.options.redact,
         });
@@ -298,6 +299,7 @@ export class Worker {
       const computed = jobOutcomeFor(run.end, {
         attempt: job.attempt,
         maxAttempts: job.max_attempts,
+        crashes: job.crashes,
         irreversibleStarted: run.irreversibleStarted,
         redact: this.options.redact,
       });
@@ -310,10 +312,13 @@ export class Worker {
         return;
       }
       // A requeue backs off (D49): the next attempt waits on the database clock, so an outage does not
-      // burn every attempt in seconds.
+      // burn every attempt in seconds. Keyed on the job's OWN attempt that failed (D57): crashes before it
+      // do not lengthen the wait.
       const requeueAfterSeconds =
         outcome.state === "queued"
-          ? (this.options.requeueBackoff ?? ((attempt: number) => requeueBackoffSeconds(attempt, this.options.random ?? Math.random)))(job.attempt)
+          ? (this.options.requeueBackoff ?? ((attempt: number) => requeueBackoffSeconds(attempt, this.options.random ?? Math.random)))(
+              ownAttempts(job.attempt, job.crashes),
+            )
           : null;
       const completion = await completeJobWithRetry(
         this.options.pool,
@@ -392,7 +397,7 @@ export class Worker {
     if (this.current?.graceTimer) clearTimeout(this.current.graceTimer);
     this.current = null;
     await this.verifyPhase({
-      job: { id: job.id, tenant_id: job.tenant_id, params: job.params, memo_key: job.memo_key, attempt: job.attempt, max_attempts: job.max_attempts },
+      job: { id: job.id, tenant_id: job.tenant_id, params: job.params, memo_key: job.memo_key, attempt: job.attempt, max_attempts: job.max_attempts, crashes: job.crashes },
       fencingToken: moved.fencingToken,
       label: "T5",
       priorStatus: outcome.priorStatus ?? null,

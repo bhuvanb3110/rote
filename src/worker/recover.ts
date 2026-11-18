@@ -6,11 +6,13 @@
 //   T6.0  claim the expired lease with the earliest expiry; rows another recoverer holds are SKIPPED,
 //         not waited on (FOR UPDATE SKIP LOCKED): two recoverers never take the same job
 //         (a `verifying` job: also read its verify cycle from job_verifications, VERIFY_CYCLE_SQL)
-//   decide with the pure recoveryAction(row) (src/fleet/stateMachine.ts): T6.1 requeue, T6.2 fail,
-//         T6.4 claim a `committing` job to verify, T6.5 re-claim a dead verifier's job, T6.6 escalate
-//         after 3 dead verify phases, T6.7 resume a deferred / handed-off verify. The SQL only executes it.
+//   decide with the pure recoveryAction(row) (src/fleet/stateMachine.ts): T6.1 requeue (a crash, not an
+//         attempt), T6.2 fail at the crash cap (crash_limit), T6.4 claim a `committing` job to verify, T6.5
+//         re-claim a dead verifier's job, T6.6 escalate after 3 dead verify phases, T6.7 resume a deferred /
+//         handed-off verify. The SQL only executes it.
 //   UPDATE jobs: the decided state, fencing_token + 1 (EVERY recovery bumps it, reviewer decision 3,
-//         so "the token changed" always means "the old holder is fenced"). T6.1/T6.2/T6.6 clear the
+//         so "the token changed" always means "the old holder is fenced"); crashes + 1 for T6.1/T6.2
+//         (a lease that died before its intent, D57). T6.1/T6.2/T6.6 clear the
 //         lease; T6.4/T6.5/T6.7 make THIS worker the owner with a fresh lease. Fenced on the claimed
 //         token and state and re-checked expired (database clock, D22).
 //   UPDATE job_attempts: the dead holder's open attempt row -> crashed
@@ -45,7 +47,7 @@ export const DEFAULT_RECOVER_PER_ITERATION = 10;
 
 /** T6.0: one expired lease, oldest first (served by the partial index jobs_lease_expiry). */
 export const CLAIM_EXPIRED_SQL = `
-SELECT id, state, attempt, max_attempts, fencing_token, lease_owner, commit_intent_at, tenant_id, params, memo_key
+SELECT id, state, attempt, max_attempts, crashes, max_crashes, fencing_token, lease_owner, commit_intent_at, tenant_id, params, memo_key
 FROM jobs
 WHERE state IN ('running', 'committing', 'verifying') AND lease_expires_at < now()
 ORDER BY lease_expires_at, id
@@ -54,7 +56,9 @@ FOR UPDATE SKIP LOCKED`;
 
 /**
  * T6.1/T6.2/T6.6: the decided state ($4) and outcome ($5; NULL keeps it, for a requeue), token + 1,
- * lease cleared. The jobs_queued_has_attempts_left CHECK still refuses a requeue with no attempt left (D21).
+ * lease cleared, crashes + $8 (1 for T6.1/T6.2: the lease died before its intent, a crash and not an
+ * attempt; 0 for T6.6; D57). The jobs_queued_has_attempts_left and jobs_queued_under_crash_cap CHECKs still
+ * refuse a requeue with no own attempt left or at the crash cap (D21, 0006).
  * A crash requeue (T6.1) does not back off (not_before NULL, D49): the bank did nothing wrong, and the
  * lease expiry already cost a full lease. T6.2 (failed) on a job a verify read [0, 0] on earlier (it was
  * resubmitted) marks it for the reconcile pass, $7 seconds out (D55): the earlier attempt's zombie can
@@ -62,7 +66,7 @@ FOR UPDATE SKIP LOCKED`;
  */
 export const RECOVER_JOB_SQL = `
 UPDATE jobs
-SET state = $4, outcome = COALESCE($5, outcome), error = $6, not_before = NULL,
+SET state = $4, outcome = COALESCE($5, outcome), error = $6, not_before = NULL, crashes = crashes + $8,
     reconcile_after = CASE WHEN $4 IN (${RECONCILABLE_STATES_SQL}) AND ${RECONCILE_TRIGGERED_SQL}
                       THEN now() + make_interval(secs => $7) ELSE reconcile_after END,
     fencing_token = fencing_token + 1, lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
@@ -94,7 +98,7 @@ WHERE job_id = $1 AND fencing_token = $2 AND ended_at IS NULL`;
 
 /** The job a recovery claimed to verify: what the verify phase needs. */
 export interface VerifyClaim {
-  job: Pick<JobRow, "id" | "tenant_id" | "params" | "memo_key" | "attempt" | "max_attempts">;
+  job: Pick<JobRow, "id" | "tenant_id" | "params" | "memo_key" | "attempt" | "max_attempts" | "crashes">;
   /** This phase's token (the new one). */
   fencingToken: number;
   /** How the phase began. */
@@ -108,6 +112,8 @@ export interface RecoveredJob {
   action: RecoveryAction;
   attempt: number;
   maxAttempts: number;
+  /** jobs.crashes after this recovery (+ 1 for T6.1/T6.2, D57). */
+  crashes: number;
   /** The holder whose lease expired. */
   deadOwner: string | null;
   /** The token before and after (always previous + 1). */
@@ -137,6 +143,8 @@ export async function recoverOne(pool: Pool, options: RecoverOptions): Promise<R
       state: RecoverableState;
       attempt: number;
       max_attempts: number;
+      crashes: number;
+      max_crashes: number;
       fencing_token: number;
       lease_owner: string | null;
       tenant_id: string;
@@ -152,8 +160,11 @@ export async function recoverOne(pool: Pool, options: RecoverOptions): Promise<R
       state: row.state,
       attempt: row.attempt,
       maxAttempts: row.max_attempts,
+      crashes: row.crashes,
+      maxCrashes: row.max_crashes,
       verify: row.state === "verifying" ? cycle : undefined,
     });
+    const crashes = row.crashes + (action.crash ? 1 : 0);
     const note = `${action.error} (${action.label}: the lease of ${row.lease_owner ?? "?"} expired; recovered by ${options.workerId})`;
     const updated =
       action.kind === "verify"
@@ -173,6 +184,7 @@ export async function recoverOne(pool: Pool, options: RecoverOptions): Promise<R
             action.outcome,
             note,
             options.reconcileDueSeconds ?? DEFAULT_RECONCILE_DUE_SECONDS,
+            action.crash ? 1 : 0,
           ]);
     if (updated.rowCount !== 1) {
       // Impossible while we hold the row lock; if it ever happens, roll back and say so loudly.
@@ -187,7 +199,7 @@ export async function recoverOne(pool: Pool, options: RecoverOptions): Promise<R
       const priorStatus = action.reason === "lease_expired_in_committing" ? null : cycle.priorStatus;
       await client.query(INSERT_PHASE_SQL, [row.id, token, options.workerId, action.reason, priorStatus]);
       claim = {
-        job: { id: row.id, tenant_id: row.tenant_id, params: row.params, memo_key: row.memo_key, attempt: row.attempt, max_attempts: row.max_attempts },
+        job: { id: row.id, tenant_id: row.tenant_id, params: row.params, memo_key: row.memo_key, attempt: row.attempt, max_attempts: row.max_attempts, crashes },
         fencingToken: token,
         label: action.label,
         priorStatus,
@@ -201,6 +213,7 @@ export async function recoverOne(pool: Pool, options: RecoverOptions): Promise<R
       action,
       attempt: row.attempt,
       maxAttempts: row.max_attempts,
+      crashes,
       deadOwner: row.lease_owner,
       previousToken: row.fencing_token,
       fencingToken: token,
@@ -267,6 +280,7 @@ export function createRecoverySweep(options: {
               label: r.action.label,
               to: r.action.to,
               attempt: r.attempt,
+              crashes: r.crashes,
               deadOwner: r.deadOwner,
               fencingToken: r.fencingToken,
               ...(r.verifyCycle ? { deadVerifyPhases: r.verifyCycle.deadPhases, deferrals: r.verifyCycle.deferrals } : {}),

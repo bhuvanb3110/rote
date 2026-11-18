@@ -38,8 +38,9 @@ async function enqueueN(n: number, maxAttempts = 3): Promise<void> {
   }
 }
 
-async function leased(maxAttempts = 3, workerId = "dead-worker"): Promise<JobRow> {
-  await enqueueN(1, maxAttempts);
+async function leased(maxAttempts = 3, workerId = "dead-worker", maxCrashes?: number): Promise<JobRow> {
+  if (maxCrashes === undefined) await enqueueN(1, maxAttempts);
+  else await enqueue(pool, { capability: CAP, tenantId: "tenant-a", idempotencyKey: `k-${Math.random()}`, params: { memberId: "1" }, maxAttempts, maxCrashes });
   const job = await dequeue(pool, { workerId, leaseSeconds: LEASE });
   if (!job) throw new Error("no job");
   return job;
@@ -64,30 +65,58 @@ const phases = async (id: string) =>
 const recover = (workerId = "rescuer") => recoverOne(pool, { workerId, leaseSeconds: LEASE });
 
 describe("T6: one row per line of the recovery table", () => {
-  it("running, attempts left -> T6.1 requeue: queued, token + 1, lease cleared, the dead attempt 'crashed'; the next dequeue is attempt 2", async () => {
+  it("running -> T6.1 requeue, a CRASH (D57): queued, token + 1, crashes + 1, lease cleared, the dead attempt 'crashed'; the next dequeue is lease 2 but still own attempt 1", async () => {
     const job = await leased();
     await expire(job.id);
     const r = await recover();
-    expect(r).toMatchObject({ jobId: job.id, from: "running", action: { kind: "requeue", label: "T6.1" }, previousToken: 1, fencingToken: 2, deadOwner: "dead-worker" });
+    expect(r).toMatchObject({ jobId: job.id, from: "running", action: { kind: "requeue", label: "T6.1", crash: true }, previousToken: 1, fencingToken: 2, crashes: 1, deadOwner: "dead-worker" });
     expect(r!.claim).toBeUndefined();
     const after = await row(job.id);
     // A crash requeue does not back off (D49): dequeueable at once.
-    expect(after).toMatchObject({ state: "queued", fencing_token: 2, lease_owner: null, lease_expires_at: null, outcome: null, attempt: 1, not_before: null });
-    expect(after.error).toMatch(/lease expired while running \(attempt 1\/3\), before any commit intent; requeued \(T6\.1: the lease of dead-worker expired; recovered by rescuer\)/);
+    expect(after).toMatchObject({ state: "queued", fencing_token: 2, lease_owner: null, lease_expires_at: null, outcome: null, attempt: 1, crashes: 1, max_crashes: 5, not_before: null });
+    expect(after.error).toMatch(
+      /lease expired while running, before any commit intent: crash 1\/5, not one of the job's attempts \(own attempts used 0\/3\); requeued \(T6\.1: the lease of dead-worker expired; recovered by rescuer\)/,
+    );
     const [a] = await attemptRows(job.id);
     expect(a).toMatchObject({ outcome: "crashed", fencing_token: 1 });
     expect(a.ended_at).toBeInstanceOf(Date);
     expect(a.error).toBe("lease expired in running; recovered by rescuer (T6.1 requeue)");
     const again = await dequeue(pool, { workerId: "w2", leaseSeconds: LEASE });
-    expect(again).toMatchObject({ id: job.id, attempt: 2, fencing_token: 3 }); // dequeue bumps it again
+    expect(again).toMatchObject({ id: job.id, attempt: 2, crashes: 1, fencing_token: 3 }); // dequeue bumps it again
   });
 
-  it("running on the last attempt -> T6.2 fail / lease_expired, never queued (D21)", async () => {
+  it("running on the job's LAST own attempt -> still T6.1 requeue (D57: the crash uses no attempt; Step 8 failed it / lease_expired); the next lease is past max_attempts", async () => {
     const job = await leased(1);
     await expire(job.id);
     const r = await recover();
-    expect(r!.action).toMatchObject({ kind: "fail", label: "T6.2" });
-    expect(await row(job.id)).toMatchObject({ state: "failed", outcome: "lease_expired", fencing_token: 2, lease_owner: null });
+    expect(r!.action).toMatchObject({ kind: "requeue", label: "T6.1" });
+    expect(await row(job.id)).toMatchObject({ state: "queued", attempt: 1, max_attempts: 1, crashes: 1, fencing_token: 2 });
+    expect(await dequeue(pool, { workerId: "w2", leaseSeconds: LEASE })).toMatchObject({ id: job.id, attempt: 2, crashes: 1 });
+  });
+
+  it("running, the crash that reaches the cap -> T6.2 fail / crash_limit (a poison job), crashes = max_crashes, never queued", async () => {
+    const job = await leased(3, "dead-worker", 2);
+    await expire(job.id);
+    expect((await recover())!.action).toMatchObject({ kind: "requeue", label: "T6.1" });
+    const second = await dequeue(pool, { workerId: "dead-2", leaseSeconds: LEASE });
+    expect(second).toMatchObject({ id: job.id, attempt: 2, crashes: 1 });
+    await expire(job.id);
+    const r = await recover();
+    expect(r).toMatchObject({ action: { kind: "fail", label: "T6.2", outcome: "crash_limit", crash: true }, crashes: 2 });
+    const after = await row(job.id);
+    expect(after).toMatchObject({ state: "failed", outcome: "crash_limit", attempt: 2, crashes: 2, max_crashes: 2, fencing_token: 4, lease_owner: null });
+    expect(after.error).toMatch(/crash limit: .*\(crash 2\/2\): a job that keeps killing its workers \(a poison job\?\); nothing irreversible happened \(T6\.2: the lease of dead-2 expired/);
+    expect((await attemptRows(job.id)).map((a) => [a.attempt, a.outcome, a.error])).toEqual([
+      [1, "crashed", "lease expired in running; recovered by rescuer (T6.1 requeue)"],
+      [2, "crashed", "lease expired in running; recovered by rescuer (T6.2 fail)"],
+    ]);
+  });
+
+  it("the schema holds both budgets (0006): no requeue at the crash cap, never more crashes than leases", async () => {
+    const job = await leased(3, "dead-worker", 1);
+    await pool.query("UPDATE jobs SET state = 'failed', lease_owner = NULL, lease_expires_at = NULL, crashes = 1 WHERE id = $1", [job.id]);
+    await expect(pool.query("UPDATE jobs SET state = 'queued' WHERE id = $1", [job.id])).rejects.toThrow(/jobs_queued_under_crash_cap/);
+    await expect(pool.query("UPDATE jobs SET crashes = 2 WHERE id = $1", [job.id])).rejects.toThrow(/jobs_crashes_are_leases/);
   });
 
   it("committing -> T6.4 claim to verify: verifying, owned by the recoverer with a fresh lease, a phase row (lease_expired_in_committing), never requeued", async () => {

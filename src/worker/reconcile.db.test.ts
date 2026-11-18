@@ -197,8 +197,9 @@ describe("marking (T4 / T6.2 / T7): a job that turns terminal after a [0, 0] ver
     expect(jobSettled(j)).toBe(true);
   });
 
-  it("D55: T6.2 (the last attempt's worker died before its intent) after a resubmit: failed AND marked", async () => {
-    const { job } = await enqueue(pool, { capability: CAP, tenantId: "tenant-a", idempotencyKey: "t62", params: { memberId: "1" }, maxAttempts: 2 });
+  it("D55: T6.2 (the worker of attempt 2 died before its intent, at the crash cap: crash_limit, D57) after a resubmit: failed AND marked", async () => {
+    // A crash cap of 1, so attempt 2's death is the cap (D57: under the default cap of 5 it is a T6.1 requeue).
+    const { job } = await enqueue(pool, { capability: CAP, tenantId: "tenant-a", idempotencyKey: "t62", params: { memberId: "1" }, maxAttempts: 2, maxCrashes: 1 });
     const a1 = (await dequeue(pool, { workerId: "w1", leaseSeconds: LEASE }))!;
     await writeCommitIntent(pool, { jobId: a1.id, fencingToken: a1.fencing_token, workerId: "w1", leaseSeconds: LEASE });
     const moved = await completeIntoVerify(pool, {
@@ -214,7 +215,7 @@ describe("marking (T4 / T6.2 / T7): a job that turns terminal after a [0, 0] ver
     await pool.query("UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", [job.id]);
     const { recovered } = await recoverExpired(pool, { workerId: "rescuer", leaseSeconds: LEASE, reconcileDueSeconds: DUE });
     expect(recovered.map((r) => r.action.label)).toEqual(["T6.2"]);
-    expect(await row(job.id)).toMatchObject({ state: "failed", outcome: "lease_expired", reconciled_at: null });
+    expect(await row(job.id)).toMatchObject({ state: "failed", outcome: "crash_limit", crashes: 1, reconciled_at: null });
     expect(await dueIn(job.id)).toBeGreaterThan(DUE - 2);
   });
 

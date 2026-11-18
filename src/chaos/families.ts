@@ -3,14 +3,19 @@
 // a job that ends anywhere else fails the run, whatever the oracle says.
 //
 //   standard          kills every 5-15 s + one 45 s `docker pause` (the realistic zombie). Every job ends
-//                     succeeded (success / already_done) -- or failed because kills alone used up its
-//                     attempts (lease_expired: T6.2; not_committed_attempts_exhausted: a verify [0, 0] on the
-//                     last attempt). ANY job left for a human fails it, a reconcile's duplicate_suspected /
+//                     succeeded (success / already_done) -- or failed because kills alone exhausted a budget:
+//                     the crash cap (crash_limit: T6.2, five deaths before the intent; D57) or its attempts
+//                     (not_committed_attempts_exhausted: kills after the intent, each verified [0, 0] and
+//                     resubmitted, then a [0, 0] on the last own attempt). Since D57 a kill before the intent
+//                     uses no attempt, so Step 8's failed / lease_expired cannot happen and fails the run.
+//                     ANY job left for a human fails it, a reconcile's duplicate_suspected /
 //                     unrecorded_commit_suspected included.
 //   bank-fault-only   no kills, no pause; the bank down 30 s and slow 60 s (seeded). Retries back off (D49),
 //                     verifies and reconciles defer (D44): every job succeeds. 0 failed, 0 needs_human.
 //   bank-fault-kills  everything at once: the standard kills and pause plus the bank events. The reviewer
-//                     requires the same as bank-fault-only: 0 duplicates, 0 lost, 0 needs_human, 0 failed.
+//                     requires the same as bank-fault-only: 0 duplicates, 0 lost, 0 needs_human, 0 failed
+//                     (crash_limit included). Its first run failed that (two jobs whose attempts the kills
+//                     had used up); D57 made crashes stop using attempts.
 //
 // Every family also requires: the oracle passes (0 DUPLICATE, 0 LOST, 0 UNRECORDED_COMMIT, 0 MISMATCH, 0
 // ORPHAN), every job SETTLED (terminal, and its reconcile done if one was due: D50, D55), no credential in
@@ -47,7 +52,7 @@ export const FAMILY_SPECS: Record<ChaosFamily, FamilySpec> = {
     kills: true,
     pause: true,
     bankFaults: false,
-    allowedFinal: [...SUCCEEDED, "failed/lease_expired", "failed/not_committed_attempts_exhausted"],
+    allowedFinal: [...SUCCEEDED, "failed/crash_limit", "failed/not_committed_attempts_exhausted"],
     requireFaultExercised: false,
   },
   "bank-fault-only": {

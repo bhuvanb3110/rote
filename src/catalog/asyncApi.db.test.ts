@@ -202,9 +202,9 @@ describe("GET /jobs/:id?tenant=", () => {
     const res = await call(`${base}/jobs/${id}?tenant=tenant-b`, { method: "GET" });
     expect(res.status).toBe(200);
     expect(Object.keys(res.json).sort()).toEqual(
-      ["attempt", "capabilityId", "createdAt", "error", "id", "maxAttempts", "memoKey", "notBefore", "outcome", "result", "settled", "state", "tenant", "traceId", "updatedAt"].sort(),
+      ["attempt", "capabilityId", "crashes", "createdAt", "error", "id", "maxAttempts", "maxCrashes", "memoKey", "notBefore", "outcome", "result", "settled", "state", "tenant", "traceId", "updatedAt"].sort(),
     );
-    expect(res.json).toMatchObject({ id, tenant: "tenant-b", state: "queued", attempt: 0, maxAttempts: 3, memoKey: `rote-${id}`, notBefore: null, settled: false });
+    expect(res.json).toMatchObject({ id, tenant: "tenant-b", state: "queued", attempt: 0, maxAttempts: 3, crashes: 0, maxCrashes: 5, memoKey: `rote-${id}`, notBefore: null, settled: false });
 
     // settled (D50, step-10 reviewer decision 3): terminal and no reconcile due.
     const settledAs = async (cols: string) => {

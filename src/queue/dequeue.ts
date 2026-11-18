@@ -12,8 +12,9 @@
 // are briefly locked by another transaction, or it is at its cap on recount), that attempt is rolled
 // back and the claim is retried EXCLUDING that tenant. Each retry excludes one more tenant, so the
 // loop is bounded by the number of tenants, and dequeue never returns null while an unexcluded,
-// unlocked tenant still has dequeueable work. (The schema guarantees every queued job has an attempt
-// left: CHECK (state <> 'queued' OR attempt < max_attempts).)
+// unlocked tenant still has dequeueable work. (The schema guarantees every queued job has an own attempt
+// left and is under its crash cap: CHECK (state <> 'queued' OR attempt - crashes < max_attempts) and
+// CHECK (state <> 'queued' OR crashes < max_crashes); 0006, D57.)
 //
 // Clock rule (reviewer decision 7, D22): lease expiry is computed by the DATABASE (now()), never
 // from a worker's clock. No timestamp computed in TypeScript is ever sent.
@@ -64,7 +65,7 @@ WHERE tenant_id = $1 AND state IN ('running', 'committing', 'verifying')`;
 /** (3) The tenant's oldest due queued job; SKIP LOCKED still guards against any other row locker. */
 export const PICK_JOB_SQL = `
 SELECT id FROM jobs
-WHERE tenant_id = $1 AND state = 'queued' AND attempt < max_attempts
+WHERE tenant_id = $1 AND state = 'queued' AND attempt - crashes < max_attempts AND crashes < max_crashes
   AND (not_before IS NULL OR not_before <= now())
 ORDER BY created_at, id
 LIMIT 1
