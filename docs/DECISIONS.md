@@ -2423,3 +2423,26 @@ would leak and check the bytes that actually go out.
 - **Alternative considered:** intercept the `req.route` assignment to capture `baseUrl` at dispatch. That value is
   still concrete for a parameterized mount, so it would not meet the rule.
 - **The mutation check gains mutant 13:** the handler logs `err.message`.
+
+**Amendment (Step 13a, first commit, 2026-11-19): reading router internals FAILS CLOSED.**
+- **The reviewer accepted** `mountRouter`'s dependency on Express/router internals on one condition: if the fields are
+  not where it expects them, the handler logs a fixed placeholder, never the concrete URL.
+- **What changed in `routeOf`:** once a Route has matched (`req.route` is set), anything unexpected gives the fixed
+  `UNKNOWN_ROUTE` = `/(unknown route)`, with nothing appended:
+  - `req.route` is not an object, or its `path` is not a string;
+  - `req.app.router.stack` is not an array (no `app.router`, or no `stack`);
+  - the Route is under no Layer's `route` field in the walk.
+- **Before this,** the last case logged `(route not in the app's stack)` + `req.route.path`. That was the router-relative
+  pattern, not the concrete URL. But an upgrade that moves the fields may also change what they hold, so nothing read
+  from them is trusted once the walk fails.
+- **Unchanged:** no `req.route` at all is still `(no route)` (an error before routing; also what an Express that stopped
+  setting `req.route` would give, which is just as fixed). A path-less mount whose `slash` field moved would show as
+  `/(unregistered mount)`, also a fixed string.
+- **Tests** (`errorHandler.test.ts`, 3 new, 21 in the file):
+  - every route Layer's `route` field renamed in a real app (dispatch still works: router 2.x's `Route#dispatch` sets
+    `req.route` itself);
+  - `req.app` without `router`, as the handler sees it;
+  - `summarize` with a non-string `route.path`, a non-array stack, no `stack`, and no `app`.
+  - Each asserts the route is exactly `/(unknown route)`, and that no tenant, member id, year, memo or path segment is
+    in the summaries, the logs or the response bodies. On the old code the first two log
+    `(route not in the app's stack)/member/:id/transfer` and fail.
