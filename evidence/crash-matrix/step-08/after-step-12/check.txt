@@ -1,0 +1,8 @@
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: needs_human=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+needs_human (1), listed with outcome and ledger rows:
+  cc047793-efc4-4ad5-90d5-c9718f09c18c tenant-a outcome=commit_uncertain rows=1 [TXN-000001]
+RESULT: PASS

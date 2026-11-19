@@ -1,0 +1,132 @@
+[
+  {
+    "id": "cd7f283d-c372-4059-9f7b-27632fd56119",
+    "idempotency_key": "outage-0",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 2,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 9,
+    "trace_id": "b7612410e97fbafe997038a66a8d2f41",
+    "commit_intent_at": "2026-11-14T07:29:38.547Z",
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000003"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/verify-bank-outage-30s/worker-evidence/transfer-2026-11-14T07-29-37-065Z-6771ce2d/run.jsonl"
+    },
+    "memo_key": "rote-cd7f283d-c372-4059-9f7b-27632fd56119",
+    "created_at": "2026-11-14T07:28:39.632Z",
+    "updated_at": "2026-11-14T07:29:38.866Z"
+  },
+  {
+    "id": "8554f33a-54cf-423f-8c0a-d0192e144b09",
+    "idempotency_key": "outage-1",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 2,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 9,
+    "trace_id": "0cb7871a7526ddf1e5bf23f84c054175",
+    "commit_intent_at": "2026-11-14T07:29:38.813Z",
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000004"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/verify-bank-outage-30s/worker-evidence/transfer-2026-11-14T07-29-37-459Z-3003e3c7/run.jsonl"
+    },
+    "memo_key": "rote-8554f33a-54cf-423f-8c0a-d0192e144b09",
+    "created_at": "2026-11-14T07:28:39.642Z",
+    "updated_at": "2026-11-14T07:29:39.147Z"
+  },
+  {
+    "id": "10870776-2be8-4c27-8fc8-bbaf0f92f529",
+    "idempotency_key": "outage-2",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 8,
+    "trace_id": "bbd69fb368925a4d82689296706176b3",
+    "commit_intent_at": "2026-11-14T07:28:44.745Z",
+    "outcome": "already_done",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000001"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/verify-bank-outage-30s/worker-evidence/transfer-history-lookup-2026-11-14T07-29-27-410Z-e9e28ee3/run.jsonl",
+      "recoveredBy": "verify"
+    },
+    "memo_key": "rote-10870776-2be8-4c27-8fc8-bbaf0f92f529",
+    "created_at": "2026-11-14T07:28:39.647Z",
+    "updated_at": "2026-11-14T07:29:29.909Z"
+  },
+  {
+    "id": "737f08e5-3e02-4f9d-b67d-8b4c8696a4b2",
+    "idempotency_key": "outage-3",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 8,
+    "trace_id": "7147bc7d0c265ce42e6cf0215f9fc771",
+    "commit_intent_at": "2026-11-14T07:28:46.106Z",
+    "outcome": "already_done",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000002"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/verify-bank-outage-30s/worker-evidence/transfer-history-lookup-2026-11-14T07-29-35-953Z-1072044e/run.jsonl",
+      "recoveredBy": "verify"
+    },
+    "memo_key": "rote-737f08e5-3e02-4f9d-b67d-8b4c8696a4b2",
+    "created_at": "2026-11-14T07:28:39.652Z",
+    "updated_at": "2026-11-14T07:29:37.014Z"
+  }
+]

@@ -1,0 +1,203 @@
+Chaos run, started 2026-11-19T05:20:56.708Z (code 9d38bb2)
+family: standard -- kills every 5-15 s and one 45 s pause; no bank faults; expected final states: succeeded/success, succeeded/already_done, failed/crash_limit, failed/not_committed_attempts_exhausted (src/chaos/families.ts)
+seed: 1173696840  (reproduce: npm run chaos -- --seed 1173696840 --jobs 500 --duration 800s)
+jobs: 500, workers: 4, schedule 800000 ms: 79 kills (gap 5000-15000 ms), pause replica 4 407699-452699 ms, bank no faults, restart after 2000 ms; drain (until settled) timeout 900000 ms
+database: postgres://rote:***@127.0.0.1:55432/rote
+reset: queue tables truncated; bank ledger rows: 0; bank knobs: errors: off, latency: 0ms, history lag: 0ms
+replicas: rote-worker-1=d6f39c899b70, rote-worker-2=6049abae02b9, rote-worker-3=6f8544e01444, rote-worker-4=d44b0fe854ff
+  event {"tMs":0,"at":"2026-11-19T05:21:15.925Z","kind":"clock-start"}
+  event {"tMs":7380,"at":"2026-11-19T05:21:23.305Z","kind":"enqueue-done","created":500,"of":500}
+enqueued: 500/500 x 201
+  event {"tMs":8568,"at":"2026-11-19T05:21:24.493Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":7973,"heldJobs":[{"id":"e3fcf038-b546-4f94-8597-297ca17d833e","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"e3fcf038-b546-4f94-8597-297ca17d833e","state":"running","attempt":1}]}
+  event {"tMs":10391,"at":"2026-11-19T05:21:26.316Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":9973}
+  event {"tMs":20955,"at":"2026-11-19T05:21:36.880Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":20438,"heldJobs":[{"id":"9385cf8a-30bb-4ea7-8ba6-3314e6534520","state":"committing","attempt":1},{"id":"e3fcf038-b546-4f94-8597-297ca17d833e","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"9385cf8a-30bb-4ea7-8ba6-3314e6534520","state":"running","attempt":1},{"id":"e3fcf038-b546-4f94-8597-297ca17d833e","state":"running","attempt":1}]}
+  event {"tMs":22804,"at":"2026-11-19T05:21:38.729Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":22438}
+  event {"tMs":32017,"at":"2026-11-19T05:21:47.942Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":31476,"heldJobs":[{"id":"9385cf8a-30bb-4ea7-8ba6-3314e6534520","state":"committing","attempt":1},{"id":"af626f8a-cd79-44a3-829e-78af2303c3d8","state":"running","attempt":1},{"id":"e3fcf038-b546-4f94-8597-297ca17d833e","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"9385cf8a-30bb-4ea7-8ba6-3314e6534520","state":"committing","attempt":1},{"id":"e3fcf038-b546-4f94-8597-297ca17d833e","state":"running","attempt":1}]}
+  event {"tMs":33861,"at":"2026-11-19T05:21:49.786Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":33476}
+  event {"tMs":39222,"at":"2026-11-19T05:21:55.147Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":38593,"heldJobs":[{"id":"7439ad50-8524-4f46-ae88-cea1ff166394","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"7439ad50-8524-4f46-ae88-cea1ff166394","state":"running","attempt":1}]}
+  event {"tMs":40951,"at":"2026-11-19T05:21:56.876Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":40593}
+  event {"tMs":47161,"at":"2026-11-19T05:22:03.086Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":46566,"heldJobs":[{"id":"e7de0b35-a6a4-4eb3-a1cf-c21ac86997a3","state":"committing","attempt":1}],"heldJobsBeforeKill":[{"id":"e7de0b35-a6a4-4eb3-a1cf-c21ac86997a3","state":"running","attempt":1}]}
+  event {"tMs":48903,"at":"2026-11-19T05:22:04.828Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":48566}
+  event {"tMs":60126,"at":"2026-11-19T05:22:16.051Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":59521,"heldJobs":[{"id":"9c666616-c72e-4f63-a783-c6e6bdd24b4b","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"9c666616-c72e-4f63-a783-c6e6bdd24b4b","state":"running","attempt":1}]}
+  event {"tMs":61887,"at":"2026-11-19T05:22:17.812Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":61521}
+  event {"tMs":75082,"at":"2026-11-19T05:22:31.007Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":74517,"heldJobs":[{"id":"7a1f9d4c-9ec3-4c69-974c-40d046b760f6","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"7a1f9d4c-9ec3-4c69-974c-40d046b760f6","state":"running","attempt":1}]}
+  event {"tMs":76891,"at":"2026-11-19T05:22:32.816Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":76517}
+  event {"tMs":83157,"at":"2026-11-19T05:22:39.082Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":82656,"heldJobs":[{"id":"6ac9bcb5-5d50-4027-94b9-65817b8313d6","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"6ac9bcb5-5d50-4027-94b9-65817b8313d6","state":"running","attempt":1}]}
+  event {"tMs":85060,"at":"2026-11-19T05:22:40.985Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":84656}
+  event {"tMs":91662,"at":"2026-11-19T05:22:47.587Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":91130,"heldJobs":[{"id":"b8a36baf-d8c1-4c8b-95e7-b50aef5bde4d","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"b8a36baf-d8c1-4c8b-95e7-b50aef5bde4d","state":"running","attempt":1}]}
+  event {"tMs":93500,"at":"2026-11-19T05:22:49.425Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":93130}
+  event {"tMs":99812,"at":"2026-11-19T05:22:55.737Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":99324,"heldJobs":[{"id":"6ac9bcb5-5d50-4027-94b9-65817b8313d6","state":"running","attempt":1},{"id":"6f6213bd-adc7-45bd-900b-283f8eed8175","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"6ac9bcb5-5d50-4027-94b9-65817b8313d6","state":"running","attempt":1},{"id":"6f6213bd-adc7-45bd-900b-283f8eed8175","state":"running","attempt":1}]}
+  event {"tMs":101664,"at":"2026-11-19T05:22:57.589Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":101324}
+  event {"tMs":107629,"at":"2026-11-19T05:23:03.554Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":107034,"heldJobs":[{"id":"6ac9bcb5-5d50-4027-94b9-65817b8313d6","state":"running","attempt":1},{"id":"6f6213bd-adc7-45bd-900b-283f8eed8175","state":"running","attempt":1},{"id":"b0d46f71-6a13-4b3b-8747-23f5ed7590c2","state":"committing","attempt":1}],"heldJobsBeforeKill":[{"id":"6ac9bcb5-5d50-4027-94b9-65817b8313d6","state":"running","attempt":1},{"id":"6f6213bd-adc7-45bd-900b-283f8eed8175","state":"running","attempt":1},{"id":"b0d46f71-6a13-4b3b-8747-23f5ed7590c2","state":"committing","attempt":1}]}
+  event {"tMs":109370,"at":"2026-11-19T05:23:05.295Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":109034}
+  event {"tMs":112941,"at":"2026-11-19T05:23:08.866Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":112352,"heldJobs":[{"id":"185bb506-a074-4052-b72a-71095164e376","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"185bb506-a074-4052-b72a-71095164e376","state":"running","attempt":1}]}
+  event {"tMs":114683,"at":"2026-11-19T05:23:10.608Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":114352}
+  event {"tMs":120432,"at":"2026-11-19T05:23:16.357Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":119916,"heldJobs":[{"id":"185bb506-a074-4052-b72a-71095164e376","state":"running","attempt":1},{"id":"b8a36baf-d8c1-4c8b-95e7-b50aef5bde4d","state":"running","attempt":2}],"heldJobsBeforeKill":[{"id":"185bb506-a074-4052-b72a-71095164e376","state":"running","attempt":1}]}
+  event {"tMs":122247,"at":"2026-11-19T05:23:18.172Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":121916}
+  event {"tMs":127675,"at":"2026-11-19T05:23:23.600Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":127176,"heldJobs":[{"id":"de8c215e-121d-41ca-bfaf-b7e334cc8778","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"de8c215e-121d-41ca-bfaf-b7e334cc8778","state":"running","attempt":1}]}
+  event {"tMs":129520,"at":"2026-11-19T05:23:25.445Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":129176}
+  event {"tMs":137367,"at":"2026-11-19T05:23:33.292Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":136840,"heldJobs":[{"id":"285e5c0c-ac77-4e04-9d87-be654ca60fdb","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"285e5c0c-ac77-4e04-9d87-be654ca60fdb","state":"running","attempt":1},{"id":"b0d46f71-6a13-4b3b-8747-23f5ed7590c2","state":"committing","attempt":1}]}
+  event {"tMs":139194,"at":"2026-11-19T05:23:35.119Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":138840}
+  event {"tMs":146643,"at":"2026-11-19T05:23:42.568Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":146129,"heldJobs":[{"id":"285e5c0c-ac77-4e04-9d87-be654ca60fdb","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"285e5c0c-ac77-4e04-9d87-be654ca60fdb","state":"running","attempt":1}]}
+  event {"tMs":148548,"at":"2026-11-19T05:23:44.473Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":148129}
+  event {"tMs":154393,"at":"2026-11-19T05:23:50.318Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":153725,"heldJobs":[{"id":"d0799d7c-ed68-4d6f-ae82-07833dd6a086","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"d0799d7c-ed68-4d6f-ae82-07833dd6a086","state":"running","attempt":1}]}
+  event {"tMs":156109,"at":"2026-11-19T05:23:52.034Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":155725}
+  event {"tMs":165944,"at":"2026-11-19T05:24:01.869Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":165343,"heldJobs":[{"id":"f275b39b-49dd-46c5-85ef-2379b061937b","state":"committing","attempt":1}],"heldJobsBeforeKill":[{"id":"f275b39b-49dd-46c5-85ef-2379b061937b","state":"committing","attempt":1}]}
+  event {"tMs":167757,"at":"2026-11-19T05:24:03.682Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":167343}
+  event {"tMs":180222,"at":"2026-11-19T05:24:16.147Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":179660,"heldJobs":[{"id":"4c752677-ddf3-4f23-af40-849ec6abeb67","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"4c752677-ddf3-4f23-af40-849ec6abeb67","state":"running","attempt":1}]}
+  event {"tMs":182020,"at":"2026-11-19T05:24:17.945Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":181660}
+  event {"tMs":189899,"at":"2026-11-19T05:24:25.824Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":189328,"heldJobs":[{"id":"d72ea101-9664-4bd9-8840-ff29f002f422","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"d72ea101-9664-4bd9-8840-ff29f002f422","state":"running","attempt":1}]}
+  event {"tMs":191738,"at":"2026-11-19T05:24:27.663Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":191328}
+  event {"tMs":198839,"at":"2026-11-19T05:24:34.764Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":198262,"heldJobs":[{"id":"b3994212-72ea-453e-bb79-9610befe17eb","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"b3994212-72ea-453e-bb79-9610befe17eb","state":"running","attempt":1}]}
+  event {"tMs":200665,"at":"2026-11-19T05:24:36.590Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":200262}
+  event {"tMs":211425,"at":"2026-11-19T05:24:47.350Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":210776,"heldJobs":[{"id":"4c752677-ddf3-4f23-af40-849ec6abeb67","state":"running","attempt":2},{"id":"b3994212-72ea-453e-bb79-9610befe17eb","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"4c752677-ddf3-4f23-af40-849ec6abeb67","state":"running","attempt":2},{"id":"b3994212-72ea-453e-bb79-9610befe17eb","state":"running","attempt":1}]}
+  event {"tMs":213210,"at":"2026-11-19T05:24:49.135Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":212776}
+  event {"tMs":226293,"at":"2026-11-19T05:25:02.218Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":225732,"heldJobs":[{"id":"4c752677-ddf3-4f23-af40-849ec6abeb67","state":"running","attempt":2},{"id":"b3994212-72ea-453e-bb79-9610befe17eb","state":"running","attempt":1},{"id":"d18c4a8b-b1af-4832-9ce3-45b6732cc83f","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"4c752677-ddf3-4f23-af40-849ec6abeb67","state":"running","attempt":2},{"id":"b3994212-72ea-453e-bb79-9610befe17eb","state":"running","attempt":1},{"id":"d18c4a8b-b1af-4832-9ce3-45b6732cc83f","state":"running","attempt":1}]}
+  event {"tMs":228109,"at":"2026-11-19T05:25:04.034Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":227732}
+  event {"tMs":238021,"at":"2026-11-19T05:25:13.946Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":237308,"heldJobs":[{"id":"d8c6f422-a776-4d9e-ab9b-aa491c376956","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"d8c6f422-a776-4d9e-ab9b-aa491c376956","state":"running","attempt":1}]}
+  event {"tMs":239729,"at":"2026-11-19T05:25:15.654Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":239308}
+  event {"tMs":248777,"at":"2026-11-19T05:25:24.702Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":248217,"heldJobs":[{"id":"3f6bac32-4722-4ccf-b339-27b42908d693","state":"running","attempt":1},{"id":"d8c6f422-a776-4d9e-ab9b-aa491c376956","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"3f6bac32-4722-4ccf-b339-27b42908d693","state":"running","attempt":1},{"id":"d8c6f422-a776-4d9e-ab9b-aa491c376956","state":"running","attempt":1}]}
+  event {"tMs":250560,"at":"2026-11-19T05:25:26.485Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":250217}
+  event {"tMs":254396,"at":"2026-11-19T05:25:30.321Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":253758,"heldJobs":[{"id":"df91137d-b75d-4bf8-aa76-bbf55ba2e069","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"df91137d-b75d-4bf8-aa76-bbf55ba2e069","state":"running","attempt":1}]}
+  event {"tMs":256128,"at":"2026-11-19T05:25:32.053Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":255758}
+  event {"tMs":269430,"at":"2026-11-19T05:25:45.355Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":266700,"heldJobs":[{"id":"d8c6f422-a776-4d9e-ab9b-aa491c376956","state":"running","attempt":2}],"heldJobsBeforeKill":[{"id":"d8c6f422-a776-4d9e-ab9b-aa491c376956","state":"running","attempt":2}]}
+  event {"tMs":270030,"at":"2026-11-19T05:25:45.955Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":268700}
+  event {"tMs":280922,"at":"2026-11-19T05:25:56.847Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":280128,"heldJobs":[{"id":"5f0c6cda-a6a5-4b3c-8562-0db1a4c47f29","state":"committing","attempt":1}],"heldJobsBeforeKill":[{"id":"5f0c6cda-a6a5-4b3c-8562-0db1a4c47f29","state":"committing","attempt":1}]}
+  event {"tMs":282553,"at":"2026-11-19T05:25:58.478Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":282128}
+  event {"tMs":289856,"at":"2026-11-19T05:26:05.781Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":289307,"heldJobs":[{"id":"0dae12cf-df92-4562-8da6-dbf2ab2cdc0a","state":"running","attempt":1},{"id":"5f0c6cda-a6a5-4b3c-8562-0db1a4c47f29","state":"committing","attempt":1}],"heldJobsBeforeKill":[{"id":"0dae12cf-df92-4562-8da6-dbf2ab2cdc0a","state":"running","attempt":1},{"id":"5f0c6cda-a6a5-4b3c-8562-0db1a4c47f29","state":"committing","attempt":1}]}
+  event {"tMs":291713,"at":"2026-11-19T05:26:07.638Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":291307}
+  event {"tMs":296309,"at":"2026-11-19T05:26:12.234Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":295732,"heldJobs":[{"id":"0dae12cf-df92-4562-8da6-dbf2ab2cdc0a","state":"running","attempt":1},{"id":"5f0c6cda-a6a5-4b3c-8562-0db1a4c47f29","state":"committing","attempt":1}],"heldJobsBeforeKill":[{"id":"0dae12cf-df92-4562-8da6-dbf2ab2cdc0a","state":"running","attempt":1},{"id":"5f0c6cda-a6a5-4b3c-8562-0db1a4c47f29","state":"committing","attempt":1}]}
+  event {"tMs":298114,"at":"2026-11-19T05:26:14.039Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":297732}
+  event {"tMs":302915,"at":"2026-11-19T05:26:18.840Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":302312,"heldJobs":[{"id":"0dae12cf-df92-4562-8da6-dbf2ab2cdc0a","state":"running","attempt":1},{"id":"5f0c6cda-a6a5-4b3c-8562-0db1a4c47f29","state":"committing","attempt":1},{"id":"f47cc23a-e2a9-42ae-b8a9-0b6894dc680a","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"0dae12cf-df92-4562-8da6-dbf2ab2cdc0a","state":"running","attempt":1},{"id":"5f0c6cda-a6a5-4b3c-8562-0db1a4c47f29","state":"committing","attempt":1},{"id":"f47cc23a-e2a9-42ae-b8a9-0b6894dc680a","state":"running","attempt":1}]}
+  event {"tMs":304679,"at":"2026-11-19T05:26:20.604Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":304312}
+  event {"tMs":312292,"at":"2026-11-19T05:26:28.217Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":311731,"heldJobs":[{"id":"0dae12cf-df92-4562-8da6-dbf2ab2cdc0a","state":"running","attempt":1},{"id":"930e88d5-811c-4c8a-97d1-ab5708a93b8e","state":"running","attempt":1},{"id":"f47cc23a-e2a9-42ae-b8a9-0b6894dc680a","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"0dae12cf-df92-4562-8da6-dbf2ab2cdc0a","state":"running","attempt":1},{"id":"930e88d5-811c-4c8a-97d1-ab5708a93b8e","state":"running","attempt":1},{"id":"f47cc23a-e2a9-42ae-b8a9-0b6894dc680a","state":"running","attempt":1}]}
+  event {"tMs":314094,"at":"2026-11-19T05:26:30.019Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":313731}
+  event {"tMs":321100,"at":"2026-11-19T05:26:37.025Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":320541,"heldJobs":[{"id":"6f4bbb2b-b72a-4ff0-866a-d97fb33bbea2","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"6f4bbb2b-b72a-4ff0-866a-d97fb33bbea2","state":"running","attempt":1}]}
+  event {"tMs":322921,"at":"2026-11-19T05:26:38.846Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":322541}
+  event {"tMs":329112,"at":"2026-11-19T05:26:45.037Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":328503,"heldJobs":[{"id":"6f4bbb2b-b72a-4ff0-866a-d97fb33bbea2","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"6f4bbb2b-b72a-4ff0-866a-d97fb33bbea2","state":"running","attempt":1}]}
+  event {"tMs":330865,"at":"2026-11-19T05:26:46.790Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":330503}
+  event {"tMs":334810,"at":"2026-11-19T05:26:50.735Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":334160,"heldJobs":[{"id":"41226cba-cacb-46a0-a30e-60740a642226","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"41226cba-cacb-46a0-a30e-60740a642226","state":"running","attempt":1}]}
+  event {"tMs":336550,"at":"2026-11-19T05:26:52.475Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":336160}
+  event {"tMs":348296,"at":"2026-11-19T05:27:04.221Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":347676,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":349943,"at":"2026-11-19T05:27:05.868Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":349676}
+  event {"tMs":361894,"at":"2026-11-19T05:27:17.819Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":361367,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":363723,"at":"2026-11-19T05:27:19.648Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":363367}
+  event {"tMs":366963,"at":"2026-11-19T05:27:22.888Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":366487,"heldJobs":[{"id":"71e4e10d-1f3a-45cb-bfcd-cb80a3b93876","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"71e4e10d-1f3a-45cb-bfcd-cb80a3b93876","state":"running","attempt":1}]}
+  event {"tMs":368779,"at":"2026-11-19T05:27:24.704Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":368487}
+  event {"tMs":380420,"at":"2026-11-19T05:27:36.345Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":379993,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":382258,"at":"2026-11-19T05:27:38.183Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":381993}
+  event {"tMs":392060,"at":"2026-11-19T05:27:47.985Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":391578,"heldJobs":[{"id":"71e4e10d-1f3a-45cb-bfcd-cb80a3b93876","state":"running","attempt":1}],"heldJobsBeforeKill":[{"id":"71e4e10d-1f3a-45cb-bfcd-cb80a3b93876","state":"running","attempt":1}]}
+  event {"tMs":393844,"at":"2026-11-19T05:27:49.769Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":393578}
+  event {"tMs":402791,"at":"2026-11-19T05:27:58.716Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":402280,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":404627,"at":"2026-11-19T05:28:00.552Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":404280}
+  event {"tMs":407802,"at":"2026-11-19T05:28:03.727Z","kind":"pause","replica":4,"container":"rote-worker-4","scheduledMs":407699,"heldJobs":[{"id":"a0be09e9-7f7e-4f77-bf58-8d010fae014a","state":"committing","attempt":1}],"heldJobsBeforePause":[{"id":"a0be09e9-7f7e-4f77-bf58-8d010fae014a","state":"committing","attempt":1}]}
+  event {"tMs":416175,"at":"2026-11-19T05:28:12.100Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":415696,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":417960,"at":"2026-11-19T05:28:13.885Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":417696}
+  event {"tMs":429844,"at":"2026-11-19T05:28:25.769Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":429409,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":431665,"at":"2026-11-19T05:28:27.590Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":431409}
+  event {"tMs":441797,"at":"2026-11-19T05:28:37.722Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":441305,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":443567,"at":"2026-11-19T05:28:39.492Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":443305}
+  event {"tMs":452779,"at":"2026-11-19T05:28:48.704Z","kind":"unpause","replica":4,"container":"rote-worker-4","scheduledMs":452699,"heldJobs":[]}
+  event {"tMs":453826,"at":"2026-11-19T05:28:49.751Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":453332,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":455623,"at":"2026-11-19T05:28:51.548Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":455332}
+  event {"tMs":466589,"at":"2026-11-19T05:29:02.514Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":466014,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":468308,"at":"2026-11-19T05:29:04.233Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":468014}
+  event {"tMs":480226,"at":"2026-11-19T05:29:16.151Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":479678,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":482002,"at":"2026-11-19T05:29:17.927Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":481678}
+  event {"tMs":493885,"at":"2026-11-19T05:29:29.810Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":493423,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":495737,"at":"2026-11-19T05:29:31.662Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":495423}
+  event {"tMs":502789,"at":"2026-11-19T05:29:38.714Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":502200,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":504494,"at":"2026-11-19T05:29:40.419Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":504200}
+  event {"tMs":511244,"at":"2026-11-19T05:29:47.169Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":510749,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":513026,"at":"2026-11-19T05:29:48.951Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":512749}
+  event {"tMs":520424,"at":"2026-11-19T05:29:56.349Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":519937,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":522202,"at":"2026-11-19T05:29:58.127Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":521937}
+  event {"tMs":529083,"at":"2026-11-19T05:30:05.008Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":528672,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":531033,"at":"2026-11-19T05:30:06.958Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":530672}
+  event {"tMs":541608,"at":"2026-11-19T05:30:17.533Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":541035,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":543329,"at":"2026-11-19T05:30:19.254Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":543035}
+  event {"tMs":554547,"at":"2026-11-19T05:30:30.472Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":554055,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":556371,"at":"2026-11-19T05:30:32.296Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":556055}
+  event {"tMs":563603,"at":"2026-11-19T05:30:39.528Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":563122,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":565400,"at":"2026-11-19T05:30:41.325Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":565122}
+  event {"tMs":573243,"at":"2026-11-19T05:30:49.168Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":572809,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":575086,"at":"2026-11-19T05:30:51.011Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":574809}
+  event {"tMs":580393,"at":"2026-11-19T05:30:56.318Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":579859,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":582146,"at":"2026-11-19T05:30:58.071Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":581859}
+  event {"tMs":587474,"at":"2026-11-19T05:31:03.399Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":586976,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":589273,"at":"2026-11-19T05:31:05.198Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":588976}
+  event {"tMs":598471,"at":"2026-11-19T05:31:14.396Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":597932,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":600220,"at":"2026-11-19T05:31:16.145Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":599932}
+  event {"tMs":608280,"at":"2026-11-19T05:31:24.205Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":607729,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":610016,"at":"2026-11-19T05:31:25.941Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":609729}
+  event {"tMs":616253,"at":"2026-11-19T05:31:32.178Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":615735,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":618010,"at":"2026-11-19T05:31:33.935Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":617735}
+  event {"tMs":621630,"at":"2026-11-19T05:31:37.555Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":621147,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":623422,"at":"2026-11-19T05:31:39.347Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":623147}
+  event {"tMs":631343,"at":"2026-11-19T05:31:47.268Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":630822,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":633108,"at":"2026-11-19T05:31:49.033Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":632822}
+  event {"tMs":643030,"at":"2026-11-19T05:31:58.955Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":642549,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":644845,"at":"2026-11-19T05:32:00.770Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":644549}
+  event {"tMs":654135,"at":"2026-11-19T05:32:10.060Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":653684,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":655946,"at":"2026-11-19T05:32:11.871Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":655684}
+  event {"tMs":660387,"at":"2026-11-19T05:32:16.312Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":659931,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":662233,"at":"2026-11-19T05:32:18.158Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":661931}
+  event {"tMs":670537,"at":"2026-11-19T05:32:26.462Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":670028,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":672323,"at":"2026-11-19T05:32:28.248Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":672028}
+  event {"tMs":685191,"at":"2026-11-19T05:32:41.116Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":684658,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":686965,"at":"2026-11-19T05:32:42.890Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":686658}
+  event {"tMs":693989,"at":"2026-11-19T05:32:49.914Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":693536,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":695799,"at":"2026-11-19T05:32:51.724Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":695536}
+  event {"tMs":708302,"at":"2026-11-19T05:33:04.227Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":707809,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":710109,"at":"2026-11-19T05:33:06.034Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":709809}
+  event {"tMs":719214,"at":"2026-11-19T05:33:15.139Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":718729,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":721021,"at":"2026-11-19T05:33:16.946Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":720729}
+  event {"tMs":732333,"at":"2026-11-19T05:33:28.258Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":731877,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":734179,"at":"2026-11-19T05:33:30.104Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":733877}
+  event {"tMs":745566,"at":"2026-11-19T05:33:41.491Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":745049,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":747349,"at":"2026-11-19T05:33:43.274Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":747049}
+  event {"tMs":752192,"at":"2026-11-19T05:33:48.117Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":751742,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":753986,"at":"2026-11-19T05:33:49.911Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":753742}
+  event {"tMs":761046,"at":"2026-11-19T05:33:56.971Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":760577,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":762869,"at":"2026-11-19T05:33:58.794Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":762577}
+  event {"tMs":766309,"at":"2026-11-19T05:34:02.234Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":765735,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":768009,"at":"2026-11-19T05:34:03.934Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":767735}
+  event {"tMs":775568,"at":"2026-11-19T05:34:11.493Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":775100,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":777411,"at":"2026-11-19T05:34:13.336Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":777100}
+  event {"tMs":784552,"at":"2026-11-19T05:34:20.477Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":784056,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":786370,"at":"2026-11-19T05:34:22.295Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":786056}
+  event {"tMs":797250,"at":"2026-11-19T05:34:33.175Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":796816,"heldJobs":[],"heldJobsBeforeKill":[]}
+  event {"tMs":799094,"at":"2026-11-19T05:34:35.019Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":798816}
+  event {"tMs":799094,"at":"2026-11-19T05:34:35.019Z","kind":"schedule-done"}
+  event {"tMs":799105,"at":"2026-11-19T05:34:35.030Z","kind":"drain-done","timedOut":false,"ms":11}
+
+kills executed: 79; restarts: 79; errors: 0; kills/pauses whose post-call snapshot differed from the pre-call one: 5
+recovery kinds (decision 8): requeuedAfterCrash x28, claimedToVerify x6, already_done x5, resubmitted x1, reconciled x1
+verify and reconcile phases (job_verifications: decision[lookups] (reason)): already_done[1] (lease_expired_in_committing) x5, reconciled[1] (reconcile) x1, resubmitted[0,0] (lease_expired_in_committing) x1
+needs_human jobs: 0 (the standard family allows none)
+failed jobs: 0
+crash budget (D57): 34 crash(es) on 31 job(s), at most 2 on one job; 0 job(s) leased past max_attempts (crashes used no attempt); 0 at the crash cap
+reconciler deaths (D59): 0 on 0 job(s); 0 reconcile(s) abandoned by the pass
+attempt outcomes: crashed x33, lease_lost x1, success x495
+final job states: succeeded/already_done x5, succeeded/success x495
+settled: 500/500; drain 4 s
+worker containers at the end: rote-worker-1:running, rote-worker-2:running, rote-worker-3:running, rote-worker-4:running
+worker protections fired (container logs): heartbeatLeaseLost x1, fencedCommitIntent x0, completionFencedOut x0, runAbortedOnLostLease x1, verifyPhaseAborted x0, verifyDecisionFencedOut x0, reconcileDecisionFencedOut x0, duplicatesDetected x0, unrecordedCommitsDetected x0, reconcileAbandoned x0
+credential values in jobs/attempts/API responses/container logs: none
+docker stats, peak memory per container:
+  rote-api-1: 233.4 MiB
+  rote-bank-1: 56.0 MiB
+  rote-postgres-1: 65.2 MiB
+  rote-worker-1: 231.1 MiB
+  rote-worker-2: 233.8 MiB
+  rote-worker-3: 234.7 MiB
+  rote-worker-4: 236.5 MiB
+
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 500; ledger rows: 500; drain timed out: no
+job states: succeeded=500
+verdicts: ok=500, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+
+family judge (standard; src/chaos/families.ts): every expectation met
+RESULT: PASS

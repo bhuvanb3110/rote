@@ -1,0 +1,11 @@
+diff --git a/src/fleet/stateMachine.ts b/src/fleet/stateMachine.ts
+--- a/src/fleet/stateMachine.ts
++++ b/src/fleet/stateMachine.ts
+@@ -509,6 +509,7 @@
+               : "resuming a verify handed over by rote jobs reverify (T6.7)",
+         };
+       }
++      if (cycle.deadPhases >= 3) return crashLimitAfterIntent(row, crash, `in verifying (mutant: a separate cap of 3 dead verify phases)`);
+       if (crash >= row.maxCrashes) return crashLimitAfterIntent(row, crash, `in verifying (dead verify phases in this cycle: ${cycle.deadPhases})`);
+       return {
+         kind: "verify",

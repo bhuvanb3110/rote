@@ -28,6 +28,8 @@ export interface RunLogEntry {
     | "drift"
     | "result"
     | "risk_approved"
+    | "irreversible_settle"
+    | "aborted"
     | "escalation_raised"
     | "escalation_resumed";
   detail: Record<string, unknown>;

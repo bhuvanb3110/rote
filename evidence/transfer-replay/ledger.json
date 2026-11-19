@@ -1,0 +1,32 @@
+{
+  "memoMaxLength": 64,
+  "entries": [
+    {
+      "id": "TXN-000001",
+      "tenantId": "tenant-a",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 12.34,
+      "memo": "rote-evidence-tenant-a",
+      "at": "2026-11-09T23:39:05.979Z"
+    },
+    {
+      "id": "TXN-000002",
+      "tenantId": "tenant-b",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 12.34,
+      "memo": "rote-evidence-tenant-b",
+      "at": "2026-11-09T23:39:08.829Z"
+    },
+    {
+      "id": "TXN-000003",
+      "tenantId": "tenant-c",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 12.34,
+      "memo": "rote-evidence-tenant-c",
+      "at": "2026-11-09T23:39:11.346Z"
+    }
+  ]
+}

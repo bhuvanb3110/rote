@@ -1,0 +1,217 @@
+
+ RUN  v4.1.10 C:/Users/hp/Downloads/rote
+
+ ✓ |unit-db| src/worker/verifySql.db.test.ts (14 tests) 4784ms
+     ✓ committing -> verifying: token + 1, a fresh lease, outcome commit_uncertain, the result stored, the attempt closed, a phase row (commit_uncertain, prior_status)  316ms
+     ✓ also from running (a T3 COMMIT whose result was unknown): a thrown run, prior_status NULL  426ms
+     ✓ fenced: a stale T5 (token bumped by recovery) writes nothing (lease_lost); the same token on a job already verifying is illegal_transition  314ms
+     ✓ the job STAYS verifying with the deferring verifier as owner (jobs_active_has_owner), the token bumped (nobody holds it), lease = now + backoff; the phase is `deferred`  300ms
+     ✓ the budget: deferred-for (database clock, from the first deferral's end) at or past the budget -> needs_human / verify_unavailable  427ms
+     ✓ accepts the 'could not tell' outcomes; refuses ambiguous, other needs_human, other states, another tenant, a missing job  786ms
+ ✓ |unit-db| src/queue/enqueue.db.test.ts (13 tests) 5393ms
+     ✓ concurrent same key: 20 clients x 25 rounds -> one job per round, all 20 get its id, exactly one created  3609ms
+ ✓ |unit-db| src/oracle/collect.db.test.ts (5 tests) 8948ms
+     ✓ a clean run passes; the ledger is read through the bank's HTTP endpoint and validated  356ms
+     ✓ prints the report, writes oracle.json and check.txt, exits 0 on PASS and 1 on FAIL  7603ms
+ ✓ |unit-db| src/queue/schema.db.test.ts (21 tests) 4367ms
+     ✓ job_verifications rejects an unknown reason, prior_status or decision, a token < 1, and ended before started  491ms
+     ✓ one verification per (job, fencing token); a job id must exist; deleting the job deletes its verifications  373ms
+ ✓ |unit-db| src/queue/dequeue.db.test.ts (14 tests) 10336ms
+     ✓ 16 concurrent dequeuers over 300 jobs: every job handed out exactly once, token 1, attempt 1, one attempt row each  5845ms
+     ✓ the cap holds under concurrency: 8 dequeuers, cap 2 -> never more than 2 active (sampled), and exactly 2 once drained  1306ms
+     ✓ a failure between the lease (4) and the attempt row (5) rolls back both: job queued, token 0, no attempt row  522ms
+     ✓ re-dequeue after a requeue (standing in for Day-2 recovery) -> fencing_token 2, attempt 2, a second attempt row  364ms
+     ✓ tenant-a's queued job row locked by another open transaction: dequeue still returns tenant-b's job  425ms
+     ✓ an exhausted job can never sit in 'queued', so it can't make a tenant look like it has work  302ms
+ ✓ |unit-db| src/worker/recover.db.test.ts (16 tests) 10216ms
+     ✓ running, attempts left -> T6.1 requeue: queued, token + 1, lease cleared, the dead attempt 'crashed'; the next dequeue is attempt 2  382ms
+     ✓ running on the last attempt -> T6.2 fail / lease_expired, never queued (D21)  397ms
+     ✓ verifying, 3 dead phases -> T6.6 escalate: needs_human / verify_exhausted, the third dead phase closed  366ms
+     ✓ verifying, deferred (the bank was unavailable) -> T6.7 resume after the backoff; deferrals never count toward the cap  461ms
+     ✓ recovers oldest expiry first, at most `max` per call, and reports each  489ms
+     ✓ the sweep STOPS at the first claim to verify (that job is the iteration's work); the rest wait for the next sweep  381ms
+     ✓ 8 concurrent recoverers over 50 expired jobs: each job recovered exactly once (token + 1 exactly once)  3352ms
+     ✓ 8 concurrent verifiers re-claiming 16 expired verifying jobs (looping until none is left): each claimed exactly once, one open phase each  2140ms
+     ✓ logs each recovery and resolves with the claim to verify; a transient DB error is logged and swallowed; any other error propagates  425ms
+ ✓ |unit-db| src/worker/fault.test.ts (9 tests) 5633ms
+     ✓ ROTE_FAULT without the enable flag: exit 1 before connecting to anything  2774ms
+     ✓ an unknown point: exit 1  2838ms
+ ✓ |unit-db| src/testing/unitScript.test.ts (1 test) 3156ms
+     ✓ plain run lists DB files; npm_lifecycle_event=test:unit and ROTE_SKIP_DB_TESTS=1 list none  3152ms
+ ✓ |unit-db| mock-app/transfer.http.test.ts (49 tests) 3198ms
+     ✓ tenant-a: Continue -> Submit appends exactly one ledger row  410ms
+     ✓ counts matching transfers and filters by memo  436ms
+     ✓ a new row is missing from the history rows AND the count until the lag has passed; /control/ledger sees it at once  579ms
+ ✓ |unit-db| src/confidence/overrideApproval.test.ts (9 tests) 1520ms
+     ✓ records one digest per override file and allows every approved tenant  824ms
+ ✓ |unit-db| src/tenant/digest.test.ts (6 tests) 79ms
+ ✓ |unit-db| src/escalation/controller.test.ts (7 tests) 144ms
+ ✓ |unit-db| src/queue/migrate.db.test.ts (7 tests) 5212ms
+     ✓ applies 0001_init, 0002_day2 and 0003_verify once, in order, into an empty schema  458ms
+     ✓ a rerun applies nothing  522ms
+     ✓ an applied file that was edited fails loudly, naming it  2562ms
+     ✓ a CRLF checkout of an applied file is NOT an edit (same checksum)  394ms
+     ✓ an applied migration missing from the directory fails loudly  423ms
+     ✓ two concurrent runners on separate connections apply it exactly once  481ms
+     ✓ a failing migration rolls back whole: no partial tables, no schema_migrations row, earlier ones kept  368ms
+ ✓ |unit-db| src/worker/intent.db.test.ts (10 tests) 2261ms
+ ✓ |unit-db| src/confidence/approval.test.ts (10 tests) 208ms
+ ✓ |unit-db| src/queue/db.db.test.ts (5 tests) 719ms
+ ✓ |unit-db| src/worker/heartbeat.db.test.ts (8 tests) 1281ms
+ ✓ |unit-db| src/worker/complete.db.test.ts (11 tests) 1952ms
+ ✓ |unit-db| src/worker/bankForward.test.ts (5 tests) 459ms
+ ✓ |unit-db| src/worker/faultPoints.db.test.ts (4 tests) 1153ms
+     ✓ no fault: the same tick completes normally  403ms
+ ✓ |unit-db| src/confidence/store.test.ts (22 tests) 740ms
+ ✓ |unit-db| src/queue/migrate.test.ts (4 tests) 57ms
+ ✓ |unit-db| src/surface/webSurface.test.ts (3 tests) 420ms
+     ✓ throws the original error after 3 failed attempts  310ms
+ ✓ |unit-db| src/artifact/canonical.test.ts (4 tests) 108ms
+ ✓ |unit-db| src/catalog/asyncApi.db.test.ts (13 tests) 2353ms
+     ✓ 200: the same tenant + key + request returns the existing job; 409 on a different request  381ms
+ ✓ |unit-db| src/tenant/apply.test.ts (6 tests) 98ms
+ ✓ |unit-db| src/catalog/committedApprovals.test.ts (13 tests) 723ms
+     ✓ transfer: approved for exactly its committed tenant overrides  305ms
+ ✓ |unit-db| src/artifact/capability.test.ts (11 tests) 72ms
+ ✓ |unit-db| src/chaos/schedule.test.ts (10 tests) 88ms
+ ✓ |unit-db| src/testing/browserProject.test.ts (3 tests) 90ms
+ ✓ |unit-db| src/testing/listen.test.ts (4 tests) 84ms
+ ✓ |unit-db| src/queue/enqueue.test.ts (5 tests) 100ms
+ ✓ |unit-db| src/fleet/stateMachine.test.ts (23 tests) 92ms
+ ✓ |unit-db| src/queue/db.test.ts (5 tests) 43ms
+ ✓ |unit-db| src/chaos/crashExpected.test.ts (6 tests) 23ms
+ ✓ |unit-db| src/oracle/ledger.test.ts (12 tests) 27ms
+ ✓ |unit-db| src/worker/heartbeat.test.ts (10 tests) 26ms
+ ✓ |unit-db| src/fleet/jobOutcome.test.ts (14 tests) 18ms
+ ✓ |unit-db| src/safety/redact.test.ts (8 tests) 15ms
+ ✓ |unit-db| src/tenant/canonicalize.test.ts (10 tests) 14ms
+ ✓ |unit-db| src/safety/policy.test.ts (5 tests) 13ms
+ ✓ |unit-db| src/worker/worker.test.ts (16 tests) 61ms
+ ✓ |unit-db| src/confidence/score.test.ts (6 tests) 9ms
+ ✓ |unit-db| src/fleet/stateMachine.property.test.ts (22 tests) 23206ms
+     ✓ property 1: no duplicate unless a zombie clicked (frozen across its own lease expiry) or the history lag exceeds the settle period  2378ms
+     ✓ property 1's preconditions are NECESSARY: without the zombie, a lag over the settle period alone duplicates; without the lag, a zombie alone does  461ms
+     ✓ property 2: no duplicate at all when no pause spans lease + settle (no click lands that long after its lease was extended) and there is no history lag  2511ms
+     ✓ property 3: no lost job -- after the bank is back, everyone wakes and the leases pass, recovery + verify + clean workers reach a terminal state  2728ms
+     ✓ property 4: terminal states are final (only rote jobs reverify reopens one, never modelled here), and queued always has an attempt left (D21)  2931ms
+     ✓ property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups  3071ms
+     ✓ property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal  3585ms
+     ✓ R2a: at most one worker holds a valid lease (owner + token match, lease_expires_at > now), and it is the one that took the job last  2658ms
+     ✓ R2b: the fencing token never decreases  2169ms
+     ✓ over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate  691ms
+ ✓ |unit-db| src/fleet/modelVsReal.db.test.ts (2 tests) 43490ms
+     ✓ 200 seeded command sequences agree after every command  35052ms
+     ✓ 100 more sequences that START with a job in verifying (a real dequeue + T5): the verify writes, re-claims and deferrals; then every Step 9 path was exercised  7945ms
+ ✓ |browser| src/worker/worker.db.test.ts (5 tests) 50084ms
+     ✓ 6 jobs (2 per tenant), one worker -> all succeeded; ledger memos are exactly the memo_keys; confirmationRef = row id  25875ms
+     ✓ two workers, 12 jobs -> each run once (attempt 1), both workers used, per-tenant cap never exceeded  20953ms
+     ✓ business outcome (unknown toMemberId) -> business_outcome on attempt 1, never retried, 0 rows  2140ms
+ ✓ |browser| src/replay/replay.test.ts (8 tests) 18615ms
+     ✓ (a) happy path: succeeds and returns the savings balance  1846ms
+     ✓ (b) business outcome: unknown member returns NO_SUCH_MEMBER, not a failure  1404ms
+     ✓ (c) recoverable: transient interstitial is retried and replay still succeeds  2681ms
+     ✓ (d) hard failure: an impossible success condition returns a debuggable failure  1545ms
+     ✓ (e) risky action without approveRisky returns needs_human, not silent execution  3470ms
+     ✓ (f) risky action WITH approveRisky executes and actually completes the flow  2781ms
+     ✓ (g) escalation: pauses on the risky step, resumes to success once a human resolves it  2442ms
+     ✓ (h) escalation: a no-op hand-back safely re-pauses instead of crashing  2399ms
+ ✓ |browser| src/replay/fleet.test.ts (30 tests) 88210ms
+     ✓ two sequential runs on one browser both succeed; the browser stays up with 0 contexts  5343ms
+     ✓ two concurrent runs on one browser get their own balances (contexts share no cookies)  3614ms
+     ✓ headless is ignored (not rejected) when a browser is passed  1499ms
+     ✓ gate says safe, artifact says risky: refused without approveRisky (0 rows); runs with it (1 row)  6891ms
+     ✓ artifact says safe, gate says risky: still irreversible (today's behavior, pinned)  2590ms
+     ✓ gate-blind Submit with approveRisky still goes through onIrreversible.before  3129ms
+     ✓ before then after, once each, on step-11; after() runs once the bank answered (ledger already has the row)  2703ms
+     ✓ before() throws: runReplay rejects with that same error, the click never happens, after() never runs  2732ms
+     ✓ after() throws: runReplay rejects with that error and the click happened (exactly 1 row)  2651ms
+     ✓ no hooks for an all-safe capability, nor for a transfer without approveRisky  4229ms
+     ✓ no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs  11122ms
+     ✓ transient interstitial right after Submit: no reload (no re-POST), non-success with commitUncertain, 0 rows  2416ms
+     ✓ transient interstitial BEFORE Submit still recovers (the rules apply only after the attempt)  2949ms
+     ✓ 503 right after Submit, before the write (errors/on armed in before()): failure + commitUncertain, 0 rows  2415ms
+     ✓ 503 right after Submit, after the write (errors/after-write): failure + commitUncertain, 1 row, lookup finds 1  3982ms
+     ✓ a business_outcome after the attempt carries commitUncertain too  2378ms
+     ✓ business outcomes BEFORE the attempt carry no marker (a blind retry is safe)  4194ms
+     ✓ a throw after the attempt becomes failure/unknown with the marker (not an exception)  2586ms
+     ✓ operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click  2704ms
+     ✓ abort during a slow step (bank latency 3 s): AbortError well under 3 s, shared browser up with 0 contexts, 0 rows  1057ms
+     ✓ abort inside after() (the click happened): still rejects with AbortError, 1 row, aborted entry names step-11  1858ms
+     ✓ abort without a shared browser closes the browser replay launched, and still rejects  1181ms
+     ✓ the abort listener is removed when the run ends (no leak on a long-lived worker)  1128ms
+     ✓ absent: nothing changes (every other test in this file runs without it)  2207ms
+     ✓ called once per step that completed, in order, with its index; the bank's row exists from step-11 on  3502ms
+     ✓ a throw before the irreversible step rejects with that same error, closes the context, runs no further step (0 rows)  1090ms
+     ✓ a throw AFTER the irreversible step still rejects with that error (a hook error, not a result): exactly 1 row  3099ms
+     ✓ not called for a step that failed its checkpoint  1344ms
+ ✓ |browser| src/replay/confidenceGate.test.ts (6 tests) 24157ms
+     ✓ N consecutive high-confidence runs promote a draft capability, which then replays unattended without the flag  6910ms
+     ✓ a low-confidence (hostile-DOM) run computes confidence 0 and does not count toward promotion  2859ms
+     ✓ an approval for another version refuses unattended replay before any browser launches (D15)  3428ms
+     ✓ a content change with the SAME version is refused before any browser launches (D24)  2745ms
+     ✓ auto-promotion through real runs records the replayed artifact's version (D15)  8160ms
+ ✓ |browser| src/tenant/multiTenant.test.ts (5 tests) 10034ms
+     ✓ tenant A, no override: the base capability succeeds as-is against the root-mounted tenant  1852ms
+     ✓ tenant B, with override: the SAME base capability succeeds against /tenant-b/, same balance, and logs drift for the overridden controls  2974ms
+     ✓ tenant B without the override would fail: the base capability alone can't find 'Search' or the old balance label  1607ms
+     ✓ tenant C (hostile DOM), with override: the SAME base capability still succeeds -- no ARIA roles, no <label for>, no table for the balance -- and every overridden control logs drift  2168ms
+     ✓ tenant C without the override would fail: roleName/labelText alone can't survive hostile markup  1233ms
+ ✓ |browser| src/catalog/invoke.test.ts (4 tests) 6065ms
+     ✓ browser, onIrreversible, signal, evidenceBaseDir and statusDir all reach replay (tenant-b transfer)  2846ms
+     ✓ onStep reaches replay too (D34): once per step of the tenant-b transfer, in order  2716ms
+ ✓ |browser| mock-app/transfer.browser.test.ts (1 test) 4500ms
+     ✓ each tenant: login -> Transfer -> Continue -> Submit -> History filter; ledger has exactly one row each  4189ms
+ ✓ |browser| src/catalog/catalog.test.ts (4 tests) 2277ms
+     ✓ succeeds with valid params via the real replay path  2146ms
+ ✓ |browser| src/surface/locate.test.ts (4 tests) 1039ms
+ ✓ |browser| src/replay/transfer.test.ts (21 tests) 114692ms
+     ✓ success on all three tenants (ref = ledger id); same memo twice -> lookup 2; tenants isolated  35807ms
+     ✓ lookup 1.2.0: the bank's 503 is the BANK_UNAVAILABLE outcome (nothing read), on every tenant; a history lag hides a new row  10659ms
+     ✓ without approveRisky: needs_human at step-11 and nothing in the ledger  2420ms
+     ✓ transfer business outcome NO_SUCH_MEMBER, ledger stays empty (approveRisky on)  1291ms
+     ✓ transfer business outcome PERMISSION_DENIED, ledger stays empty (approveRisky on)  1221ms
+     ✓ transfer business outcome SOURCE_CLOSED, ledger stays empty (approveRisky on)  2061ms
+     ✓ transfer business outcome NO_SUCH_RECIPIENT, ledger stays empty (approveRisky on)  2418ms
+     ✓ transfer business outcome RECIPIENT_CLOSED, ledger stays empty (approveRisky on)  1942ms
+     ✓ transfer business outcome SAME_MEMBER, ledger stays empty (approveRisky on)  2021ms
+     ✓ transfer business outcome INSUFFICIENT_FUNDS, ledger stays empty (approveRisky on)  5421ms
+     ✓ transfer business outcome INVALID_AMOUNT, ledger stays empty (approveRisky on)  2810ms
+     ✓ a memo containing outcome text is not mistaken for that outcome (recognizers scoped to the error message)  7110ms
+     ✓ an empty To Member ID or Amount is REQUIRED_FIELD_MISSING (the input schema can't reject it earlier)  5342ms
+     ✓ lookup business outcomes: NO_SUCH_MEMBER and PERMISSION_DENIED  6332ms
+     ✓ a 100-char memo is stored at 64; the full-memo lookup finds 0  8143ms
+     ✓ write-then-error (errors/after-write): non-success, exactly 1 row, lookup finds 1  5955ms
+     ✓ errors/on (503 before any write): the transfer fails and writes nothing  1221ms
+     ✓ transient interstitials on login and navigation steps are retried (transfer up to Submit, lookup end to end)  11104ms
+     ✓ tenant-c: `.zk9bv` matches exactly one element on the history page and the Submitted page  1153ms
+ ✓ |slow| src/worker/faults.db.test.ts (5 tests) 14844ms
+     ✓ failure BEFORE Submit (bank errors/on) -> requeued; attempt 2 succeeds; exactly 1 row  2813ms
+     ✓ Step 9: errors/after-write (bank commits, then errors) -> commit uncertain -> verify (T5) [1] -> succeeded / already_done on attempt 1; confirmationRef = the row's id; exactly 1 row; never retried  3227ms
+     ✓ graceful stop during a slow job: the job finishes and is recorded  5159ms
+     ✓ graceful stop with a tiny grace: aborted before Submit -> requeued (attempt counted, 'aborted'), 0 rows  504ms
+     ✓ Postgres blip: with the connection cut the worker backs off without exiting; restored, the queued job completes  2521ms
+ ✓ |slow| src/worker/lease.db.test.ts (8 tests) 37369ms
+     ✓ keeps a slow job's 5 s lease alive across a 1.5 s-per-request bank (a run far longer than the lease), then completes normally  13384ms
+     ✓ token bumped under a running job (bank latency 3 s): the context closes within one beat; nothing recorded on jobs; 0 rows; attempt lease_lost  1159ms
+     ✓ a normal run goes running -> committing -> succeeded; the attempt row records when its intent was written  2273ms
+     ✓ token bumped right before Submit (recovered): FencingError, the Submit is NEVER clicked, 0 rows; the stale requeue is fenced too  1617ms
+     ✓ T3 fails with anything but a FencingError (COMMIT result unknown): no click; the attempt 'may have committed', so verify (T5) looks: [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row  6818ms
+     ✓ lease expired before Submit but nobody recovered it: T3 refuses (no click); the worker's own requeue is recorded; attempt 2 succeeds; exactly 1 row  3412ms
+     ✓ a dead worker's expired `running` job is requeued by the next worker's loop (T6.1) and finished: attempt 2, exactly 1 row  1629ms
+     ✓ Step 9: a dead worker's expired `committing` job (intent written, no click) is claimed to verify (T6.4): [0, 0] -> resubmitted -> attempt 2 succeeds, exactly 1 row  5856ms
+ ✓ |slow| src/worker/verify.db.test.ts (10 tests) 54685ms
+     ✓ [1] -> already_done at once: one lookup, no settle  515ms
+     ✓ [0, 1]: the second lookup waits the settle period, then already_done  636ms
+     ✓ the lease lost during the settle period (token bumped): the heartbeat aborts the phase; nothing on jobs; the phase says lease_lost  1125ms
+     ✓ errors/on armed right after the intent (503 BEFORE the write): verify finds the bank down -> deferred; the outage ends -> resumed (T6.7) [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row  9493ms
+     ✓ a business outcome shown after Submit with nothing written -> [0, 0] -> business_outcome (the refusal stands), never retried; 0 rows  7065ms
+     ✓ rote jobs reverify <id> end to end: a job Step 8 parked (needs_human / commit_uncertain, its transfer committed) -> the CLI hands it to verify -> the next worker's recovery (T6.7) -> [1] -> succeeded / already_done; refusals exit 1 / 2  11613ms
+     ✓ a bank outage DURING verifies (dead workers after Submit and after the intent; errors/on for 8 s): every verify defers and completes after the outage; no needs_human, no duplicate (the ledger oracle)  22968ms
+
+ Test Files  58 passed (58)
+      Tests  572 passed (572)
+   Start at  10:26:57
+   Duration  214.19s (transform 6.22s, setup 0ms, import 41.74s, tests 569.56s, environment 23ms)
+
+JSON report written to C:/Users/hp/Downloads/rote/evidence/step-10/slow-project/final-2.json
+exit=0 wall_seconds=217.7

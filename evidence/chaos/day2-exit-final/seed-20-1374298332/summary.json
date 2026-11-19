@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "completed": true,
+  "seed": 1374298332,
+  "family": "standard",
+  "jobs": 500,
+  "workers": 4,
+  "durationMs": 800000,
+  "pauseMs": 45000,
+  "drainTimeoutMs": 900000,
+  "commit": "9d38bb2",
+  "startedAt": "2026-11-19T07:11:04.296Z",
+  "wallMs": 819335,
+  "workMs": 792525,
+  "drainMs": 7392,
+  "drainTimedOut": false,
+  "kills": 82,
+  "restarts": 82,
+  "actionErrors": 0,
+  "pause": {
+    "replica": 4,
+    "fromMs": 191671,
+    "toMs": 236671
+  },
+  "bank": null,
+  "bankControlsApplied": 0,
+  "oracle": {
+    "pass": true,
+    "counts": {
+      "ok": 500,
+      "DUPLICATE": 0,
+      "MISSING_COMMIT": 0,
+      "UNRECORDED_COMMIT": 0,
+      "MISMATCH": 0,
+      "LOST": 0,
+      "PENDING": 0,
+      "ORPHAN": 0
+    },
+    "ledgerRows": 499
+  },
+  "finals": {
+    "succeeded/success": 494,
+    "needs_human/crash_limit": 1,
+    "succeeded/already_done": 5
+  },
+  "needsHuman": [
+    {
+      "id": "9e1d23f4-853e-4e32-a662-23e03f7d1e95",
+      "outcome": "crash_limit"
+    }
+  ],
+  "failed": [],
+  "notSettled": 0,
+  "recoveries": {
+    "requeuedAfterCrash": 25,
+    "requeuedAfterFailure": 0,
+    "failedByRecovery": 0,
+    "claimedToVerify": 6,
+    "reclaimedVerify": 3,
+    "resumedVerify": 0,
+    "escalatedByRecovery": 1,
+    "ownVerify": 0,
+    "already_done": 5,
+    "resubmitted": 0,
+    "exhausted": 0,
+    "not_committed_final": 0,
+    "deferred": 0,
+    "escalated": 0,
+    "reconciled": 0,
+    "duplicate_suspected": 0,
+    "unrecorded_commit_suspected": 0,
+    "reconcile_unreadable": 0,
+    "reconcile_deferred": 0
+  },
+  "crashBudget": {
+    "jobsWithCrashes": 31,
+    "totalCrashes": 35,
+    "maxCrashesOnOneJob": 5,
+    "jobsLeasedPastMaxAttempts": 0,
+    "crashLimit": 1
+  },
+  "escalatedByCrashCapAttributed": [
+    {
+      "jobId": "9e1d23f4-853e-4e32-a662-23e03f7d1e95",
+      "crashes": 5,
+      "ledgerRows": 0,
+      "deaths": [
+        {
+          "row": "attempt",
+          "n": 1,
+          "holder": "d6f39c899b70-7-473c",
+          "recovery": "T6.4",
+          "event": {
+            "kind": "kill",
+            "container": "rote-worker-1",
+            "at": "2026-11-19T07:14:08.486Z",
+            "tMs": 164816
+          }
+        },
+        {
+          "row": "verify phase",
+          "n": 2,
+          "holder": "d6f39c899b70-7-69e7",
+          "recovery": "T6.5",
+          "event": {
+            "kind": "kill",
+            "container": "rote-worker-1",
+            "at": "2026-11-19T07:14:41.611Z",
+            "tMs": 197941
+          }
+        },
+        {
+          "row": "verify phase",
+          "n": 3,
+          "holder": "6049abae02b9-7-0117",
+          "recovery": "T6.5",
+          "event": {
+            "kind": "kill",
+            "container": "rote-worker-2",
+            "at": "2026-11-19T07:15:13.854Z",
+            "tMs": 230184
+          }
+        },
+        {
+          "row": "verify phase",
+          "n": 4,
+          "holder": "6049abae02b9-7-f6e7",
+          "recovery": "T6.5",
+          "event": {
+            "kind": "kill",
+            "container": "rote-worker-2",
+            "at": "2026-11-19T07:15:39.814Z",
+            "tMs": 256144
+          }
+        },
+        {
+          "row": "verify phase",
+          "n": 5,
+          "holder": "6f8544e01444-7-7b7d",
+          "recovery": "T6.6",
+          "event": {
+            "kind": "kill",
+            "container": "rote-worker-3",
+            "at": "2026-11-19T07:16:13.843Z",
+            "tMs": 290173
+          }
+        }
+      ]
+    }
+  ],
+  "reconcileAbandoned": [],
+  "workerProtections": {
+    "heartbeatLeaseLost": 0,
+    "fencedCommitIntent": 0,
+    "completionFencedOut": 0,
+    "runAbortedOnLostLease": 0,
+    "verifyPhaseAborted": 0,
+    "verifyDecisionFencedOut": 0,
+    "reconcileDecisionFencedOut": 0,
+    "duplicatesDetected": 0,
+    "unrecordedCommitsDetected": 0,
+    "reconcileAbandoned": 0
+  },
+  "leaks": [],
+  "oom": [],
+  "problems": [],
+  "pass": true
+}

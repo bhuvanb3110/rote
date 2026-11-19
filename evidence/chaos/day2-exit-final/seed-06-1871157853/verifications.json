@@ -1,0 +1,78 @@
+[
+  {
+    "id": 1,
+    "job_id": "8098f88d-38e9-42bf-ab6c-8bc623e25f73",
+    "fencing_token": 2,
+    "worker_id": "6f8544e01444-7-c2bd",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:02:33.680Z",
+    "ended_at": "2026-11-19T04:02:35.637Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 2,
+    "job_id": "10105023-3136-4e6f-a5f0-626db95b4472",
+    "fencing_token": 2,
+    "worker_id": "6f8544e01444-7-d712",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:03:08.949Z",
+    "ended_at": "2026-11-19T04:03:16.858Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 3,
+    "job_id": "bd1ae7f9-b1ca-4754-999e-bd79bccdc12d",
+    "fencing_token": 2,
+    "worker_id": "6049abae02b9-7-6d2b",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:03:23.208Z",
+    "ended_at": "2026-11-19T04:03:24.780Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 4,
+    "job_id": "10105023-3136-4e6f-a5f0-626db95b4472",
+    "fencing_token": 4,
+    "worker_id": "d44b0fe854ff-7-30c8",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:04:18.772Z",
+    "ended_at": "2026-11-19T04:04:20.502Z",
+    "lookups": [
+      1
+    ],
+    "decision": "reconciled",
+    "error": null
+  },
+  {
+    "id": 5,
+    "job_id": "49866041-7d8c-4976-a833-71d994f7afd1",
+    "fencing_token": 2,
+    "worker_id": "d6f39c899b70-7-426a",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:04:49.924Z",
+    "ended_at": "2026-11-19T04:04:51.601Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  }
+]

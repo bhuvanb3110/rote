@@ -1,5 +1,44 @@
-import type { Capability } from "../artifact/index.js";
+import type { Browser } from "playwright";
+import type { Capability, Step } from "../artifact/index.js";
 import type { EscalationController } from "../escalation/index.js";
+import type { TenantOverride } from "../tenant/index.js";
+
+/**
+ * Callbacks around the one irreversible action in a run (a step the live gate OR the artifact
+ * marks risky -- see replay.ts). They run only when that action is actually about to be executed
+ * by replay: never for safe steps, and never when approveRisky is false (replay stops first).
+ */
+export interface IrreversibleHooks {
+  /**
+   * Runs right before the irreversible click, after the approveRisky check. The fleet writes its
+   * commit intent here and throws if its fencing check fails (lease lost, token mismatch). A throw
+   * PREVENTS the click: runReplay closes its context and rejects with that same error, unwrapped.
+   * It never returns a ReplayResult for it.
+   */
+  before(step: Step): Promise<void>;
+  /**
+   * Contract: runs once the bank has ANSWERED the click, not merely when the click was dispatched.
+   * After the click, replay waits (bounded, 10 s) for the page's resulting navigation to reach
+   * "load", and only then calls after(). So when after() runs, the bank has processed the POST:
+   * if it committed, its ledger already has the row. If that wait times out or errors, it does not
+   * throw: it is recorded in evidence (`irreversible_settle`, `loaded: false`) and after() still
+   * runs. after() also runs if the click itself threw (it may still have been dispatched).
+   * Crash-after-submit fault injection fires here. A throw rejects runReplay with that same error
+   * (after closing the context); no ReplayResult is returned.
+   */
+  after(step: Step): Promise<void>;
+}
+
+/**
+ * A callback after each step that completed normally (docs/DECISIONS.md D34): its checkpoint passed,
+ * or it had none and its action raised no error. Main path only: not after a step a human resolved
+ * ("skip"), not for a step whose run ended there. Every step, the irreversible one included. The
+ * crash-point matrix kills a worker here. A throw rejects runReplay with that same error, unwrapped,
+ * after closing the context, even after the irreversible step (like IrreversibleHooks).
+ */
+export interface StepHooks {
+  after(step: Step, index: number): Promise<void>;
+}
 
 export interface ReplayOptions {
   capability: Capability;
@@ -10,8 +49,19 @@ export interface ReplayOptions {
    * this is checked against that pattern and rejected if it doesn't match.
    */
   entryUrl: string;
-  /** Defaults to true -- unlike discovery, replay doesn't need a human watching. */
+  /**
+   * Defaults to true -- unlike discovery, replay doesn't need a human watching. Ignored when
+   * `browser` is given (that browser is already headed or headless); passing both is allowed,
+   * because invokeCapability always passes headless.
+   */
   headless?: boolean;
+  /**
+   * Reuse this running browser instead of launching one (fleet: one browser per worker, one
+   * context per job). Replay opens a fresh context for the run and closes only that context on
+   * every exit path, including throws; the browser stays connected. Omit it to launch and close a
+   * browser per run, as before.
+   */
+  browser?: Browser;
   evidenceBaseDir?: string;
   /**
    * Defaults to false. A risky/irreversible step is refused unless this is explicitly true --
@@ -34,6 +84,35 @@ export interface ReplayOptions {
    * until enough consecutive high-confidence runs auto-promote it.
    */
   approveUnattended?: boolean;
+  /**
+   * The artifact the approval gate checks (version + content digest, D15/D24) and that confidence
+   * runs are recorded against. Defaults to `capability`. invokeCapability passes the BASE artifact
+   * here, because `capability` is then the tenant-effective one (overrides applied), whose digest is
+   * not the approved artifact's. Must have the same id and version as `capability` (else replay
+   * throws before anything runs).
+   */
+  approvalArtifact?: Capability;
+  /**
+   * The tenant override that was applied to produce `capability` (a tenant run). The approval gate
+   * refuses unless the approval covers exactly this override (its digest, D30). invokeCapability and
+   * the CLI's `--tenant` pass it. Omit for a run of the base artifact (no override check).
+   */
+  approvalOverride?: TenantOverride;
   /** Defaults to "status" -- where per-capability approval/confidence sidecar files live. */
   statusDir?: string;
+  /** Callbacks around the irreversible action (the fleet's commit intent / fault injection). */
+  onIrreversible?: IrreversibleHooks;
+  /** Called after each normally completed step (StepHooks). Absent: no change at all. */
+  onStep?: StepHooks;
+  /**
+   * Aborts the run (fleet: the heartbeat lost the lease). Already aborted at entry → rejects with
+   * `signal.reason` before any evidence, browser or context is created. Aborted mid-run → replay
+   * closes its context (or the browser it launched) immediately, mid-action, and rejects with
+   * `signal.reason`. Abort ALWAYS rejects and never returns a ReplayResult, even after the
+   * irreversible action was attempted: a worker that lost its lease must not record anything, and
+   * the next lease holder recovers by reading the history. Evidence gets one `aborted` entry
+   * (`reason`, `irreversibleAttempted`); no `result` entry and no confidence write. Takes precedence
+   * over a hook error. Not observed while paused for a human (controller).
+   */
+  signal?: AbortSignal;
 }

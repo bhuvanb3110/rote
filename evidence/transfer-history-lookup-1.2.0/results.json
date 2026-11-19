@@ -1,0 +1,308 @@
+[
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer",
+    "label": "main",
+    "params": {
+      "memberId": "10001",
+      "toMemberId": "10002",
+      "amount": "12.34",
+      "memo": "rote-evidence-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000001"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/01-transfer-main-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer-history-lookup",
+    "label": "main",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "1",
+        "firstMatchRef": "TXN-000001"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/02-lookup-main-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-b",
+    "capability": "transfer",
+    "label": "main",
+    "params": {
+      "memberId": "10001",
+      "toMemberId": "10002",
+      "amount": "12.34",
+      "memo": "rote-evidence-tenant-b"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000002"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/03-transfer-main-tenant-b/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-b",
+    "capability": "transfer-history-lookup",
+    "label": "main",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-tenant-b"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "1",
+        "firstMatchRef": "TXN-000002"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/04-lookup-main-tenant-b/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-c",
+    "capability": "transfer",
+    "label": "main",
+    "params": {
+      "memberId": "10001",
+      "toMemberId": "10002",
+      "amount": "12.34",
+      "memo": "rote-evidence-tenant-c"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000003"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/05-transfer-main-tenant-c/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-c",
+    "capability": "transfer-history-lookup",
+    "label": "main",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-tenant-c"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "1",
+        "firstMatchRef": "TXN-000003"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/06-lookup-main-tenant-c/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer-history-lookup",
+    "label": "no-match",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-none-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "0",
+        "firstMatchRef": "No matching transfers."
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/07-lookup-no-match-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-b",
+    "capability": "transfer-history-lookup",
+    "label": "no-match",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-none-tenant-b"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "0",
+        "firstMatchRef": "No matching transfers."
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/08-lookup-no-match-tenant-b/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-c",
+    "capability": "transfer-history-lookup",
+    "label": "no-match",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-none-tenant-c"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "0",
+        "firstMatchRef": "No matching transfers."
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/09-lookup-no-match-tenant-c/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer",
+    "label": "twice-1",
+    "params": {
+      "memberId": "10001",
+      "toMemberId": "10002",
+      "amount": "12.34",
+      "memo": "rote-evidence-twice-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000004"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/10-transfer-twice-1-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer",
+    "label": "twice-2",
+    "params": {
+      "memberId": "10001",
+      "toMemberId": "10002",
+      "amount": "12.34",
+      "memo": "rote-evidence-twice-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000005"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/11-transfer-twice-2-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer-history-lookup",
+    "label": "two-matches",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-twice-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "2",
+        "firstMatchRef": "TXN-000004"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/12-lookup-two-matches-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer",
+    "label": "lagged",
+    "params": {
+      "memberId": "10001",
+      "toMemberId": "10002",
+      "amount": "12.34",
+      "memo": "rote-evidence-lagged-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000006"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/13-transfer-lagged-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer-history-lookup",
+    "label": "lag-60s",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-lagged-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "0",
+        "firstMatchRef": "No matching transfers."
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/14-lookup-lag-60s-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer-history-lookup",
+    "label": "lag-off",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-lagged-tenant-a"
+    },
+    "result": {
+      "status": "success",
+      "outputs": {
+        "matchingCount": "1",
+        "firstMatchRef": "TXN-000006"
+      },
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/15-lookup-lag-off-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-a",
+    "capability": "transfer-history-lookup",
+    "label": "bank-503",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-tenant-a"
+    },
+    "result": {
+      "status": "business_outcome",
+      "code": "BANK_UNAVAILABLE",
+      "detail": "The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.",
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/16-lookup-bank-503-tenant-a/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-b",
+    "capability": "transfer-history-lookup",
+    "label": "bank-503",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-tenant-b"
+    },
+    "result": {
+      "status": "business_outcome",
+      "code": "BANK_UNAVAILABLE",
+      "detail": "The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.",
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/17-lookup-bank-503-tenant-b/run.jsonl"
+    }
+  },
+  {
+    "tenant": "tenant-c",
+    "capability": "transfer-history-lookup",
+    "label": "bank-503",
+    "params": {
+      "memberId": "10001",
+      "memo": "rote-evidence-tenant-c"
+    },
+    "result": {
+      "status": "business_outcome",
+      "code": "BANK_UNAVAILABLE",
+      "detail": "The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.",
+      "evidenceRef": "evidence://evidence/transfer-history-lookup-1.2.0/runs/18-lookup-bank-503-tenant-c/run.jsonl"
+    }
+  }
+]

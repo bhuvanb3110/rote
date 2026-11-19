@@ -5,17 +5,33 @@
   "type": "module",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
     "discover": "tsx src/cli/index.ts discover",
     "replay": "tsx src/cli/index.ts replay",
     "operator": "tsx src/cli/index.ts operator",
     "catalog": "tsx src/cli/index.ts catalog",
     "mock": "tsx mock-app/index.ts",
     "demo:agent": "tsx examples/agent-demo.ts",
-    "test": "vitest run"
+    "evidence:transfer": "tsx scripts/evidence-transfer-replay.ts",
+    "evidence:queue": "tsx scripts/evidence-queue.ts",
+    "evidence:day1": "tsx scripts/evidence-day1-exit.ts",
+    "oracle": "tsx src/cli/index.ts oracle check",
+    "jobs": "tsx src/cli/index.ts jobs",
+    "reconcile": "tsx src/cli/index.ts reconcile",
+    "chaos": "tsx scripts/chaos.ts",
+    "chaos-seeds": "tsx scripts/chaos-seeds.ts",
+    "crash-matrix": "tsx scripts/crash-matrix.ts",
+    "verify-scenarios": "tsx scripts/verify-scenarios.ts",
+    "mutation-check": "tsx scripts/mutation-check.ts",
+    "worker": "tsx src/worker/main.ts",
+    "db:migrate": "tsx src/cli/index.ts db migrate",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:fast": "vitest run --project unit-db --project browser"
   },
   "license": "ISC",
   "dependencies": {
@@ -23,6 +39,7 @@
     "commander": "^15.0.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "pg": "^8.23.1",
     "pino": "^10.3.1",
     "playwright": "^1.62.1",
     "zod": "^4.4.3"
@@ -30,6 +47,8 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.2.0",
+    "@types/pg": "^8.23.1",
+    "fast-check": "^4.10.2",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"

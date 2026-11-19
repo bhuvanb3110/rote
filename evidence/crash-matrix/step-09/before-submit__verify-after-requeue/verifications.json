@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "job_id": "e6acbe16-801a-40fa-85c6-0aed2f4a2db8",
+    "fencing_token": 2,
+    "worker_id": "fault-verify-after-requeue",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-14T07:15:36.358Z",
+    "ended_at": "2026-11-14T07:15:43.725Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  }
+]

@@ -1,0 +1,55 @@
+# npm test (vitest run) x10, back to back, Windows host, 2026-11-09, after the D8 screenshot retry
+# Command: for i in 1..10: npx vitest run   (full logs were checked for FAIL / 'Unable to capture'; none found)
+
+## run 1 (exit 0)
+Test Files  16 passed (16)
+Tests  128 passed (128)
+Duration  20.60s (transform 2.05s, setup 0ms, import 12.13s, tests 61.06s, environment 4ms)
+
+## run 2 (exit 0)
+Test Files  16 passed (16)
+Tests  128 passed (128)
+Duration  19.26s (transform 2.22s, setup 0ms, import 18.60s, tests 61.72s, environment 4ms)
+
+## run 3 (exit 0)
+Test Files  16 passed (16)
+Tests  128 passed (128)
+Duration  19.06s (transform 1.64s, setup 0ms, import 18.30s, tests 62.64s, environment 5ms)
+
+## run 4 (exit 0)
+Test Files  16 passed (16)
+Tests  128 passed (128)
+Duration  19.81s (transform 3.10s, setup 0ms, import 15.66s, tests 64.86s, environment 6ms)
+
+## run 5 (exit 0)
+Test Files  16 passed (16)
+Tests  128 passed (128)
+Duration  18.92s (transform 2.08s, setup 0ms, import 15.28s, tests 64.69s, environment 5ms)
+
+## run 6 (exit 0)
+Test Files  16 passed (16)
+Tests  128 passed (128)
+Duration  17.24s (transform 2.03s, setup 0ms, import 15.18s, tests 56.87s, environment 6ms)
+
+## run 7 (exit 0)
+Test Files  16 passed (16)
+Tests  128 passed (128)
+Duration  16.03s (transform 1.61s, setup 0ms, import 13.17s, tests 49.60s, environment 4ms)
+
+## run 8 (exit 0)
+Test Files  16 passed (16)
+Tests  128 passed (128)
+Duration  17.80s (transform 1.73s, setup 0ms, import 13.26s, tests 56.67s, environment 5ms)
+
+## run 9 (exit 0)
+Test Files  16 passed (16)
+Tests  128 passed (128)
+Duration  17.14s (transform 1.85s, setup 0ms, import 14.45s, tests 54.68s, environment 4ms)
+
+## run 10 (exit 0)
+Test Files  16 passed (16)
+Tests  128 passed (128)
+Duration  17.56s (transform 1.94s, setup 0ms, import 14.02s, tests 57.82s, environment 5ms)
+
+# grep -c 'FAIL' across all 10 logs: 0
+# grep -c 'Unable to capture screenshot' across all 10 logs: 0

@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "job_id": "064c1c2b-8f87-4b48-bb9b-e2fbdbc5c83d",
+    "fencing_token": 2,
+    "worker_id": "worker-t5-lag-3000",
+    "reason": "commit_uncertain",
+    "prior_status": "failure",
+    "started_at": "2026-11-14T07:26:13.128Z",
+    "ended_at": "2026-11-14T07:26:20.006Z",
+    "lookups": [
+      0,
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  }
+]

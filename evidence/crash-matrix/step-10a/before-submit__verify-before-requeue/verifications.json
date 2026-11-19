@@ -1,0 +1,46 @@
+[
+  {
+    "id": 1,
+    "job_id": "6fca6777-ac8a-4903-a6e3-2c9a3509873d",
+    "fencing_token": 2,
+    "worker_id": "fault-verify-before-requeue",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-14T16:42:42.988Z",
+    "ended_at": "2026-11-14T16:42:54.181Z",
+    "lookups": null,
+    "decision": "crashed",
+    "error": "lease expired in verifying; recovered by clean-before-submit>verify-before-requeue (T6.5 verify)"
+  },
+  {
+    "id": 2,
+    "job_id": "6fca6777-ac8a-4903-a6e3-2c9a3509873d",
+    "fencing_token": 3,
+    "worker_id": "clean-before-submit>verify-before-requeue",
+    "reason": "lease_expired_in_verifying",
+    "prior_status": null,
+    "started_at": "2026-11-14T16:42:54.181Z",
+    "ended_at": "2026-11-14T16:43:01.611Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 3,
+    "job_id": "6fca6777-ac8a-4903-a6e3-2c9a3509873d",
+    "fencing_token": 5,
+    "worker_id": "clean-before-submit>verify-before-requeue",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-14T16:43:18.960Z",
+    "ended_at": "2026-11-14T16:43:19.990Z",
+    "lookups": [
+      1
+    ],
+    "decision": "reconciled",
+    "error": null
+  }
+]

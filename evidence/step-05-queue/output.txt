@@ -1,0 +1,38 @@
+# fleet Step 5 queue evidence, 2026-11-10T02:29:44.751Z
+database: postgres://rote:***@127.0.0.1:55432/rote
+
+$ docker compose ps
+NAME              IMAGE         COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+rote-postgres-1   postgres:17   "docker-entrypoint.s…"   postgres   33 minutes ago   Up 27 minutes (healthy)   127.0.0.1:55432->5432/tcp
+
+$ docker inspect -f {{.State.Health.Status}} rote-postgres-1
+healthy
+
+$ docker image inspect postgres:17 --format {{index .RepoDigests 0}}
+postgres@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
+
+# migrate() on the app database (npm run db:migrate): {"applied":[],"alreadyApplied":["0001_init"]}
+PASS  app database has 0001_init applied (schema_migrations: 0001_init)
+# PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+
+# scenario schema evidence_step05_1794277785274: migrate() -> {"applied":["0001_init"],"alreadyApplied":[]}
+# tenants: [{"id":"tenant-a","max_concurrent":2},{"id":"tenant-b","max_concurrent":2},{"id":"tenant-c","max_concurrent":2}]
+PASS  every tenant at the dev cap max_concurrent = 2
+
+# same-key enqueue: 20 connections x 25 rounds
+PASS  same key: 25/25 rounds -> exactly 1 job, all 20 callers got its id, exactly one created
+PASS  same key in 3 tenants -> 3 distinct jobs, all created
+PASS  credentials in params -> CredentialsInParamsError, 0 rows stored
+
+# 300 jobs (100 per tenant), 16 dequeue loops, cap 2 per tenant: 3416 ms, 2045 active-count samples
+# jobs by (state, fencing_token, attempt): [{"state":"succeeded","fencing_token":1,"attempt":1,"n":300}]
+# job_attempts: {"n":300,"jobs":300}; max active per tenant (sampled): {"tenant-a":2,"tenant-b":2,"tenant-c":2}
+PASS  300 dequeues returned 300 distinct job ids (0 duplicate ids; got 300 / 300)
+PASS  every job succeeded with fencing_token 1 and attempt 1
+PASS  job_attempts: 300 rows for 300 jobs, 0 jobs with more than one
+PASS  every completion was fenced by its own token (0 stale)
+PASS  cap never exceeded: max active per tenant {"tenant-a":2,"tenant-b":2,"tenant-c":2} <= 2 over 2045 samples
+PASS  the cap was actually reached (each tenant hit 2 at least once)
+PASS  starvation: tenant-a's older job row locked by another transaction -> dequeue returned tenant-b's job
+
+RESULT: PASS

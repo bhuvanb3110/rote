@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "completed": true,
+  "seed": 2080386450,
+  "family": "standard",
+  "jobs": 500,
+  "workers": 4,
+  "durationMs": 800000,
+  "pauseMs": 45000,
+  "drainTimeoutMs": 900000,
+  "commit": "0a30ac0",
+  "startedAt": "2026-11-18T01:07:16.870Z",
+  "wallMs": 861185,
+  "workMs": 817266,
+  "drainMs": 19564,
+  "drainTimedOut": false,
+  "kills": 78,
+  "restarts": 78,
+  "actionErrors": 0,
+  "pause": {
+    "replica": 2,
+    "fromMs": 588860,
+    "toMs": 633860
+  },
+  "bank": null,
+  "bankControlsApplied": 0,
+  "oracle": {
+    "pass": true,
+    "counts": {
+      "ok": 500,
+      "DUPLICATE": 0,
+      "MISSING_COMMIT": 0,
+      "UNRECORDED_COMMIT": 0,
+      "MISMATCH": 0,
+      "LOST": 0,
+      "PENDING": 0,
+      "ORPHAN": 0
+    },
+    "ledgerRows": 500
+  },
+  "finals": {
+    "succeeded/success": 493,
+    "succeeded/already_done": 6,
+    "needs_human/verify_exhausted": 1
+  },
+  "needsHuman": [
+    {
+      "id": "1ba81fdf-1644-404d-a644-7314afddd597",
+      "outcome": "verify_exhausted"
+    }
+  ],
+  "failed": [],
+  "notSettled": 0,
+  "recoveries": {
+    "requeuedAfterCrash": 56,
+    "requeuedAfterFailure": 0,
+    "failedByRecovery": 0,
+    "claimedToVerify": 7,
+    "reclaimedVerify": 3,
+    "resumedVerify": 0,
+    "escalatedByRecovery": 1,
+    "ownVerify": 0,
+    "already_done": 6,
+    "resubmitted": 0,
+    "exhausted": 0,
+    "not_committed_final": 0,
+    "deferred": 0,
+    "escalated": 0,
+    "reconciled": 0,
+    "duplicate_suspected": 0,
+    "unrecorded_commit_suspected": 0,
+    "reconcile_unreadable": 0,
+    "reconcile_deferred": 0
+  },
+  "crashBudget": {
+    "jobsWithCrashes": 48,
+    "totalCrashes": 56,
+    "maxCrashesOnOneJob": 3,
+    "jobsLeasedPastMaxAttempts": 1,
+    "crashLimit": 0
+  },
+  "workerProtections": {
+    "heartbeatLeaseLost": 0,
+    "fencedCommitIntent": 0,
+    "completionFencedOut": 0,
+    "runAbortedOnLostLease": 0,
+    "verifyPhaseAborted": 0,
+    "verifyDecisionFencedOut": 0,
+    "reconcileDecisionFencedOut": 0,
+    "duplicatesDetected": 0,
+    "unrecordedCommitsDetected": 0
+  },
+  "leaks": [],
+  "oom": [],
+  "problems": [
+    "1 job(s) ended needs_human/verify_exhausted, which the standard family does not allow (allowed: succeeded/success, succeeded/already_done, failed/crash_limit, failed/not_committed_attempts_exhausted)"
+  ],
+  "pass": false
+}

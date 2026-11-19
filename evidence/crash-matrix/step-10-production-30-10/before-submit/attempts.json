@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "job_id": "5171719f-d53d-49f0-b217-6d2af3042826",
+    "attempt": 1,
+    "worker_id": "fault-before-submit",
+    "fencing_token": 1,
+    "started_at": "2026-11-18T23:10:22.939Z",
+    "ended_at": "2026-11-18T23:10:55.235Z",
+    "outcome": "crashed",
+    "commit_uncertain": false,
+    "trace_id": "11d49c599c2e3d1e7e3adf5541d372dc",
+    "error": "lease expired in committing; recovered by clean-before-submit (T6.4 verify)",
+    "commit_intent_at": "2026-11-18T23:10:24.426Z"
+  },
+  {
+    "id": 2,
+    "job_id": "5171719f-d53d-49f0-b217-6d2af3042826",
+    "attempt": 2,
+    "worker_id": "clean-before-submit",
+    "fencing_token": 3,
+    "started_at": "2026-11-18T23:11:02.538Z",
+    "ended_at": "2026-11-18T23:11:03.735Z",
+    "outcome": "success",
+    "commit_uncertain": false,
+    "trace_id": "11d49c599c2e3d1e7e3adf5541d372dc",
+    "error": null,
+    "commit_intent_at": "2026-11-18T23:11:03.486Z"
+  }
+]

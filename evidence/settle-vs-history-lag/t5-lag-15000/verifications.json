@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "job_id": "fafcfe85-bfc1-4aa2-99ae-801cf5a0fe76",
+    "fencing_token": 2,
+    "worker_id": "worker-t5-lag-15000",
+    "reason": "commit_uncertain",
+    "prior_status": "failure",
+    "started_at": "2026-11-14T07:26:34.123Z",
+    "ended_at": "2026-11-14T07:26:42.492Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  }
+]

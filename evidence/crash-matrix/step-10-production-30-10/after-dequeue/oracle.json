@@ -1,0 +1,37 @@
+{
+  "jobs": 1,
+  "ledgerRows": 1,
+  "drainTimedOut": false,
+  "byState": {
+    "succeeded": 1
+  },
+  "counts": {
+    "ok": 1,
+    "DUPLICATE": 0,
+    "MISSING_COMMIT": 0,
+    "UNRECORDED_COMMIT": 0,
+    "MISMATCH": 0,
+    "LOST": 0,
+    "PENDING": 0,
+    "ORPHAN": 0
+  },
+  "findings": [
+    {
+      "jobId": "6f4cd6d9-04b6-4ee5-af17-a22ca2cc13d9",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-6f4cd6d9-04b6-4ee5-af17-a22ca2cc13d9",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000001"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000001), confirmationRef matches"
+    }
+  ],
+  "orphans": [],
+  "pass": true
+}

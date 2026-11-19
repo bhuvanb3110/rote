@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "id": "TXN-000001",
+      "tenantId": "tenant-a",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 1,
+      "memo": "rote-b5985cd0-ff68-412e-bf15-ca1ea4e05c68",
+      "at": "2026-11-14T17:08:39.918Z"
+    },
+    {
+      "id": "TXN-000002",
+      "tenantId": "tenant-a",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 1,
+      "memo": "rote-ea149f58-2310-4a88-8fb4-c96d4cfe856b",
+      "at": "2026-11-14T17:08:40.862Z"
+    },
+    {
+      "id": "TXN-000003",
+      "tenantId": "tenant-b",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 1,
+      "memo": "rote-d30aa02c-f540-4301-beca-72fa8071b7dc",
+      "at": "2026-11-14T17:09:33.812Z"
+    },
+    {
+      "id": "TXN-000004",
+      "tenantId": "tenant-b",
+      "fromMemberId": "10001",
+      "toMemberId": "10002",
+      "amount": 1,
+      "memo": "rote-f44f475a-80db-4676-8e1f-da6f7a7ad799",
+      "at": "2026-11-14T17:09:33.994Z"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+[
+  {
+    "id": 1,
+    "job_id": "fad6b7a8-adc7-4fc3-a920-8058bc7349fa",
+    "fencing_token": 2,
+    "worker_id": "d6f39c899b70-7-a867",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T02:52:12.097Z",
+    "ended_at": "2026-11-19T02:52:14.375Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 2,
+    "job_id": "833d9a7e-9661-47db-9259-6fb243b0da0b",
+    "fencing_token": 2,
+    "worker_id": "6049abae02b9-6-7eac",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T02:52:29.435Z",
+    "ended_at": "2026-11-19T02:52:31.557Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 3,
+    "job_id": "c4eef539-3ce8-4673-8101-68fa88023dbf",
+    "fencing_token": 2,
+    "worker_id": "6f8544e01444-7-cd7c",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T02:54:01.891Z",
+    "ended_at": "2026-11-19T02:54:11.229Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 4,
+    "job_id": "c4eef539-3ce8-4673-8101-68fa88023dbf",
+    "fencing_token": 4,
+    "worker_id": "6049abae02b9-7-39e1",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-19T02:55:13.569Z",
+    "ended_at": "2026-11-19T02:55:16.013Z",
+    "lookups": [
+      1
+    ],
+    "decision": "reconciled",
+    "error": null
+  }
+]

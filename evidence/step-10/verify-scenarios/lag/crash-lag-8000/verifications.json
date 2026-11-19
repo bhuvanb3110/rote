@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "job_id": "c096466d-b667-41f5-a64c-42dad46c90fb",
+    "fencing_token": 2,
+    "worker_id": "clean-crash-lag-8000",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-14T17:04:21.441Z",
+    "ended_at": "2026-11-14T17:04:29.025Z",
+    "lookups": [
+      0,
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  }
+]

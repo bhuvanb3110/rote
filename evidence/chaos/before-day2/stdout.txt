@@ -1,0 +1,142 @@
+Chaos run, started 2026-11-11T18:36:51.913Z
+seed: 2024306878  (reproduce: npm run chaos -- --seed 2024306878)
+jobs: 100, workers: 4, schedule 150000 ms: 15 kills (gap 5000-15000 ms), pause replica 3 26577-71577 ms, restart after 2000 ms; drain timeout 180000 ms
+database: postgres://rote:***@127.0.0.1:55432/rote
+reset: queue tables truncated; bank ledger rows: 0
+replicas: rote-worker-1=4a0cce62e362, rote-worker-2=6713fa4939b1, rote-worker-3=b3bfd668c3b0, rote-worker-4=3f906deea9ee
+  event {"tMs":0,"at":"2026-11-11T18:37:40.070Z","kind":"clock-start"}
+  event {"tMs":6945,"at":"2026-11-11T18:37:47.015Z","kind":"enqueue-done","created":100,"of":100}
+enqueued: 100/100 x 201
+  event {"tMs":7471,"at":"2026-11-11T18:37:47.541Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":5914,"heldJobs":[{"id":"12037bf9-e8e0-4f5d-b886-eb94746f43d0","state":"running","attempt":1}]}
+  event {"tMs":8746,"at":"2026-11-11T18:37:48.816Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":7914}
+  event {"tMs":15868,"at":"2026-11-11T18:37:55.938Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":15152,"heldJobs":[{"id":"b52bffb9-1719-4d2f-825b-fb8c52ae9426","state":"running","attempt":1}]}
+  event {"tMs":17533,"at":"2026-11-11T18:37:57.603Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":17152}
+  event {"tMs":23566,"at":"2026-11-11T18:38:03.636Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":22869,"heldJobs":[{"id":"12037bf9-e8e0-4f5d-b886-eb94746f43d0","state":"running","attempt":1},{"id":"b44c059a-e4ec-420f-8a8a-4c845322c64b","state":"running","attempt":1}]}
+  event {"tMs":25396,"at":"2026-11-11T18:38:05.466Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":24869}
+  event {"tMs":26784,"at":"2026-11-11T18:38:06.854Z","kind":"pause","replica":3,"container":"rote-worker-3","scheduledMs":26577,"heldJobs":[{"id":"bd5e6bcf-c333-48e1-a3f3-ddc824f60272","state":"running","attempt":1}]}
+  event {"tMs":38342,"at":"2026-11-11T18:38:18.412Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":37520,"redirectedFrom":3,"heldJobs":[{"id":"12037bf9-e8e0-4f5d-b886-eb94746f43d0","state":"running","attempt":1},{"id":"b44c059a-e4ec-420f-8a8a-4c845322c64b","state":"running","attempt":1}]}
+  event {"tMs":39904,"at":"2026-11-11T18:38:19.974Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":39520}
+  event {"tMs":48663,"at":"2026-11-11T18:38:28.733Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":48121,"redirectedFrom":3,"heldJobs":[{"id":"12037bf9-e8e0-4f5d-b886-eb94746f43d0","state":"running","attempt":1},{"id":"b44c059a-e4ec-420f-8a8a-4c845322c64b","state":"running","attempt":1}]}
+  event {"tMs":50410,"at":"2026-11-11T18:38:30.480Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":50121}
+  event {"tMs":55618,"at":"2026-11-11T18:38:35.688Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":55100,"redirectedFrom":3,"heldJobs":[{"id":"12037bf9-e8e0-4f5d-b886-eb94746f43d0","state":"running","attempt":1},{"id":"b44c059a-e4ec-420f-8a8a-4c845322c64b","state":"running","attempt":1}]}
+  event {"tMs":57371,"at":"2026-11-11T18:38:37.441Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":57100}
+  event {"tMs":69685,"at":"2026-11-11T18:38:49.755Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":69094,"heldJobs":[]}
+  event {"tMs":71387,"at":"2026-11-11T18:38:51.457Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":71094}
+  event {"tMs":71668,"at":"2026-11-11T18:38:51.738Z","kind":"unpause","replica":3,"container":"rote-worker-3","scheduledMs":71577,"heldJobs":[{"id":"bd5e6bcf-c333-48e1-a3f3-ddc824f60272","state":"running","attempt":1}]}
+  event {"tMs":81797,"at":"2026-11-11T18:39:01.867Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":81175,"heldJobs":[{"id":"b52bffb9-1719-4d2f-825b-fb8c52ae9426","state":"running","attempt":1}]}
+  event {"tMs":83480,"at":"2026-11-11T18:39:03.550Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":83175}
+  event {"tMs":87554,"at":"2026-11-11T18:39:07.624Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":87010,"heldJobs":[]}
+  event {"tMs":89380,"at":"2026-11-11T18:39:09.450Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":89010}
+  event {"tMs":100968,"at":"2026-11-11T18:39:21.038Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":100407,"heldJobs":[{"id":"67bb92d5-e2b0-4635-8b05-6b18650e36f3","state":"running","attempt":1}]}
+  event {"tMs":102657,"at":"2026-11-11T18:39:22.727Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":102407}
+  event {"tMs":109099,"at":"2026-11-11T18:39:29.169Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":108528,"heldJobs":[{"id":"12037bf9-e8e0-4f5d-b886-eb94746f43d0","state":"running","attempt":1},{"id":"b44c059a-e4ec-420f-8a8a-4c845322c64b","state":"running","attempt":1}]}
+  event {"tMs":110821,"at":"2026-11-11T18:39:30.891Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":110528}
+  event {"tMs":116366,"at":"2026-11-11T18:39:36.436Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":115873,"heldJobs":[{"id":"12037bf9-e8e0-4f5d-b886-eb94746f43d0","state":"running","attempt":1},{"id":"b44c059a-e4ec-420f-8a8a-4c845322c64b","state":"running","attempt":1}]}
+  event {"tMs":118126,"at":"2026-11-11T18:39:38.196Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":117873}
+  event {"tMs":121626,"at":"2026-11-11T18:39:41.696Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":121028,"heldJobs":[]}
+  event {"tMs":123401,"at":"2026-11-11T18:39:43.471Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":123028}
+  event {"tMs":136096,"at":"2026-11-11T18:39:56.166Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":135555,"heldJobs":[{"id":"12037bf9-e8e0-4f5d-b886-eb94746f43d0","state":"running","attempt":1},{"id":"b44c059a-e4ec-420f-8a8a-4c845322c64b","state":"running","attempt":1}]}
+  event {"tMs":137906,"at":"2026-11-11T18:39:57.976Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":137555}
+  event {"tMs":149283,"at":"2026-11-11T18:40:09.353Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":148833,"heldJobs":[]}
+  event {"tMs":151098,"at":"2026-11-11T18:40:11.168Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":150833}
+  event {"tMs":151098,"at":"2026-11-11T18:40:11.168Z","kind":"schedule-done"}
+  event {"tMs":331998,"at":"2026-11-11T18:43:12.068Z","kind":"drain-done","timedOut":true,"ms":180899}
+
+kills executed: 15; restarts: 15; errors: 0
+non-terminal jobs tied to the kill or pause that orphaned them:
+  12037bf9-e8e0-4f5d-b886-eb94746f43d0 running rows=0: kill of rote-worker-4 at 7471 ms; kill of rote-worker-4 at 23566 ms; kill of rote-worker-4 at 38342 ms; kill of rote-worker-4 at 48663 ms; kill of rote-worker-4 at 55618 ms; kill of rote-worker-4 at 109099 ms; kill of rote-worker-4 at 116366 ms; kill of rote-worker-4 at 136096 ms
+  b52bffb9-1719-4d2f-825b-fb8c52ae9426 running rows=0: kill of rote-worker-2 at 15868 ms; kill of rote-worker-2 at 81797 ms
+  ee01daeb-488b-4d1f-9a78-f0122839d364 queued rows=0: never dequeued (no free tenant slot)
+  6e7aff44-d13e-45bf-8d1f-8c41441df359 queued rows=0: never dequeued (no free tenant slot)
+  d8902ff5-595a-46ca-b9ff-56145414302b queued rows=0: never dequeued (no free tenant slot)
+  5bddcd98-ab8a-4335-a2b4-886dfa4956b3 queued rows=0: never dequeued (no free tenant slot)
+  b44c059a-e4ec-420f-8a8a-4c845322c64b running rows=0: kill of rote-worker-4 at 23566 ms; kill of rote-worker-4 at 38342 ms; kill of rote-worker-4 at 48663 ms; kill of rote-worker-4 at 55618 ms; kill of rote-worker-4 at 109099 ms; kill of rote-worker-4 at 116366 ms; kill of rote-worker-4 at 136096 ms
+  696122f8-7908-4137-ab3d-235bdfb19b15 queued rows=0: never dequeued (no free tenant slot)
+  7b72cdce-f594-4a19-8e8f-dfd42fc5abcf queued rows=0: never dequeued (no free tenant slot)
+  68b5892a-d7f2-427c-ba04-232afe41ef28 queued rows=0: never dequeued (no free tenant slot)
+  9e336cc6-6c16-4bd1-a883-cbe041c13491 queued rows=0: never dequeued (no free tenant slot)
+  634eafe4-0773-4846-894d-88ee3bf004f9 queued rows=0: never dequeued (no free tenant slot)
+  43657bc4-8322-48f7-822e-ffc7e7d0599f queued rows=0: never dequeued (no free tenant slot)
+  34ba53fa-f0af-4bd3-b429-33bb9c928cd2 queued rows=0: never dequeued (no free tenant slot)
+  819b645f-266b-46c5-b19a-1d00b0b7d32c queued rows=0: never dequeued (no free tenant slot)
+  737cd085-0d4c-4333-a29d-f86d2931be15 queued rows=0: never dequeued (no free tenant slot)
+  1496af73-968d-45c8-92a6-8b56deea72a0 queued rows=0: never dequeued (no free tenant slot)
+  360444cd-c503-47f2-9370-ea8872a1ef4d queued rows=0: never dequeued (no free tenant slot)
+  11d57b90-29ee-4900-8137-57cc652219a8 queued rows=0: never dequeued (no free tenant slot)
+  4d6bb13d-07d2-4d21-81c3-ced56029deec queued rows=0: never dequeued (no free tenant slot)
+  48ebfcb9-d8d7-484b-85e8-5de98b5fc45d queued rows=0: never dequeued (no free tenant slot)
+  87fabb2c-5801-4d41-998d-4dad7440a3d6 queued rows=0: never dequeued (no free tenant slot)
+  91c9a560-71e5-41ca-8547-65bf17e8006d queued rows=0: never dequeued (no free tenant slot)
+  d9693621-19dc-4541-a502-7312a40c7bc1 queued rows=0: never dequeued (no free tenant slot)
+  722bdf89-986f-4dd8-843e-37310531a2d1 queued rows=0: never dequeued (no free tenant slot)
+  f45b9695-6b03-4d7c-96f1-3ce9edf126fa queued rows=0: never dequeued (no free tenant slot)
+  f4fa3dcd-4291-4039-92e5-6bb4ae04edd1 queued rows=0: never dequeued (no free tenant slot)
+  67bb92d5-e2b0-4635-8b05-6b18650e36f3 running rows=1: kill of rote-worker-3 at 100968 ms
+  b0cd25a9-3bde-4dfe-a354-60be7487175f queued rows=0: never dequeued (no free tenant slot)
+  47a6545b-51a1-4222-8f4d-7626bfd1c1e5 queued rows=0: never dequeued (no free tenant slot)
+  d96bdfea-93f5-475e-9731-8cf52f69dcff queued rows=0: never dequeued (no free tenant slot)
+  2ca6e39a-a8e4-450f-96d3-373fd12cb592 queued rows=0: never dequeued (no free tenant slot)
+  414ecec3-022a-401b-8328-629ac6e9b316 queued rows=0: never dequeued (no free tenant slot)
+  be8ed616-f76f-44cb-985f-de034b08ae7c queued rows=0: never dequeued (no free tenant slot)
+  708ff11f-197e-4261-ad7b-f26325192079 queued rows=0: never dequeued (no free tenant slot)
+  e6452668-0f64-4159-94d9-56bc1100febc queued rows=0: never dequeued (no free tenant slot)
+  9e3fae71-36c1-427d-9369-1b49b98fe960 queued rows=0: never dequeued (no free tenant slot)
+  d6826a09-dc9e-40ba-826b-31fad34bf9aa queued rows=0: never dequeued (no free tenant slot)
+  f2d43e7c-ef7f-41e4-ab26-5a113249f6eb queued rows=0: never dequeued (no free tenant slot)
+worker containers at the end: rote-worker-1:running, rote-worker-2:running, rote-worker-3:running, rote-worker-4:running
+credential values in jobs/attempts/API responses/container logs: none
+docker stats, peak memory per container:
+  rote-api-1: 167.9 MiB
+  rote-bank-1: 47.7 MiB
+  rote-postgres-1: 128.7 MiB
+  rote-worker-1: 226.4 MiB
+  rote-worker-2: 217.0 MiB
+  rote-worker-3: 223.6 MiB
+  rote-worker-4: 206.9 MiB
+
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 100; ledger rows: 62; drain timed out: yes
+job states: queued=35, running=4, succeeded=61
+verdicts: ok=61, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=39, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 39 (of which after commit: 1); orphan rows: 0
+findings (39):
+  LOST              12037bf9-e8e0-4f5d-b886-eb94746f43d0 tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner 3f906deea9ee-7-ccca (no ledger row)
+  LOST              b52bffb9-1719-4d2f-825b-fb8c52ae9426 tenant-a running attempt=1 rows=0: still running after the drain timeout, lease_owner 6713fa4939b1-7-cd20 (no ledger row)
+  LOST              ee01daeb-488b-4d1f-9a78-f0122839d364 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              6e7aff44-d13e-45bf-8d1f-8c41441df359 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              d8902ff5-595a-46ca-b9ff-56145414302b tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              5bddcd98-ab8a-4335-a2b4-886dfa4956b3 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              b44c059a-e4ec-420f-8a8a-4c845322c64b tenant-b running attempt=1 rows=0: still running after the drain timeout, lease_owner 3f906deea9ee-7-cd64 (no ledger row)
+  LOST              696122f8-7908-4137-ab3d-235bdfb19b15 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              7b72cdce-f594-4a19-8e8f-dfd42fc5abcf tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              68b5892a-d7f2-427c-ba04-232afe41ef28 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              9e336cc6-6c16-4bd1-a883-cbe041c13491 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              634eafe4-0773-4846-894d-88ee3bf004f9 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              43657bc4-8322-48f7-822e-ffc7e7d0599f tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              34ba53fa-f0af-4bd3-b429-33bb9c928cd2 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              819b645f-266b-46c5-b19a-1d00b0b7d32c tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              737cd085-0d4c-4333-a29d-f86d2931be15 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              1496af73-968d-45c8-92a6-8b56deea72a0 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              360444cd-c503-47f2-9370-ea8872a1ef4d tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              11d57b90-29ee-4900-8137-57cc652219a8 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              4d6bb13d-07d2-4d21-81c3-ced56029deec tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              48ebfcb9-d8d7-484b-85e8-5de98b5fc45d tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              87fabb2c-5801-4d41-998d-4dad7440a3d6 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              91c9a560-71e5-41ca-8547-65bf17e8006d tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              d9693621-19dc-4541-a502-7312a40c7bc1 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              722bdf89-986f-4dd8-843e-37310531a2d1 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              f45b9695-6b03-4d7c-96f1-3ce9edf126fa tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              f4fa3dcd-4291-4039-92e5-6bb4ae04edd1 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              67bb92d5-e2b0-4635-8b05-6b18650e36f3 tenant-b running attempt=1 rows=1: still running after the drain timeout, lease_owner b3bfd668c3b0-8-506c (lost after commit: ledger row TXN-000062 exists)
+  LOST              b0cd25a9-3bde-4dfe-a354-60be7487175f tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              47a6545b-51a1-4222-8f4d-7626bfd1c1e5 tenant-b queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              d96bdfea-93f5-475e-9731-8cf52f69dcff tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              2ca6e39a-a8e4-450f-96d3-373fd12cb592 tenant-b queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              414ecec3-022a-401b-8328-629ac6e9b316 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              be8ed616-f76f-44cb-985f-de034b08ae7c tenant-b queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              708ff11f-197e-4261-ad7b-f26325192079 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              e6452668-0f64-4159-94d9-56bc1100febc tenant-b queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              9e3fae71-36c1-427d-9369-1b49b98fe960 tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              d6826a09-dc9e-40ba-826b-31fad34bf9aa tenant-b queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+  LOST              f2d43e7c-ef7f-41e4-ab26-5a113249f6eb tenant-a queued attempt=0 rows=0: still queued after the drain timeout, lease_owner none (no ledger row)
+RESULT: FAIL

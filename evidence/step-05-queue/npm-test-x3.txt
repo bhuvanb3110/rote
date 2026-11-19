@@ -1,0 +1,23 @@
+# fleet Step 5: npm test x3 back to back at commit 29f5721 (2026-11-10T02:41:29Z), Postgres up
+
+## run 1
+ Test Files  29 passed (29)
+      Tests  271 passed (271)
+   Duration  87.22s (transform 2.57s, setup 0ms, import 24.37s, tests 330.30s, environment 8ms)
+FAIL lines: 0; 'Unable to capture screenshot' lines: 0
+
+## run 2
+ Test Files  29 passed (29)
+      Tests  271 passed (271)
+   Duration  84.31s (transform 2.23s, setup 0ms, import 22.85s, tests 330.46s, environment 10ms)
+FAIL lines: 0; 'Unable to capture screenshot' lines: 0
+
+## run 3
+ Test Files  29 passed (29)
+      Tests  271 passed (271)
+   Duration  82.34s (transform 3.32s, setup 0ms, import 27.12s, tests 322.03s, environment 10ms)
+FAIL lines: 0; 'Unable to capture screenshot' lines: 0
+
+## npm run test:unit (no DB files)
+ Test Files  24 passed (24)
+      Tests  219 passed (219)

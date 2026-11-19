@@ -10,8 +10,17 @@ import type {
 } from "./types.js";
 
 export interface WebSurfaceOptions {
-  /** Defaults to false (headed) — human handoff needs a real window to take over in. */
+  /**
+   * Defaults to false (headed) — human handoff needs a real window to take over in. Ignored when
+   * `browser` is given: that browser was already launched headed or headless.
+   */
   headless?: boolean;
+  /**
+   * An already-running browser to reuse (the fleet's one-browser-per-worker). The surface opens a
+   * fresh context + page on it, and close() closes ONLY that context, never the browser. Omit it
+   * to launch and own a browser, exactly as before.
+   */
+  browser?: Browser;
 }
 
 const MAX_ARIA_SNAPSHOT_CHARS = 4000;
@@ -19,6 +28,18 @@ const MAX_VISIBLE_TEXT_CHARS = 2000;
 const MAX_LANDMARKS = 40;
 const WAIT_FOR_POLL_MS = 150;
 const DEFAULT_WAIT_FOR_TIMEOUT_MS = 5000;
+
+// Chromium under CPU load sometimes drops a Page.captureScreenshot call with this exact message
+// (docs/REPO_NOTES.md "Known flake", docs/DECISIONS.md D8). Only that message is retried; any
+// other error, or a failure on the last attempt, throws exactly as before.
+const SCREENSHOT_MAX_ATTEMPTS = 3;
+const SCREENSHOT_BACKOFF_MS = 100;
+const TRANSIENT_SCREENSHOT_ERROR = /Unable to capture screenshot/;
+
+/** How waiting for an action's resulting navigation ended. Never an exception. */
+export type NavigationSettle =
+  | { loaded: true; ms: number; url: string }
+  | { loaded: false; ms: number; url: string; reason: string };
 
 function truncate(value: string, maxChars: number): string {
   return value.length > maxChars ? `${value.slice(0, maxChars)}...[truncated]` : value;
@@ -66,18 +87,32 @@ export class WebSurface implements Surface {
   private readonly page: Page;
   private readonly provenanceLog: LocatorProvenanceEntry[] = [];
   private lastReadTextValue: string | null = null;
+  private screenshotRetryCount = 0;
+  /** False when the browser was passed in: then close() must leave it running for the next job. */
+  private readonly ownsBrowser: boolean;
 
-  private constructor(browser: Browser, context: BrowserContext, page: Page) {
+  private constructor(browser: Browser, context: BrowserContext, page: Page, ownsBrowser = true) {
     this.browser = browser;
     this.context = context;
     this.page = page;
+    this.ownsBrowser = ownsBrowser;
   }
 
   static async launch(options: WebSurfaceOptions = {}): Promise<WebSurface> {
+    if (options.browser) {
+      const context = await options.browser.newContext();
+      try {
+        const page = await context.newPage();
+        return new WebSurface(options.browser, context, page, false);
+      } catch (err) {
+        await context.close().catch(() => undefined);
+        throw err;
+      }
+    }
     const browser = await chromium.launch({ headless: options.headless ?? false });
     const context = await browser.newContext();
     const page = await context.newPage();
-    return new WebSurface(browser, context, page);
+    return new WebSurface(browser, context, page, true);
   }
 
   /** Exposed so src/escalation can hand control to a human on this SAME live session. */
@@ -98,13 +133,23 @@ export class WebSurface implements Surface {
     return this.lastReadTextValue;
   }
 
+  /** How many screenshot captures were retried on this surface (a fleet metric later). */
+  get screenshotRetries(): number {
+    return this.screenshotRetryCount;
+  }
+
+  /** Closes the browser if this surface launched it, otherwise only this surface's context. */
   async close(): Promise<void> {
-    await this.browser.close();
+    if (this.ownsBrowser) {
+      await this.browser.close();
+    } else {
+      await this.context.close();
+    }
   }
 
   async perceive(): Promise<Observation> {
     const url = this.page.url();
-    const screenshot = await this.page.screenshot();
+    const screenshot = await this.captureScreenshot();
     const body = this.page.locator("body");
     const [ariaSnapshotRaw, visibleTextRaw, landmarkTexts] = await Promise.all([
       body.ariaSnapshot(),
@@ -122,6 +167,43 @@ export class WebSurface implements Surface {
       landmarks,
       screenshot,
     };
+  }
+
+  /**
+   * Watches for the main frame's NEXT navigation (one that starts after this call) and resolves
+   * once it reaches "load" -- i.e. the server has answered and the response page is loaded. If that
+   * doesn't happen within `timeoutMs`, or the page/context closes, it resolves with
+   * `loaded: false` and the reason; it never rejects. Call it BEFORE the action expected to
+   * navigate (so the navigation can't be missed), then await it after the action.
+   */
+  watchNextNavigation(timeoutMs: number): Promise<NavigationSettle> {
+    const startedAt = Date.now();
+    const mainFrame = this.page.mainFrame();
+    return this.page
+      .waitForEvent("framenavigated", { predicate: (frame) => frame === mainFrame, timeout: timeoutMs })
+      .then(() => this.page.waitForLoadState("load", { timeout: Math.max(1, timeoutMs - (Date.now() - startedAt)) }))
+      .then((): NavigationSettle => ({ loaded: true, ms: Date.now() - startedAt, url: this.page.url() }))
+      .catch(
+        (err: unknown): NavigationSettle => ({
+          loaded: false,
+          ms: Date.now() - startedAt,
+          url: this.page.isClosed() ? "(page closed)" : this.page.url(),
+          reason: err instanceof Error ? err.message.split("\n")[0]! : String(err),
+        }),
+      );
+  }
+
+  private async captureScreenshot(): Promise<Buffer> {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await this.page.screenshot();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (attempt >= SCREENSHOT_MAX_ATTEMPTS || !TRANSIENT_SCREENSHOT_ERROR.test(message)) throw err;
+        this.screenshotRetryCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, SCREENSHOT_BACKOFF_MS * attempt));
+      }
+    }
   }
 
   async locate(descriptor: ElementDescriptor): Promise<Handle | null> {

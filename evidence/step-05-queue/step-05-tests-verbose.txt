@@ -1,0 +1,108 @@
+ ✓ src/confidence/store.test.ts > consecutiveQualifyingRuns > counts from the tail, stopping at the first sub-threshold run
+ ✓ src/confidence/store.test.ts > consecutiveQualifyingRuns > is 0 when the most recent run is below threshold
+ ✓ src/confidence/store.test.ts > consecutiveQualifyingRuns > is 0 for empty history
+ ✓ src/confidence/store.test.ts > recordConfidenceRun / approveCapability > a fresh capability with no sidecar file starts draft
+ ✓ src/confidence/store.test.ts > recordConfidenceRun / approveCapability > auto-promotes only once N consecutive qualifying runs have landed, not before
+ ✓ src/confidence/store.test.ts > recordConfidenceRun / approveCapability > a low-confidence run resets the streak and does not count toward promotion
+ ✓ src/confidence/store.test.ts > recordConfidenceRun / approveCapability > approveCapability with a reason force-approves regardless of history
+ ✓ src/confidence/store.test.ts > recordConfidenceRun / approveCapability > approveCapability without a reason rejects a capability that doesn't yet qualify
+ ✓ src/confidence/store.test.ts > recordConfidenceRun / approveCapability > approveCapability without a reason succeeds once history already qualifies
+ ✓ src/confidence/store.test.ts > approvals are bound to the artifact version (docs/DECISIONS.md D15) > auto-promotion records the promoted version as approvedVersion, and each run records its version
+ ✓ src/confidence/store.test.ts > approvals are bound to the artifact version (docs/DECISIONS.md D15) > manual approval (with a reason) records approvedVersion
+ ✓ src/confidence/store.test.ts > approvals are bound to the artifact version (docs/DECISIONS.md D15) > manual approval without a reason records the version its history qualified for
+ ✓ src/confidence/store.test.ts > approvals are bound to the artifact version (docs/DECISIONS.md D15) > runs of another version never count toward promoting this one
+ ✓ src/confidence/store.test.ts > approvals are bound to the artifact version (docs/DECISIONS.md D15) > a stale approval (another version) does not stop runs being recorded, and re-promotes for the new version
+ ✓ src/confidence/store.test.ts > approvals are bound to the artifact version (docs/DECISIONS.md D15) > a current approval is left untouched by further runs (no write)
+ ✓ src/confidence/store.test.ts > approvals are bound to the artifact version (docs/DECISIONS.md D15) > an old status file with no approvedVersion and unversioned history still parses, and counts as current (grandfathered)
+ ✓ src/confidence/store.test.ts > approvals are bound to the artifact version (docs/DECISIONS.md D15) > rejects a non-semver approvedVersion
+ ✓ src/queue/migrate.db.test.ts > migrate() > applies 0001_init once into an empty schema
+ ✓ src/queue/enqueue.db.test.ts > enqueue > creates a queued job: attempt 0, token 0, a trace id, memo_key, the request hash
+ ✓ src/queue/schema.db.test.ts > jobs constraints > memo_key is generated as 'rote-' || id, 41 characters, and cannot be written
+ ✓ src/queue/enqueue.db.test.ts > enqueue > the same key and request again returns the same job, created = false
+ ✓ src/queue/migrate.test.ts > migration files > checksums ignore CRLF vs LF, but not any other change
+ ✓ src/queue/migrate.test.ts > migration files > loads files in numeric order and names them by file name
+ ✓ src/queue/db.db.test.ts > Postgres connectivity and transactions > connects to the test database (not the dev one) as PostgreSQL 17
+ ✓ src/queue/db.db.test.ts > Postgres connectivity and transactions > int8 comes back as a number
+ ✓ src/queue/db.db.test.ts > Postgres connectivity and transactions > an int8 above 2^53 - 1 is refused, not rounded
+ ✓ src/queue/db.db.test.ts > Postgres connectivity and transactions > each pool is confined to its own schema
+ ✓ src/queue/migrate.test.ts > migration files > rejects a badly named file and a duplicate number
+ ✓ src/queue/migrate.test.ts > migration files > the committed 0001_init.sql is LF on disk (.gitattributes) and loads
+ ✓ src/queue/schema.db.test.ts > jobs constraints > a lease is both owner and expiry, or neither (jobs_lease_pair)
+ ✓ src/queue/migrate.db.test.ts > migrate() > a rerun applies nothing
+ ✓ src/queue/db.db.test.ts > Postgres connectivity and transactions > withTransaction commits on success and rolls back on a throw, rethrowing the original error
+ ✓ src/queue/schema.db.test.ts > jobs constraints > an active job always has an owner (jobs_active_has_owner)
+ ✓ src/queue/schema.db.test.ts > jobs constraints > committing requires a commit intent (jobs_committing_has_intent)
+ ✓ src/replay/confidenceGate.test.ts > approval gate + confidence scoring, wired into the real replay path > a fresh draft capability refuses unattended replay before any browser launches
+ ✓ src/queue/schema.db.test.ts > jobs constraints > reviewer decision 6: an exhausted job cannot be queued -- not on insert, not by an UPDATE (Day-2 recovery must use 'failed')
+ ✓ src/queue/enqueue.test.ts > enqueue helpers > canonicalJson sorts keys at every level and drops undefined
+ ✓ src/queue/enqueue.test.ts > enqueue helpers > computeRequestHash depends on tenant, capability and params, not on key order
+ ✓ src/queue/enqueue.test.ts > enqueue helpers > newTraceId is a W3C trace id
+ ✓ src/queue/enqueue.test.ts > enqueue helpers > worker-supplied inputs: credentials always; memo only for a capability with an irreversible step
+ ✓ src/queue/enqueue.test.ts > enqueue helpers > validateJobParams rejects credentials before anything else, even with other errors present
+ ✓ src/queue/migrate.db.test.ts > migrate() > an applied file that was edited fails loudly, naming it
+ ✓ src/queue/schema.db.test.ts > jobs constraints > an unknown state is rejected; business_outcome is a valid state
+ ✓ src/confidence/approval.test.ts > checkApproval(capabilityId, version) > match: approved for 1.1.0, artifact is 1.1.0 -> allowed
+ ✓ src/confidence/approval.test.ts > checkApproval(capabilityId, version) > mismatch: approved for 1.0.0, artifact is 1.1.0 -> not allowed, says re-approve
+ ✓ src/confidence/approval.test.ts > checkApproval(capabilityId, version) > mismatch also refuses a DOWNGRADE (approved for 1.1.0, artifact is 1.0.0)
+ ✓ src/confidence/approval.test.ts > checkApproval(capabilityId, version) > missing approvedVersion (grandfathered) -> allowed, and the reason says it is grandfathered
+ ✓ src/confidence/approval.test.ts > checkApproval(capabilityId, version) > draft (no status file) -> not allowed
+ ✓ src/confidence/approval.test.ts > checkApproval(capabilityId, version) > approveUnattended allows a stale approval for this one run, without reading status
+ ✓ src/queue/schema.db.test.ts > jobs constraints > a job for an unknown tenant fails at the foreign key
+ ✓ src/queue/schema.db.test.ts > jobs constraints > reviewer decision 3: idempotency keys are unique PER TENANT
+ ✓ src/queue/migrate.db.test.ts > migrate() > a CRLF checkout of an applied file is NOT an edit (same checksum)
+ ✓ src/queue/schema.db.test.ts > jobs constraints > format checks: key length, request_hash, trace_id, params must be an object
+ ✓ src/queue/db.test.ts > db helpers > parseInt8 parses safe integers and refuses to round anything larger
+ ✓ src/queue/db.test.ts > db helpers > redactDatabaseUrl never shows the password
+ ✓ src/queue/db.test.ts > db helpers > quoteIdent doubles embedded quotes
+ ✓ src/queue/db.test.ts > db helpers > sqlState reads a driver error's code
+ ✓ src/queue/db.test.ts > no Postgres -> a loud, explanatory failure (never a skip) > assertReachable on a closed port throws PostgresUnreachableError naming the fix, password redacted
+ ✓ src/catalog/committedApprovals.test.ts > committed approvals (status/) match the committed artifacts (artifacts/) > finds the committed artifacts
+ ✓ src/catalog/committedApprovals.test.ts > committed approvals (status/) match the committed artifacts (artifacts/) > member-lookup 1.0.0: approved for exactly this version
+ ✓ src/catalog/committedApprovals.test.ts > committed approvals (status/) match the committed artifacts (artifacts/) > open-sub-account-confirmed 1.0.0: approved for exactly this version
+ ✓ src/catalog/committedApprovals.test.ts > committed approvals (status/) match the committed artifacts (artifacts/) > open-sub-account 1.0.0: approved for exactly this version
+ ✓ src/catalog/committedApprovals.test.ts > committed approvals (status/) match the committed artifacts (artifacts/) > transfer-history-lookup 1.1.0: approved for exactly this version
+ ✓ src/catalog/committedApprovals.test.ts > committed approvals (status/) match the committed artifacts (artifacts/) > transfer 1.1.0: approved for exactly this version
+ ✓ src/queue/migrate.db.test.ts > migrate() > an applied migration missing from the directory fails loudly
+ ✓ src/queue/schema.db.test.ts > jobs constraints > a tenant's max_concurrent stays within 1..100
+ ✓ src/queue/schema.db.test.ts > job_attempts and breakers constraints > each attempt and each fencing token is recorded once per job
+ ✓ src/confidence/score.test.ts > stepConfidence > scores 1 when the top strategy resolved
+ ✓ src/confidence/score.test.ts > stepConfidence > degrades linearly toward the last index
+ ✓ src/confidence/score.test.ts > stepConfidence > scores 1 for a single-strategy descriptor (only option, degenerate case)
+ ✓ src/confidence/score.test.ts > stepConfidence > scores 0 when the resolved kind isn't authored in the list at all (the guaranteed 'visual' fallback)
+ ✓ src/confidence/score.test.ts > computeRunConfidence > defaults to 1 when no step had a target
+ ✓ src/confidence/score.test.ts > computeRunConfidence > averages per-step scores
+ ✓ src/queue/schema.db.test.ts > job_attempts and breakers constraints > an open breaker needs opened_at
+ ✓ src/queue/migrate.db.test.ts > migrate() > two concurrent runners on separate connections apply it exactly once
+ ✓ src/queue/schema.db.test.ts > Zod row schemas parse real rows > JobRowSchema and AttemptRowSchema accept rows straight from SELECT *
+ ✓ src/queue/migrate.db.test.ts > migrate() > a failing migration rolls back whole: no partial tables, no schema_migrations row, earlier ones kept
+ ✓ src/queue/enqueue.db.test.ts > enqueue > concurrent same key: 20 clients x 25 rounds -> one job per round, all 20 get its id, exactly one created
+ ✓ src/queue/enqueue.db.test.ts > enqueue > forced interleaving: B blocks on A's uncommitted insert, A commits, B returns A's id
+ ✓ src/queue/enqueue.db.test.ts > enqueue > why not DO NOTHING: the same interleaving against the CTE idiom returns ZERO rows to B
+ ✓ src/queue/enqueue.db.test.ts > enqueue > the same key with a different request -> IdempotencyKeyConflict; the stored job is unchanged
+ ✓ src/queue/enqueue.db.test.ts > enqueue > reviewer decision 3: the same key in two tenants -> two different jobs, both created, no conflict
+ ✓ src/queue/enqueue.db.test.ts > enqueue > reviewer decision 1: credentials in params -> CredentialsInParamsError, nothing stored, values never echoed
+ ✓ src/queue/enqueue.db.test.ts > enqueue > request_hash covers only non-secret params (the hash input is the stored params)
+ ✓ src/queue/enqueue.db.test.ts > enqueue > the memo of an irreversible capability is reserved for memo_key; a read-only capability keeps it
+ ✓ src/queue/enqueue.db.test.ts > enqueue > params are validated strictly: unknown key, missing required, wrong type -> InvalidParamsError
+ ✓ src/queue/enqueue.db.test.ts > enqueue > an unknown tenant fails at the foreign key; an over-long key at the check constraint
+ ✓ src/queue/enqueue.db.test.ts > enqueue > ENQUEUE_SQL conflicts on (tenant_id, idempotency_key), never on the key alone
+ ✓ src/queue/dequeue.db.test.ts > dequeue > 16 concurrent dequeuers over 300 jobs: every job handed out exactly once, token 1, attempt 1, one attempt row each
+ ✓ src/queue/dequeue.db.test.ts > dequeue > the cap holds under concurrency: 8 dequeuers, cap 2 -> never more than 2 active (sampled), and exactly 2 once drained
+ ✓ src/queue/dequeue.db.test.ts > dequeue > the write skew, forced: the count-only variant lets 3 run under cap 2; the real dequeue keeps 2
+ ✓ src/queue/dequeue.db.test.ts > dequeue > fairness: the tenant with the oldest waiting job goes first; a tenant at its cap is skipped for one with room
+ ✓ src/queue/dequeue.db.test.ts > dequeue > verifying (and committing) count toward max_concurrent (reviewer decision 4)
+ ✓ src/queue/dequeue.db.test.ts > dequeue > lease, token and attempt row are written together, expiry from the database clock
+ ✓ src/queue/dequeue.db.test.ts > dequeue > a failure between the lease (4) and the attempt row (5) rolls back both: job queued, token 0, no attempt row
+ ✓ src/queue/dequeue.db.test.ts > dequeue > re-dequeue after a requeue (standing in for Day-2 recovery) -> fencing_token 2, attempt 2, a second attempt row
+ ✓ src/queue/dequeue.db.test.ts > reviewer decision 6: tenant starvation > tenant-a's queued job row locked by another open transaction: dequeue still returns tenant-b's job
+ ✓ src/queue/dequeue.db.test.ts > reviewer decision 6: tenant starvation > an exhausted job can never sit in 'queued', so it can't make a tenant look like it has work
+ ✓ src/queue/dequeue.db.test.ts > reviewer decision 6: tenant starvation > several tenants each blocked (row locked / at cap): dequeue walks past all of them to the one with work
+ ✓ src/queue/dequeue.db.test.ts > reviewer decision 7: the database clock, never the worker's > a worker whose clock is an hour ahead still gets a lease of ~30 s by the database's now()
+ ✓ src/queue/dequeue.db.test.ts > reviewer decision 7: the database clock, never the worker's > no dequeue statement takes a timestamp parameter: expiry is now() + an interval
+ ✓ src/queue/dequeue.db.test.ts > argument checks > rejects a missing worker id and an out-of-range lease
+ ✓ src/replay/confidenceGate.test.ts > approval gate + confidence scoring, wired into the real replay path > N consecutive high-confidence runs promote a draft capability, which then replays unattended without the flag
+ ✓ src/replay/confidenceGate.test.ts > approval gate + confidence scoring, wired into the real replay path > a low-confidence (hostile-DOM) run computes confidence 0 and does not count toward promotion
+ ✓ src/replay/confidenceGate.test.ts > approval gate + confidence scoring, wired into the real replay path > an approval for another version refuses unattended replay before any browser launches (D15)
+ ✓ src/replay/confidenceGate.test.ts > approval gate + confidence scoring, wired into the real replay path > auto-promotion through real runs records the replayed artifact's version (D15)
+ Test Files  13 passed (13)
+      Tests  106 passed (106)

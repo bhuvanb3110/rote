@@ -1,0 +1,12 @@
+# fleet Step 5 queue evidence, 2026-11-10T02:29:44.751Z
+database: postgres://rote:***@127.0.0.1:55432/rote
+
+$ docker compose ps
+NAME              IMAGE         COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+rote-postgres-1   postgres:17   "docker-entrypoint.s…"   postgres   33 minutes ago   Up 27 minutes (healthy)   127.0.0.1:55432->5432/tcp
+
+$ docker inspect -f {{.State.Health.Status}} rote-postgres-1
+healthy
+
+$ docker image inspect postgres:17 --format {{index .RepoDigests 0}}
+postgres@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f

@@ -1,0 +1,94 @@
+[
+  {
+    "id": 1,
+    "job_id": "2b5bcaf2-9464-479b-b044-70e94c6e6cf3",
+    "fencing_token": 2,
+    "worker_id": "d44b0fe854ff-7-4ab9",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T03:32:35.380Z",
+    "ended_at": "2026-11-19T03:32:37.124Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 2,
+    "job_id": "fd232de7-c550-4cbe-8ed9-a70ab6613265",
+    "fencing_token": 2,
+    "worker_id": "6f8544e01444-7-6684",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T03:33:38.061Z",
+    "ended_at": "2026-11-19T03:33:46.633Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 3,
+    "job_id": "b7e09b53-f3f1-4ccc-a67c-742f5a3e9aff",
+    "fencing_token": 2,
+    "worker_id": "d6f39c899b70-7-6068",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T03:34:11.005Z",
+    "ended_at": "2026-11-19T03:34:12.877Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 4,
+    "job_id": "fd232de7-c550-4cbe-8ed9-a70ab6613265",
+    "fencing_token": 4,
+    "worker_id": "6049abae02b9-7-fdcf",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-19T03:34:48.933Z",
+    "ended_at": "2026-11-19T03:34:51.157Z",
+    "lookups": [
+      1
+    ],
+    "decision": "reconciled",
+    "error": null
+  },
+  {
+    "id": 5,
+    "job_id": "011a5660-f700-4017-815d-a654b5187b9b",
+    "fencing_token": 2,
+    "worker_id": "6f8544e01444-7-4162",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T03:34:49.066Z",
+    "ended_at": "2026-11-19T03:34:58.163Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 6,
+    "job_id": "011a5660-f700-4017-815d-a654b5187b9b",
+    "fencing_token": 4,
+    "worker_id": "6f8544e01444-7-a825",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-19T03:36:00.964Z",
+    "ended_at": "2026-11-19T03:36:03.274Z",
+    "lookups": [
+      1
+    ],
+    "decision": "reconciled",
+    "error": null
+  }
+]

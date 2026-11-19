@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "completed": true,
+  "seed": 41379566,
+  "family": "bank-fault-kills",
+  "jobs": 100,
+  "workers": 4,
+  "durationMs": 150000,
+  "pauseMs": 45000,
+  "drainTimeoutMs": 600000,
+  "commit": "90009c0",
+  "startedAt": "2026-11-18T00:51:55.532Z",
+  "wallMs": 216354,
+  "workMs": 181154,
+  "drainMs": 37764,
+  "drainTimedOut": false,
+  "kills": 16,
+  "restarts": 16,
+  "actionErrors": 0,
+  "pause": {
+    "replica": 2,
+    "fromMs": 100876,
+    "toMs": 145876
+  },
+  "bank": {
+    "outage": {
+      "fromMs": 91967,
+      "toMs": 121967
+    },
+    "slow": {
+      "fromMs": 11301,
+      "toMs": 71301,
+      "latencyMs": 2000
+    }
+  },
+  "bankControlsApplied": 4,
+  "oracle": {
+    "pass": true,
+    "counts": {
+      "ok": 100,
+      "DUPLICATE": 0,
+      "MISSING_COMMIT": 0,
+      "UNRECORDED_COMMIT": 0,
+      "MISMATCH": 0,
+      "LOST": 0,
+      "PENDING": 0,
+      "ORPHAN": 0
+    },
+    "ledgerRows": 100
+  },
+  "finals": {
+    "succeeded/success": 100
+  },
+  "needsHuman": [],
+  "failed": [],
+  "notSettled": 0,
+  "recoveries": {
+    "requeuedAfterCrash": 14,
+    "requeuedAfterFailure": 65,
+    "failedByRecovery": 0,
+    "claimedToVerify": 0,
+    "reclaimedVerify": 0,
+    "resumedVerify": 0,
+    "escalatedByRecovery": 0,
+    "ownVerify": 0,
+    "already_done": 0,
+    "resubmitted": 0,
+    "exhausted": 0,
+    "not_committed_final": 0,
+    "deferred": 0,
+    "escalated": 0,
+    "reconciled": 0,
+    "duplicate_suspected": 0,
+    "unrecorded_commit_suspected": 0,
+    "reconcile_unreadable": 0,
+    "reconcile_deferred": 0
+  },
+  "crashBudget": {
+    "jobsWithCrashes": 12,
+    "totalCrashes": 15,
+    "maxCrashesOnOneJob": 2,
+    "jobsLeasedPastMaxAttempts": 3,
+    "crashLimit": 0
+  },
+  "workerProtections": {
+    "heartbeatLeaseLost": 1,
+    "fencedCommitIntent": 0,
+    "completionFencedOut": 0,
+    "runAbortedOnLostLease": 1,
+    "verifyPhaseAborted": 0,
+    "verifyDecisionFencedOut": 0,
+    "reconcileDecisionFencedOut": 0,
+    "duplicatesDetected": 0,
+    "unrecordedCommitsDetected": 0
+  },
+  "leaks": [],
+  "oom": [],
+  "problems": [],
+  "pass": true
+}

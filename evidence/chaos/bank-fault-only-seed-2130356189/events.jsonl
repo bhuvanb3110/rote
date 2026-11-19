@@ -1,0 +1,8 @@
+{"tMs":1,"at":"2026-11-17T19:16:56.846Z","kind":"clock-start"}
+{"tMs":6242,"at":"2026-11-17T19:17:03.087Z","kind":"enqueue-done","created":100,"of":100}
+{"tMs":24271,"at":"2026-11-17T19:17:21.116Z","kind":"bank","control":"errors/on","scheduledMs":24239,"answer":"errors: on"}
+{"tMs":54260,"at":"2026-11-17T19:17:51.105Z","kind":"bank","control":"errors/off","scheduledMs":54239,"answer":"errors: off"}
+{"tMs":79711,"at":"2026-11-17T19:18:16.556Z","kind":"bank","control":"latency/2000","scheduledMs":79690,"answer":"latency: 2000ms"}
+{"tMs":139711,"at":"2026-11-17T19:19:16.556Z","kind":"bank","control":"latency/0","scheduledMs":139690,"answer":"latency: 0ms"}
+{"tMs":139712,"at":"2026-11-17T19:19:16.557Z","kind":"schedule-done"}
+{"tMs":171943,"at":"2026-11-17T19:19:48.788Z","kind":"drain-done","timedOut":false,"ms":32231}

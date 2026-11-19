@@ -1,0 +1,8 @@
+NAME              IMAGE                                                                     COMMAND                  SERVICE    CREATED         STATUS                        PORTS
+rote-api-1        rote-fleet:local                                                          "node dist/src/cli/i…"   api        2 minutes ago   Up About a minute (healthy)   127.0.0.1:8080->8080/tcp
+rote-bank-1       rote-fleet:local                                                          "node dist/mock-app/…"   bank       2 minutes ago   Up About a minute (healthy)   127.0.0.1:4100->4100/tcp
+rote-postgres-1   postgres:17                                                               "docker-entrypoint.s…"   postgres   3 hours ago     Up 18 minutes (healthy)       127.0.0.1:55432->5432/tcp
+rote-worker-1     sha256:e10cf13d05a280ca40b5e43ff040f2d869349898b103b8dec32d40c7f8fe27fd   "node dist/src/worke…"   worker     5 minutes ago   Exited (0) 1 second ago       
+rote-worker-2     sha256:e10cf13d05a280ca40b5e43ff040f2d869349898b103b8dec32d40c7f8fe27fd   "node dist/src/worke…"   worker     5 minutes ago   Exited (0) 1 second ago       
+rote-worker-3     sha256:e10cf13d05a280ca40b5e43ff040f2d869349898b103b8dec32d40c7f8fe27fd   "node dist/src/worke…"   worker     5 minutes ago   Exited (0) 1 second ago       
+rote-worker-4     sha256:e10cf13d05a280ca40b5e43ff040f2d869349898b103b8dec32d40c7f8fe27fd   "node dist/src/worke…"   worker     5 minutes ago   Exited (0) 1 second ago       

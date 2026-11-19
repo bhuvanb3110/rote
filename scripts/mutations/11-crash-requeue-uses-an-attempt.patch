@@ -1,0 +1,12 @@
+diff --git a/src/fleet/stateMachine.ts b/src/fleet/stateMachine.ts
+--- a/src/fleet/stateMachine.ts
++++ b/src/fleet/stateMachine.ts
+@@ -460,7 +460,7 @@
+             to: "queued",
+             outcome: null,
+             crash: true,
+-            leaseCrash: true,
++            leaseCrash: false,
+             error:
+               `lease expired while running, before any commit intent: crash ${crash}/${row.maxCrashes}, not one of the job's ` +
+               `attempts (own attempts used ${own - 1}/${row.maxAttempts}); requeued`,

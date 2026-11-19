@@ -40,6 +40,11 @@ human handoff), a single process is the simpler and more correct choice, not mer
 one: splitting perception/action across processes would mean shipping page state or reconnecting
 a live Playwright session across a process boundary for no benefit at this scale.
 
+*Update (fleet build, 2026-11): one replay still runs inside one process, holding its own browser
+context, for exactly the reason above. What changed is around it: a single-machine fleet (Postgres
+job queue, N worker processes, Docker Compose) now runs many such replays in parallel, each worker
+owning one Chromium and one job at a time. See README "Fleet (Day 1)" and docs/DECISIONS.md D1.*
+
 **Why the mock credit-union app, and not something else.** Two alternatives considered: a public
 website, and a real desktop application. A public site can't be given controllable failure
 injection — you can't make it show a session timeout or a transient error on demand — so
@@ -179,6 +184,17 @@ re-evaluating: `successCondition` now passing means the human finished the job b
 (**skip** — its action, e.g. a click on a button the human already clicked, is never re-run);
 neither passing means **retry** the step fresh (safe even if the human did nothing — it just
 re-pauses). Elaborated with real evidence in §5.
+
+**After an irreversible action (fleet Step 4).** A step is irreversible if the live policy gate
+*or* the artifact's own `risk: "risky"` says so. Replay marks the attempt right before it dispatches
+that click. From then on it applies no recoverable reload: a reload of the POST response would
+re-post the form, and a test showed exactly that, with a second POST committing and replay
+reporting `success`. It also never retries the irreversible step (in operator mode a "retry" after
+hand-back becomes `needs_human`), and it turns any throw into `failure`/`unknown`. Every non-success
+result then carries an optional `commitUncertain` field: "the commit may have happened, verify
+before retrying". The four-way union is unchanged. Optional hooks run just before the click and
+again once the bank has answered it, and an `AbortSignal` lets a caller stop a run at once; both
+reject rather than return a result. Rationale: `docs/DECISIONS.md` D10–D12.
 
 ## 4. Heterogeneity & multi-tenant
 
@@ -333,6 +349,6 @@ recognizers, not just step targets and `successCondition` (the real gap noted ab
 lock (or single-writer queue) under `src/confidence/store.ts`'s sidecar writes — today a concurrent
 replay of the same capability across processes can't corrupt the file (writes are atomic via
 temp-file + rename) but two writers racing on a read-modify-write can still drop one history entry,
-a documented limit rather than the scaling infra CLAUDE.md says not to build here; and an actual
+a documented limit (fleet workers never write these files: they run only approved capabilities, D7); and an actual
 `DesktopSurface`, now that the locator vocabulary itself has been proven to survive hostile HTML
 (§3) — the remaining open question is the driver, not the descriptor design.

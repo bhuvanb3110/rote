@@ -1,0 +1,167 @@
+ Image rote-fleet:local Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 508B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.56kB 0.0s done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for mcr.microsoft.com/playwright:v1.62.1-noble
+#3 DONE 0.3s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 107B done
+#4 DONE 0.0s
+
+#5 [build  1/10] FROM mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+#5 resolve mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e 0.0s done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 1.81MB 0.1s done
+#6 DONE 0.2s
+
+#7 [build  2/10] WORKDIR /app
+#7 CACHED
+
+#8 [build  3/10] COPY package.json package-lock.json ./
+#8 DONE 0.1s
+
+#9 [build  4/10] RUN npm ci
+#9 ...
+
+#10 [stage-1  4/10] RUN npm ci --omit=dev && npm cache clean --force
+#10 6.316 
+#10 6.316 added 106 packages, and audited 107 packages in 6s
+#10 6.316 
+#10 6.316 29 packages are looking for funding
+#10 6.316   run `npm fund` for details
+#10 6.325 
+#10 6.325 4 vulnerabilities (1 moderate, 2 high, 1 critical)
+#10 6.325 
+#10 6.325 To address all issues, run:
+#10 6.325   npm audit fix
+#10 6.325 
+#10 6.325 Run `npm audit` for details.
+#10 6.329 npm notice
+#10 6.329 npm notice New major version of npm available! 11.16.0 -> 12.2.3
+#10 6.329 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#10 6.329 npm notice To update run: npm install -g npm@12.2.3
+#10 6.329 npm notice
+#10 6.438 npm warn using --force Recommended protections disabled.
+#10 DONE 7.3s
+
+#9 [build  4/10] RUN npm ci
+#9 8.526 
+#9 8.526 added 171 packages, and audited 172 packages in 8s
+#9 8.526 
+#9 8.526 49 packages are looking for funding
+#9 8.526   run `npm fund` for details
+#9 8.549 
+#9 8.549 8 vulnerabilities (3 moderate, 4 high, 1 critical)
+#9 8.549 
+#9 8.549 To address all issues, run:
+#9 8.549   npm audit fix
+#9 8.549 
+#9 8.549 Run `npm audit` for details.
+#9 8.550 npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+#9 8.550 npm warn allow-scripts   esbuild@0.28.2 (postinstall: node install.js)
+#9 8.550 npm warn allow-scripts
+#9 8.550 npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+#9 8.552 npm notice
+#9 8.552 npm notice New major version of npm available! 11.16.0 -> 12.2.3
+#9 8.552 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#9 8.552 npm notice To update run: npm install -g npm@12.2.3
+#9 8.552 npm notice
+#9 DONE 8.7s
+
+#11 [build  5/10] COPY tsconfig.json ./
+#11 DONE 0.1s
+
+#12 [build  6/10] COPY src ./src
+#12 DONE 0.1s
+
+#13 [build  7/10] COPY mock-app ./mock-app
+#13 DONE 0.1s
+
+#14 [build  8/10] COPY scripts ./scripts
+#14 DONE 0.1s
+
+#15 [build  9/10] COPY examples ./examples
+#15 DONE 0.1s
+
+#16 [build 10/10] RUN npm run build
+#16 0.349 
+#16 0.349 > rote@0.1.0 build
+#16 0.349 > tsc -p tsconfig.json
+#16 0.349 
+#16 DONE 1.0s
+
+#17 [stage-1  5/10] COPY --from=build /app/dist ./dist
+#17 DONE 0.1s
+
+#18 [stage-1  6/10] COPY artifacts ./artifacts
+#18 DONE 0.1s
+
+#19 [stage-1  7/10] COPY overrides ./overrides
+#19 DONE 0.1s
+
+#20 [stage-1  8/10] COPY status ./status
+#20 DONE 0.1s
+
+#21 [stage-1  9/10] COPY db ./db
+#21 DONE 0.1s
+
+#22 [stage-1 10/10] RUN mkdir -p /evidence && chown pwuser:pwuser /evidence
+#22 DONE 0.4s
+
+#23 exporting to image
+#23 exporting layers
+#23 exporting layers 1.6s done
+#23 exporting manifest sha256:480237afdb7687f4abd35b026a2b67d199ea4166b8abf0a25a7972e613293ad1 0.0s done
+#23 exporting config sha256:167cab5335052d87b80fa775eaa7abfc7ae5b74df404ac19d3aa9539ccd74c33 0.0s done
+#23 exporting attestation manifest sha256:923020ce939afa4a473caaa4642448ed0cd118914aabfdf351cfb7fdd622ada4 0.0s done
+#23 exporting manifest list sha256:db8c225547e2ea7de84ea5a722c117a69ccc138853bca5c0da7bf4c713675a53 0.0s done
+#23 naming to docker.io/library/rote-fleet:local
+#23 naming to docker.io/library/rote-fleet:local done
+#23 unpacking to docker.io/library/rote-fleet:local
+#23 unpacking to docker.io/library/rote-fleet:local 0.7s done
+#23 DONE 2.4s
+
+#24 resolving provenance for metadata file
+#24 DONE 0.0s
+ Image rote-fleet:local Built 
+ Container rote-bank-1 Recreate 
+ Container rote-postgres-1 Recreate 
+ Container rote-bank-1 Recreated 
+ Container rote-postgres-1 Recreated 
+ Container rote-worker-1 Recreate 
+ Container rote-worker-2 Recreate 
+ Container rote-worker-3 Recreate 
+ Container rote-worker-4 Recreate 
+ Container rote-api-1 Recreate 
+ Container rote-api-1 Recreated 
+ Container rote-worker-2 Recreated 
+ Container rote-worker-3 Recreated 
+ Container rote-worker-1 Recreated 
+ Container rote-worker-4 Recreated 
+ Container rote-bank-1 Starting 
+ Container rote-postgres-1 Starting 
+ Container rote-bank-1 Started 
+ Container rote-bank-1 Waiting 
+ Container rote-postgres-1 Started 
+ Container rote-postgres-1 Waiting 
+ Container rote-bank-1 Healthy 
+ Container rote-postgres-1 Healthy 
+ Container rote-worker-1 Starting 
+ Container rote-api-1 Starting 
+ Container rote-worker-1 Started 
+ Container rote-worker-2 Starting 
+ Container rote-api-1 Started 
+ Container rote-worker-2 Started 
+ Container rote-worker-3 Starting 
+ Container rote-worker-3 Started 
+ Container rote-worker-4 Starting 
+ Container rote-worker-4 Started 
+exit=0 wall_seconds=45.9

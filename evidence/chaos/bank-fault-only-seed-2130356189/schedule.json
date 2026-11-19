@@ -1,0 +1,47 @@
+{
+  "config": {
+    "workers": 4,
+    "durationMs": 150000,
+    "minGapMs": 5000,
+    "maxGapMs": 15000,
+    "pauseMs": 0,
+    "restartDelayMs": 2000,
+    "seed": 2130356189,
+    "kills": false,
+    "bankFaults": true
+  },
+  "pause": null,
+  "bank": {
+    "outage": {
+      "fromMs": 24239,
+      "toMs": 54239
+    },
+    "slow": {
+      "fromMs": 79690,
+      "toMs": 139690,
+      "latencyMs": 2000
+    }
+  },
+  "actions": [
+    {
+      "atMs": 24239,
+      "kind": "bank",
+      "control": "errors/on"
+    },
+    {
+      "atMs": 54239,
+      "kind": "bank",
+      "control": "errors/off"
+    },
+    {
+      "atMs": 79690,
+      "kind": "bank",
+      "control": "latency/2000"
+    },
+    {
+      "atMs": 139690,
+      "kind": "bank",
+      "control": "latency/0"
+    }
+  ]
+}

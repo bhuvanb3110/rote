@@ -1,0 +1,168 @@
+{
+  "config": {
+    "workers": 4,
+    "durationMs": 150000,
+    "minGapMs": 5000,
+    "maxGapMs": 15000,
+    "pauseMs": 45000,
+    "restartDelayMs": 2000,
+    "seed": 14449393
+  },
+  "pause": {
+    "replica": 3,
+    "fromMs": 68074,
+    "toMs": 113074
+  },
+  "actions": [
+    {
+      "atMs": 13943,
+      "kind": "kill",
+      "replica": 3
+    },
+    {
+      "atMs": 15943,
+      "kind": "start",
+      "replica": 3
+    },
+    {
+      "atMs": 27889,
+      "kind": "kill",
+      "replica": 2
+    },
+    {
+      "atMs": 29889,
+      "kind": "start",
+      "replica": 2
+    },
+    {
+      "atMs": 37560,
+      "kind": "kill",
+      "replica": 1
+    },
+    {
+      "atMs": 39560,
+      "kind": "start",
+      "replica": 1
+    },
+    {
+      "atMs": 48275,
+      "kind": "kill",
+      "replica": 4
+    },
+    {
+      "atMs": 50275,
+      "kind": "start",
+      "replica": 4
+    },
+    {
+      "atMs": 55321,
+      "kind": "kill",
+      "replica": 1
+    },
+    {
+      "atMs": 57321,
+      "kind": "start",
+      "replica": 1
+    },
+    {
+      "atMs": 67488,
+      "kind": "kill",
+      "replica": 1
+    },
+    {
+      "atMs": 68074,
+      "kind": "pause",
+      "replica": 3
+    },
+    {
+      "atMs": 69488,
+      "kind": "start",
+      "replica": 1
+    },
+    {
+      "atMs": 76493,
+      "kind": "kill",
+      "replica": 1
+    },
+    {
+      "atMs": 78493,
+      "kind": "start",
+      "replica": 1
+    },
+    {
+      "atMs": 87109,
+      "kind": "kill",
+      "replica": 1
+    },
+    {
+      "atMs": 89109,
+      "kind": "start",
+      "replica": 1
+    },
+    {
+      "atMs": 92489,
+      "kind": "kill",
+      "replica": 2
+    },
+    {
+      "atMs": 94489,
+      "kind": "start",
+      "replica": 2
+    },
+    {
+      "atMs": 98047,
+      "kind": "kill",
+      "replica": 4
+    },
+    {
+      "atMs": 100047,
+      "kind": "start",
+      "replica": 4
+    },
+    {
+      "atMs": 112813,
+      "kind": "kill",
+      "replica": 2
+    },
+    {
+      "atMs": 113074,
+      "kind": "unpause",
+      "replica": 3
+    },
+    {
+      "atMs": 114813,
+      "kind": "start",
+      "replica": 2
+    },
+    {
+      "atMs": 123771,
+      "kind": "kill",
+      "replica": 3
+    },
+    {
+      "atMs": 125771,
+      "kind": "start",
+      "replica": 3
+    },
+    {
+      "atMs": 134291,
+      "kind": "kill",
+      "replica": 1
+    },
+    {
+      "atMs": 136291,
+      "kind": "start",
+      "replica": 1
+    },
+    {
+      "atMs": 144599,
+      "kind": "kill",
+      "replica": 2
+    },
+    {
+      "atMs": 146599,
+      "kind": "start",
+      "replica": 2
+    }
+  ]
+}

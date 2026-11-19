@@ -1,0 +1,23 @@
+{
+  "tenantId": "tenant-b",
+  "capabilityId": "transfer-history-lookup",
+  "entryUrl": "http://localhost:4100/tenant-b/",
+  "stepOverrides": {
+    "step-05": {
+      "describedAs": "Find Member button",
+      "strategies": [
+        {
+          "kind": "roleName",
+          "role": "button",
+          "name": "Find Member",
+          "confidence": 0.95
+        },
+        {
+          "kind": "textAnchor",
+          "anchorText": "Find Member",
+          "confidence": 0.6
+        }
+      ]
+    }
+  }
+}

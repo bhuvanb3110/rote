@@ -1,0 +1,12 @@
+diff --git a/src/fleet/stateMachine.ts b/src/fleet/stateMachine.ts
+--- a/src/fleet/stateMachine.ts
++++ b/src/fleet/stateMachine.ts
+@@ -738,7 +738,7 @@
+   if (!isReconcilable(jobState)) throw new Error(`reconcileDecision: a ${String(jobState)} job is never reconciled`);
+   switch (reading.kind) {
+     case "count":
+-      if (reading.n === reconcileExpectedMatches(jobState)) {
++      if (reading.n === reconcileExpectedMatches(jobState) || (jobState === "succeeded" && reading.n >= 2)) {
+         return { decision: "reconciled", to: jobState, outcome: null, matches: reconcileExpectedMatches(jobState), firstMatchRef: reading.n > 0 ? reading.firstMatchRef : null, error: null };
+       }
+       if (jobState !== "succeeded") {

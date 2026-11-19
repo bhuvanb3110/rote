@@ -1,0 +1,39 @@
+Chaos run, started 2026-11-18T00:51:55.532Z (code 90009c0)
+family: bank-fault-kills -- the standard kills and pause plus the bank down 30 s and slow 60 s; expected final states: succeeded/success, succeeded/already_done (src/chaos/families.ts)
+seed: 41379566  (reproduce: npm run chaos -- --seed 41379566 --bank-fault --jobs 100 --duration 150s)
+jobs: 100, workers: 4, schedule 150000 ms: 16 kills (gap 5000-15000 ms), pause replica 2 100876-145876 ms, bank down 91967-121967 ms, slow (2000 ms) 11301-71301 ms, restart after 2000 ms; drain (until settled) timeout 600000 ms
+database: postgres://rote:***@127.0.0.1:55432/rote
+reset: queue tables truncated; bank ledger rows: 0; bank knobs: errors: off, latency: 0ms, history lag: 0ms
+replicas: rote-worker-1=7c0a7c7b9264, rote-worker-2=ccd1fd792a46, rote-worker-3=cbe5fc2eea07, rote-worker-4=fd48aa89f1fe
+enqueued: 100/100 x 201
+
+kills executed: 16; restarts: 16; errors: 0; kills/pauses whose post-call snapshot differed from the pre-call one: 1
+bank controls applied: 4 of 4 (latency/2000 at 11787 ms, latency/0 at 71320 ms, errors/on at 92121 ms, errors/off at 121986 ms)
+recovery kinds (decision 8): requeuedAfterCrash x14, requeuedAfterFailure x65
+verify and reconcile phases (job_verifications: decision[lookups] (reason)): none
+needs_human jobs: 0 (the bank-fault-kills family allows none)
+failed jobs: 0
+crash budget (D57): 15 crash(es) on 12 job(s), at most 2 on one job; 3 job(s) leased past max_attempts (crashes used no attempt); 0 at the crash cap
+attempt outcomes: crashed x14, failure x65, lease_lost x1, success x100
+final job states: succeeded/success x100
+settled: 100/100; drain 37 s
+worker containers at the end: rote-worker-1:running, rote-worker-2:running, rote-worker-3:running, rote-worker-4:running
+worker protections fired (container logs): heartbeatLeaseLost x1, fencedCommitIntent x0, completionFencedOut x0, runAbortedOnLostLease x1, verifyPhaseAborted x0, verifyDecisionFencedOut x0, reconcileDecisionFencedOut x0, duplicatesDetected x0, unrecordedCommitsDetected x0
+credential values in jobs/attempts/API responses/container logs: none
+docker stats, peak memory per container:
+  rote-api-1: 159.9 MiB
+  rote-bank-1: 43.0 MiB
+  rote-postgres-1: 310.1 MiB
+  rote-worker-1: 232.1 MiB
+  rote-worker-2: 206.4 MiB
+  rote-worker-3: 221.4 MiB
+  rote-worker-4: 224.6 MiB
+
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 100; ledger rows: 100; drain timed out: no
+job states: succeeded=100
+verdicts: ok=100, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+
+family judge (bank-fault-kills; src/chaos/families.ts): every expectation met
+RESULT: PASS

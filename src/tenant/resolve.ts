@@ -9,18 +9,22 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Capability } from "../artifact/index.js";
 import { applyTenantOverride } from "./apply.js";
-import { deserializeTenantOverride } from "./types.js";
+import { deserializeTenantOverride, type TenantOverride } from "./types.js";
 
 export const DEFAULT_OVERRIDES_DIR = "overrides";
 
+/**
+ * `override` is the override that was applied (undefined without a tenant). Callers pass it to
+ * runReplay as `approvalOverride`, so the approval gate can check it was approved (D30).
+ */
 export async function resolveTenant(
   capability: Capability,
   tenantId: string | undefined,
   fallbackUrl: string,
   overridesDir: string = DEFAULT_OVERRIDES_DIR,
-): Promise<{ capability: Capability; entryUrl: string }> {
+): Promise<{ capability: Capability; entryUrl: string; override?: TenantOverride }> {
   if (!tenantId) return { capability, entryUrl: fallbackUrl };
   const overridePath = path.join(overridesDir, `${capability.id}.${tenantId}.json`);
   const override = deserializeTenantOverride(await readFile(overridePath, "utf8"));
-  return { capability: applyTenantOverride(capability, override), entryUrl: override.entryUrl };
+  return { capability: applyTenantOverride(capability, override), entryUrl: override.entryUrl, override };
 }

@@ -1,0 +1,51 @@
+
+> rote@0.1.0 chaos
+> tsx scripts/chaos.ts --bank-fault --no-kills --seed 2130356189 --jobs 100 --out evidence/chaos/bank-fault-only-seed-2130356189-after-d57
+
+Chaos run, started 2026-11-18T00:55:56.635Z (code 90009c0)
+family: bank-fault-only -- the bank down 30 s and slow (2 s per request) 60 s; no kills, no pause; expected final states: succeeded/success, succeeded/already_done (src/chaos/families.ts)
+seed: 2130356189  (reproduce: npm run chaos -- --seed 2130356189 --bank-fault --no-kills --jobs 100 --duration 150s)
+jobs: 100, workers: 4, schedule 150000 ms: 0 kills (gap 5000-15000 ms), pause none, bank down 24239-54239 ms, slow (2000 ms) 79690-139690 ms, restart after 2000 ms; drain (until settled) timeout 600000 ms
+database: postgres://rote:***@127.0.0.1:55432/rote
+reset: queue tables truncated; bank ledger rows: 0; bank knobs: errors: off, latency: 0ms, history lag: 0ms
+replicas: rote-worker-1=7c0a7c7b9264, rote-worker-2=ccd1fd792a46, rote-worker-3=cbe5fc2eea07, rote-worker-4=fd48aa89f1fe
+  event {"tMs":0,"at":"2026-11-18T00:56:19.736Z","kind":"clock-start"}
+  event {"tMs":4039,"at":"2026-11-18T00:56:23.775Z","kind":"enqueue-done","created":100,"of":100}
+enqueued: 100/100 x 201
+  event {"tMs":24277,"at":"2026-11-18T00:56:44.013Z","kind":"bank","control":"errors/on","scheduledMs":24239,"answer":"errors: on"}
+  event {"tMs":54266,"at":"2026-11-18T00:57:14.002Z","kind":"bank","control":"errors/off","scheduledMs":54239,"answer":"errors: off"}
+  event {"tMs":79715,"at":"2026-11-18T00:57:39.451Z","kind":"bank","control":"latency/2000","scheduledMs":79690,"answer":"latency: 2000ms"}
+  event {"tMs":139705,"at":"2026-11-18T00:58:39.441Z","kind":"bank","control":"latency/0","scheduledMs":139690,"answer":"latency: 0ms"}
+  event {"tMs":139705,"at":"2026-11-18T00:58:39.441Z","kind":"schedule-done"}
+  event {"tMs":182038,"at":"2026-11-18T00:59:21.774Z","kind":"drain-done","timedOut":false,"ms":42333}
+
+kills executed: 0; restarts: 0; errors: 0; kills/pauses whose post-call snapshot differed from the pre-call one: 0
+bank controls applied: 4 of 4 (errors/on at 24277 ms, errors/off at 54266 ms, latency/2000 at 79715 ms, latency/0 at 139705 ms)
+recovery kinds (decision 8): requeuedAfterFailure x101
+verify and reconcile phases (job_verifications: decision[lookups] (reason)): none
+needs_human jobs: 0 (the bank-fault-only family allows none)
+failed jobs: 0
+crash budget (D57): 0 crash(es) on 0 job(s), at most 0 on one job; 0 job(s) leased past max_attempts (crashes used no attempt); 0 at the crash cap
+attempt outcomes: failure x101, success x100
+final job states: succeeded/success x100
+settled: 100/100; drain 45 s
+worker containers at the end: rote-worker-1:running, rote-worker-2:running, rote-worker-3:running, rote-worker-4:running
+worker protections fired (container logs): heartbeatLeaseLost x0, fencedCommitIntent x0, completionFencedOut x0, runAbortedOnLostLease x0, verifyPhaseAborted x0, verifyDecisionFencedOut x0, reconcileDecisionFencedOut x0, duplicatesDetected x0, unrecordedCommitsDetected x0
+credential values in jobs/attempts/API responses/container logs: none
+docker stats, peak memory per container:
+  rote-api-1: 160.8 MiB
+  rote-bank-1: 49.0 MiB
+  rote-postgres-1: 282.2 MiB
+  rote-worker-1: 234.3 MiB
+  rote-worker-2: 236.8 MiB
+  rote-worker-3: 232.2 MiB
+  rote-worker-4: 235.5 MiB
+
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 100; ledger rows: 100; drain timed out: no
+job states: succeeded=100
+verdicts: ok=100, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+
+family judge (bank-fault-only; src/chaos/families.ts): every expectation met
+RESULT: PASS

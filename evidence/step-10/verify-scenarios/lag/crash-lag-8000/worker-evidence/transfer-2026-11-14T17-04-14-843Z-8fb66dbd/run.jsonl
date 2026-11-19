@@ -1,0 +1,12 @@
+{"timestamp":"2026-11-14T17:04:15.084Z","turn":0,"kind":"action","detail":{"stepId":"step-01","actionKind":"type","target":"User ID textbox","value":"[REDACTED]","intent":"Enter the operator username to log in."}}
+{"timestamp":"2026-11-14T17:04:15.139Z","turn":1,"kind":"action","detail":{"stepId":"step-02","actionKind":"type","target":"Password textbox","value":"[REDACTED]","intent":"Enter the operator password to log in."}}
+{"timestamp":"2026-11-14T17:04:15.264Z","turn":2,"kind":"action","detail":{"stepId":"step-03","actionKind":"click","target":"Log In button","intent":"Submit credentials to enter the back office."}}
+{"timestamp":"2026-11-14T17:04:15.324Z","turn":3,"kind":"action","detail":{"stepId":"step-04","actionKind":"type","target":"Member ID textbox","value":"10001","intent":"Enter the source member's ID in Member Lookup."}}
+{"timestamp":"2026-11-14T17:04:15.445Z","turn":4,"kind":"action","detail":{"stepId":"step-05","actionKind":"click","target":"Search button","intent":"Search for the member to open their record."}}
+{"timestamp":"2026-11-14T17:04:15.585Z","turn":5,"kind":"action","detail":{"stepId":"step-06","actionKind":"click","target":"Transfer button","intent":"Open the transfer form for this member."}}
+{"timestamp":"2026-11-14T17:04:15.665Z","turn":6,"kind":"action","detail":{"stepId":"step-07","actionKind":"type","target":"To Member ID textbox","value":"10002","intent":"Enter the recipient's member ID."}}
+{"timestamp":"2026-11-14T17:04:15.719Z","turn":7,"kind":"action","detail":{"stepId":"step-08","actionKind":"type","target":"Amount textbox","value":"1.00","intent":"Enter the amount to transfer."}}
+{"timestamp":"2026-11-14T17:04:15.771Z","turn":8,"kind":"action","detail":{"stepId":"step-09","actionKind":"type","target":"Memo textbox","value":"[REDACTED]","intent":"Enter the memo that identifies this transfer in the history."}}
+{"timestamp":"2026-11-14T17:04:15.880Z","turn":9,"kind":"action","detail":{"stepId":"step-10","actionKind":"click","target":"Continue button","intent":"Continue to the confirmation screen; the bank validates the transfer here."}}
+{"timestamp":"2026-11-14T17:04:15.881Z","turn":10,"kind":"risk_approved","detail":{"stepId":"step-11","reason":"Click target \"Submit\" matches a risky/irreversible action pattern.","riskSources":{"gate":"risky","artifact":"risky"}}}
+{"timestamp":"2026-11-14T17:04:15.946Z","turn":10,"kind":"irreversible_settle","detail":{"stepId":"step-11","timeoutMs":10000,"loaded":true,"ms":56,"url":"http://localhost:4100/member/10001/transfer/confirm"}}

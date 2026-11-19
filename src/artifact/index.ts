@@ -3,3 +3,4 @@
 export * from "./schema.js";
 export * from "./replayResult.js";
 export * from "./serialize.js";
+export * from "./canonical.js";

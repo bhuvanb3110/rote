@@ -1,0 +1,35 @@
+{
+  "jobs": 1,
+  "ledgerRows": 0,
+  "drainTimedOut": false,
+  "byState": {
+    "needs_human": 1
+  },
+  "counts": {
+    "ok": 1,
+    "DUPLICATE": 0,
+    "MISSING_COMMIT": 0,
+    "UNRECORDED_COMMIT": 0,
+    "MISMATCH": 0,
+    "LOST": 0,
+    "PENDING": 0,
+    "ORPHAN": 0
+  },
+  "findings": [
+    {
+      "jobId": "bc48578b-2af4-4425-a978-1f7c3c0ca5e6",
+      "tenant": "tenant-a",
+      "state": "needs_human",
+      "outcome": "commit_uncertain",
+      "attempt": 1,
+      "memoKey": "rote-bc48578b-2af4-4425-a978-1f7c3c0ca5e6",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "ok",
+      "detail": "needs_human with 0 row(s)"
+    }
+  ],
+  "orphans": [],
+  "pass": true
+}

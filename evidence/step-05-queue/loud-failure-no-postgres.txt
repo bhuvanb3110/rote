@@ -1,0 +1,14 @@
+$ docker compose stop postgres
+$ npx vitest run src/queue/db.db.test.ts
+ ❯ src/queue/db.db.test.ts (5 tests | 5 skipped) 10ms
+ FAIL  src/queue/db.db.test.ts [ src/queue/db.db.test.ts ]
+PostgresUnreachableError: Postgres not reachable at 127.0.0.1:55432 (postgres://rote:***@127.0.0.1:55432/postgres): run "docker compose up -d postgres". From fleet Step 5 on, npm test needs it; npm run test:unit runs the tests that don't. Cause: connect ECONNREFUSED 127.0.0.1:55432
+     46|     throw new PostgresUnreachableError(url, err);
+ Test Files  1 failed (1)
+      Tests  5 skipped (5)
+exit code: 1
+
+Note: vitest labels the file's 5 tests "skipped" because beforeAll threw before any test ran, but
+the FILE is reported FAIL with the PostgresUnreachableError above and the run exits 1, so `npm test`
+is red without Postgres. Nothing is silently skipped: there is no skip condition in any DB test.
+(Postgres was started again right after: `docker compose start postgres`.)

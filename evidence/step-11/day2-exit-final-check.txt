@@ -1,0 +1,53 @@
+batch: evidence\chaos\day2-exit-final
+seeds.json: 20 seeds; command: npm run chaos-seeds -- --seeds 20 --jobs 500 --out evidence/chaos/day2-exit-final
+seed folders: 20 of 20 expected; stray: none; .interrupted / .rerun folders: none
+top-level files: README.md, runner-log.jsonl, seeds.json, tally.json, tally.md
+
+| # | seed | commit | jobs | kills | ledger rows | raw: dup / missing / unrecorded / lost / orphan / tenant mismatch | final states | tally.md row | result |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 2080386450 | 9d38bb2 | 500 | 78 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 2, succeeded/success 498 | matches summary.json | PASS |
+| 2 | 1980443797 | 9d38bb2 | 500 | 83 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 2, succeeded/success 498 | matches summary.json | PASS |
+| 3 | 977393215 | 9d38bb2 | 500 | 77 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 7, succeeded/success 493 | matches summary.json | PASS |
+| 4 | 1596508253 | 9d38bb2 | 500 | 80 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 2, succeeded/success 498 | matches summary.json | PASS |
+| 5 | 504603894 | 9d38bb2 | 500 | 81 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 9, succeeded/success 491 | matches summary.json | PASS |
+| 6 | 1871157853 | 9d38bb2 | 500 | 78 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 3, succeeded/success 497 | matches summary.json | PASS |
+| 7 | 151950833 | 9d38bb2 | 500 | 80 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 3, succeeded/success 497 | matches summary.json | PASS |
+| 8 | 1836183831 | 9d38bb2 | 500 | 79 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 4, succeeded/success 496 | matches summary.json | PASS |
+| 9 | 1768973850 | 9d38bb2 | 500 | 80 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 5, succeeded/success 495 | matches summary.json | PASS |
+| 10 | 328679727 | 9d38bb2 | 500 | 82 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 6, succeeded/success 494 | matches summary.json | PASS |
+| 11 | 1919141393 | 9d38bb2 | 500 | 77 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 6, succeeded/success 494 | matches summary.json | PASS |
+| 12 | 1173696840 | 9d38bb2 | 500 | 79 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 5, succeeded/success 495 | matches summary.json | PASS |
+| 13 | 1668960425 | 9d38bb2 | 500 | 78 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 3, succeeded/success 497 | matches summary.json | PASS |
+| 14 | 2045087166 | 9d38bb2 | 500 | 77 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 4, succeeded/success 496 | matches summary.json | PASS |
+| 15 | 618460028 | 9d38bb2 | 500 | 78 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 6, succeeded/success 494 | matches summary.json | PASS |
+| 16 | 633038833 | 9d38bb2 | 500 | 73 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 4, succeeded/success 496 | matches summary.json | PASS |
+| 17 | 1330667932 | 9d38bb2 | 500 | 79 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 4, succeeded/success 496 | matches summary.json | PASS |
+| 18 | 347938812 | 9d38bb2 | 500 | 81 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 5, succeeded/success 495 | matches summary.json | PASS |
+| 19 | 725822945 | 9d38bb2 | 500 | 80 | 500 | 0 / 0 / 0 / 0 / 0 / 0 | succeeded/already_done 4, succeeded/success 496 | matches summary.json | PASS |
+| 20 | 1374298332 | 9d38bb2 | 500 | 82 | 499 | 0 / 0 / 0 / 0 / 0 / 0 | needs_human/crash_limit 1, succeeded/already_done 5, succeeded/success 494 | matches summary.json | PASS with 1 escalated by crash cap (attributed): not a plain pass |
+
+runner-log.jsonl: 40 entries (20 start, 20 end); set-aside: 0; seed exit codes: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3
+  first start 2026-11-19T02:48:23.425Z, last end 2026-11-19T07:24:49.184Z
+tally.json: result PASS_WITH_ATTRIBUTED_ESCALATIONS, finished 20, passed 20; recoveryTotals equal the sums of the 20 summaries: yes
+tally.md: 20 seed rows checked cell by cell against summary.json; recovery-kind table checked against the sums: yes
+
+escalation, seed 20 (1374298332): job 9e1d23f4-853e-4e32-a662-23e03f7d1e95
+  job row: tenant tenant-b, 10001 -> 10002 $1.00, state needs_human/crash_limit, attempt 1, crashes 5/5, lease_crashes 0, token 6, commit_intent_at 2026-11-19T07:14:07.875Z
+  ledger rows for memo_key rote-9e1d23f4-853e-4e32-a662-23e03f7d1e95: 0
+  attempts: #1 d6f39c899b70-7-473c 2026-11-19T07:14:06.070Z .. 2026-11-19T07:14:38.059Z crashed (intent 2026-11-19T07:14:07.875Z)
+  verify phases: d6f39c899b70-7-69e7 2026-11-19T07:14:38.059Z .. 2026-11-19T07:15:08.625Z crashed lookups=null; 6049abae02b9-7-0117 2026-11-19T07:15:08.625Z .. 2026-11-19T07:15:38.746Z crashed lookups=null; 6049abae02b9-7-f6e7 2026-11-19T07:15:38.746Z .. 2026-11-19T07:16:09.407Z crashed lookups=null; 6f8544e01444-7-7b7d 2026-11-19T07:16:09.407Z .. 2026-11-19T07:16:39.412Z crashed lookups=null
+  death 1 (attempt, T6.4): holder d6f39c899b70-7-473c; events.jsonl has the kill of rote-worker-1 at 2026-11-19T07:14:08.486Z (t=164.8 s), 2.4 s into the hold; inside the hold window: yes
+  death 2 (verify phase, T6.5): holder d6f39c899b70-7-69e7; events.jsonl has the kill of rote-worker-1 at 2026-11-19T07:14:41.611Z (t=197.9 s), 3.6 s into the hold; inside the hold window: yes
+  death 3 (verify phase, T6.5): holder 6049abae02b9-7-0117; events.jsonl has the kill of rote-worker-2 at 2026-11-19T07:15:13.854Z (t=230.2 s), 5.2 s into the hold; inside the hold window: yes
+  death 4 (verify phase, T6.5): holder 6049abae02b9-7-f6e7; events.jsonl has the kill of rote-worker-2 at 2026-11-19T07:15:39.814Z (t=256.1 s), 1.1 s into the hold; inside the hold window: yes
+  death 5 (verify phase, T6.6): holder 6f8544e01444-7-7b7d; events.jsonl has the kill of rote-worker-3 at 2026-11-19T07:16:13.843Z (t=290.2 s), 4.4 s into the hold; inside the hold window: yes
+
+totals over the 20 seeds:
+  jobs 10000; kills 1582; ledger rows 9999
+  oracle verdicts: ok 10000, DUPLICATE 0, LOST 0, MISSING_COMMIT 0, UNRECORDED_COMMIT 0, MISMATCH 0, ORPHAN 0
+  final states: succeeded 9999, needs_human 1, failed 0, business_outcome 0; not settled 0
+  by state/outcome: needs_human/crash_limit 1, succeeded/already_done 89, succeeded/success 9910
+  escalated by crash cap (attributed): 1 (seed 20: 9e1d23f4-853e-4e32-a662-23e03f7d1e95)
+  recovery kinds (sum of the summaries): requeuedAfterCrash 548 (20 seeds), requeuedAfterFailure 0 (0 seeds), failedByRecovery 0 (0 seeds), claimedToVerify 99 (20 seeds), reclaimedVerify 6 (4 seeds), resumedVerify 0 (0 seeds), escalatedByRecovery 1 (1 seeds), ownVerify 0 (0 seeds), already_done 89 (20 seeds), resubmitted 9 (7 seeds), exhausted 0 (0 seeds), not_committed_final 0 (0 seeds), deferred 0 (0 seeds), escalated 0 (0 seeds), reconciled 9 (7 seeds), duplicate_suspected 0 (0 seeds), unrecorded_commit_suspected 0 (0 seeds), reconcile_unreadable 0 (0 seeds), reconcile_deferred 0 (0 seeds)
+
+RESULT: PASS (the batch is complete, on one commit, and tally.md / tally.json agree with every seed's summary.json and with a recount from the raw jobs.json and ledger.json)

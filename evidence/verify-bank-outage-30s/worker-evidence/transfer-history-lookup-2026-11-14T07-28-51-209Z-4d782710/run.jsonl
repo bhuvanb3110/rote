@@ -1,0 +1,4 @@
+{"timestamp":"2026-11-14T07:28:51.401Z","turn":0,"kind":"action","detail":{"stepId":"step-01","actionKind":"type","target":"User ID textbox","value":"[REDACTED]","intent":"Enter the operator username to log in."}}
+{"timestamp":"2026-11-14T07:28:51.458Z","turn":1,"kind":"action","detail":{"stepId":"step-02","actionKind":"type","target":"Password textbox","value":"[REDACTED]","intent":"Enter the operator password to log in."}}
+{"timestamp":"2026-11-14T07:28:51.590Z","turn":2,"kind":"business_outcome","detail":{"stepId":"step-03","code":"BANK_UNAVAILABLE","detail":"The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later."},"screenshotFile":"step-003.png"}
+{"timestamp":"2026-11-14T07:28:51.591Z","turn":-1,"kind":"result","detail":{"status":"business_outcome","confidence":1}}

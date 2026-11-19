@@ -1,0 +1,47 @@
+Chaos run, started 2026-11-19T07:11:04.296Z (code 9d38bb2)
+family: standard -- kills every 5-15 s and one 45 s pause; no bank faults; expected final states: succeeded/success, succeeded/already_done, failed/crash_limit, failed/not_committed_attempts_exhausted (src/chaos/families.ts)
+seed: 1374298332  (reproduce: npm run chaos -- --seed 1374298332 --jobs 500 --duration 800s)
+jobs: 500, workers: 4, schedule 800000 ms: 82 kills (gap 5000-15000 ms), pause replica 4 191671-236671 ms, bank no faults, restart after 2000 ms; drain (until settled) timeout 900000 ms
+database: postgres://rote:***@127.0.0.1:55432/rote
+reset: queue tables truncated; bank ledger rows: 0; bank knobs: errors: off, latency: 0ms, history lag: 0ms
+replicas: rote-worker-1=d6f39c899b70, rote-worker-2=6049abae02b9, rote-worker-3=6f8544e01444, rote-worker-4=d44b0fe854ff
+enqueued: 500/500 x 201
+
+kills executed: 82; restarts: 82; errors: 0; kills/pauses whose post-call snapshot differed from the pre-call one: 2
+recovery kinds (decision 8): requeuedAfterCrash x25, claimedToVerify x6, reclaimedVerify x3, escalatedByRecovery x1, already_done x5
+verify and reconcile phases (job_verifications: decision[lookups] (reason)): already_done[1] (lease_expired_in_committing) x5, crashed (lease_expired_in_committing) x1, crashed (lease_expired_in_verifying) x3
+needs_human jobs: 1 (9e1d23f4-853e-4e32-a662-23e03f7d1e95 crash_limit) (the standard family allows none)
+failed jobs: 0
+crash budget (D57): 35 crash(es) on 31 job(s), at most 5 on one job; 0 job(s) leased past max_attempts (crashes used no attempt); 1 at the crash cap
+reconciler deaths (D59): 0 on 0 job(s); 0 reconcile(s) abandoned by the pass
+attempt outcomes: crashed x31, success x494
+final job states: needs_human/crash_limit x1, succeeded/already_done x5, succeeded/success x494
+settled: 500/500; drain 7 s
+worker containers at the end: rote-worker-1:running, rote-worker-2:running, rote-worker-3:running, rote-worker-4:running
+worker protections fired (container logs): heartbeatLeaseLost x0, fencedCommitIntent x0, completionFencedOut x0, runAbortedOnLostLease x0, verifyPhaseAborted x0, verifyDecisionFencedOut x0, reconcileDecisionFencedOut x0, duplicatesDetected x0, unrecordedCommitsDetected x0, reconcileAbandoned x0
+credential values in jobs/attempts/API responses/container logs: none
+docker stats, peak memory per container:
+  rote-api-1: 236.0 MiB
+  rote-bank-1: 49.9 MiB
+  rote-postgres-1: 66.1 MiB
+  rote-worker-1: 234.1 MiB
+  rote-worker-2: 236.9 MiB
+  rote-worker-3: 232.8 MiB
+  rote-worker-4: 240.6 MiB
+
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 500; ledger rows: 499; drain timed out: no
+job states: needs_human=1, succeeded=499
+verdicts: ok=500, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+needs_human (1), listed with outcome and ledger rows:
+  9e1d23f4-853e-4e32-a662-23e03f7d1e95 tenant-b outcome=crash_limit rows=0
+crash-cap escalation 9e1d23f4-853e-4e32-a662-23e03f7d1e95: ATTRIBUTED; 5 crashes, 0 ledger row(s)
+  attempt 1 of d6f39c899b70-7-473c (T6.4), held 2026-11-19T07:14:06.070Z .. 2026-11-19T07:14:38.059Z: kill of rote-worker-1 at 164.8 s
+  verify phase 2 of d6f39c899b70-7-69e7 (T6.5), held 2026-11-19T07:14:38.059Z .. 2026-11-19T07:15:08.625Z: kill of rote-worker-1 at 197.9 s
+  verify phase 3 of 6049abae02b9-7-0117 (T6.5), held 2026-11-19T07:15:08.625Z .. 2026-11-19T07:15:38.746Z: kill of rote-worker-2 at 230.2 s
+  verify phase 4 of 6049abae02b9-7-f6e7 (T6.5), held 2026-11-19T07:15:38.746Z .. 2026-11-19T07:16:09.407Z: kill of rote-worker-2 at 256.1 s
+  verify phase 5 of 6f8544e01444-7-7b7d (T6.6), held 2026-11-19T07:16:09.407Z .. 2026-11-19T07:16:39.412Z: kill of rote-worker-3 at 290.2 s
+
+family judge (standard; src/chaos/families.ts): every expectation met
+RESULT: PASS WITH 1 ESCALATION(S) BY CRASH CAP (ATTRIBUTED): 9e1d23f4-853e-4e32-a662-23e03f7d1e95 (5 deaths, 0 ledger row(s): kill of rote-worker-1 at 164.8 s, kill of rote-worker-1 at 197.9 s, kill of rote-worker-2 at 230.2 s, kill of rote-worker-2 at 256.1 s, kill of rote-worker-3 at 290.2 s)

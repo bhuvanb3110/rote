@@ -1,0 +1,1522 @@
+{
+  "jobs": 100,
+  "ledgerRows": 100,
+  "drainTimedOut": false,
+  "byState": {
+    "succeeded": 100
+  },
+  "counts": {
+    "ok": 100,
+    "DUPLICATE": 0,
+    "MISSING_COMMIT": 0,
+    "UNRECORDED_COMMIT": 0,
+    "MISMATCH": 0,
+    "LOST": 0,
+    "PENDING": 0,
+    "ORPHAN": 0
+  },
+  "findings": [
+    {
+      "jobId": "4c0d514d-1302-4848-9232-6f4ba8b2d4cf",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-4c0d514d-1302-4848-9232-6f4ba8b2d4cf",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000001"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000001), confirmationRef matches"
+    },
+    {
+      "jobId": "4975913a-6bed-4e16-8ac7-976e60ff5574",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-4975913a-6bed-4e16-8ac7-976e60ff5574",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000002"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000002), confirmationRef matches"
+    },
+    {
+      "jobId": "6d618bbb-e955-4f75-bf02-00ab2c9ba1c2",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-6d618bbb-e955-4f75-bf02-00ab2c9ba1c2",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000003"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000003), confirmationRef matches"
+    },
+    {
+      "jobId": "ffce54ff-5273-4486-9222-ca8835202e6e",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-ffce54ff-5273-4486-9222-ca8835202e6e",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000005"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000005), confirmationRef matches"
+    },
+    {
+      "jobId": "b4f02588-14da-475c-b7dd-9426a5ae1c29",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-b4f02588-14da-475c-b7dd-9426a5ae1c29",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000004"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000004), confirmationRef matches"
+    },
+    {
+      "jobId": "2173141a-211d-4832-90f3-c77acc7beeec",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-2173141a-211d-4832-90f3-c77acc7beeec",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000007"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000007), confirmationRef matches"
+    },
+    {
+      "jobId": "64948514-080b-4c80-9f08-6e6c62f5e83b",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-64948514-080b-4c80-9f08-6e6c62f5e83b",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000006"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000006), confirmationRef matches"
+    },
+    {
+      "jobId": "85bd12b5-9a4d-48e0-a5d0-445b1cd6fc52",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-85bd12b5-9a4d-48e0-a5d0-445b1cd6fc52",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000008"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000008), confirmationRef matches"
+    },
+    {
+      "jobId": "04422585-3a52-4d46-80ee-e93623749464",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-04422585-3a52-4d46-80ee-e93623749464",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000009"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000009), confirmationRef matches"
+    },
+    {
+      "jobId": "f2980ab9-d524-411b-97b1-ac497f3856b1",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-f2980ab9-d524-411b-97b1-ac497f3856b1",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000010"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000010), confirmationRef matches"
+    },
+    {
+      "jobId": "cc839764-c224-4d21-9bfd-f21f28cbf1df",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-cc839764-c224-4d21-9bfd-f21f28cbf1df",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000011"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000011), confirmationRef matches"
+    },
+    {
+      "jobId": "dfa81510-52c9-4ef3-a1e3-edb0d963bd41",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-dfa81510-52c9-4ef3-a1e3-edb0d963bd41",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000012"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000012), confirmationRef matches"
+    },
+    {
+      "jobId": "3c72668a-2a64-4aa5-b020-1c3a63bf3fec",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-3c72668a-2a64-4aa5-b020-1c3a63bf3fec",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000013"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000013), confirmationRef matches"
+    },
+    {
+      "jobId": "b0927bca-aa0a-4095-9d94-33a9fb087dd8",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-b0927bca-aa0a-4095-9d94-33a9fb087dd8",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000014"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000014), confirmationRef matches"
+    },
+    {
+      "jobId": "add093a5-d790-459f-90aa-0da09ce5967d",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-add093a5-d790-459f-90aa-0da09ce5967d",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000015"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000015), confirmationRef matches"
+    },
+    {
+      "jobId": "83608639-6a40-4af9-a345-cd851fca1c3d",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-83608639-6a40-4af9-a345-cd851fca1c3d",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000016"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000016), confirmationRef matches"
+    },
+    {
+      "jobId": "69e90341-3e4e-4d1e-9f7d-533dafee7ba2",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-69e90341-3e4e-4d1e-9f7d-533dafee7ba2",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000037"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000037), confirmationRef matches"
+    },
+    {
+      "jobId": "8bc3d261-5ac7-4776-ba08-c3314f5cd767",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-8bc3d261-5ac7-4776-ba08-c3314f5cd767",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000028"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000028), confirmationRef matches"
+    },
+    {
+      "jobId": "0dab783b-5ecd-45ce-bd06-8580e778b111",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-0dab783b-5ecd-45ce-bd06-8580e778b111",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000038"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000038), confirmationRef matches"
+    },
+    {
+      "jobId": "1d31dd30-1c8c-41be-929f-95f102a3b195",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-1d31dd30-1c8c-41be-929f-95f102a3b195",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000039"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000039), confirmationRef matches"
+    },
+    {
+      "jobId": "18394849-11da-4d44-93f3-c84bbbb0a445",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-18394849-11da-4d44-93f3-c84bbbb0a445",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000030"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000030), confirmationRef matches"
+    },
+    {
+      "jobId": "60226d12-188c-48f9-a38f-134d7cf674d3",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-60226d12-188c-48f9-a38f-134d7cf674d3",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000033"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000033), confirmationRef matches"
+    },
+    {
+      "jobId": "8d76c636-bde3-4c23-9e94-b689e90747ec",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-8d76c636-bde3-4c23-9e94-b689e90747ec",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000041"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000041), confirmationRef matches"
+    },
+    {
+      "jobId": "eab89472-fe29-4f40-86cf-7eb3627bb53c",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-eab89472-fe29-4f40-86cf-7eb3627bb53c",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000035"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000035), confirmationRef matches"
+    },
+    {
+      "jobId": "04b2f17a-8de9-4f2d-b0e4-c4e849b8cf4d",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-04b2f17a-8de9-4f2d-b0e4-c4e849b8cf4d",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000032"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000032), confirmationRef matches"
+    },
+    {
+      "jobId": "09cc4bae-73e0-48e5-a27e-d715d16a5c4c",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-09cc4bae-73e0-48e5-a27e-d715d16a5c4c",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000029"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000029), confirmationRef matches"
+    },
+    {
+      "jobId": "b2c05497-fe95-4a71-9c04-0ef1b2c1ead1",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-b2c05497-fe95-4a71-9c04-0ef1b2c1ead1",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000034"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000034), confirmationRef matches"
+    },
+    {
+      "jobId": "95666244-ce58-49ad-ba32-23cbe65d68f3",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-95666244-ce58-49ad-ba32-23cbe65d68f3",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000036"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000036), confirmationRef matches"
+    },
+    {
+      "jobId": "63ddeb20-1dd1-47a9-9b25-62c3f7419a00",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-63ddeb20-1dd1-47a9-9b25-62c3f7419a00",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000043"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000043), confirmationRef matches"
+    },
+    {
+      "jobId": "ecee8618-632c-46e5-b550-4170254da9d7",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-ecee8618-632c-46e5-b550-4170254da9d7",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000040"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000040), confirmationRef matches"
+    },
+    {
+      "jobId": "46cf7487-7c87-4a0c-afa1-c4f91a37004c",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-46cf7487-7c87-4a0c-afa1-c4f91a37004c",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000042"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000042), confirmationRef matches"
+    },
+    {
+      "jobId": "2c7ea852-a810-4c04-bf7c-a38451bcefb9",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-2c7ea852-a810-4c04-bf7c-a38451bcefb9",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000031"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000031), confirmationRef matches"
+    },
+    {
+      "jobId": "470f2d18-d587-4459-95ce-9d161ef5da0d",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-470f2d18-d587-4459-95ce-9d161ef5da0d",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000045"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000045), confirmationRef matches"
+    },
+    {
+      "jobId": "89e8d2f6-b4b5-4a0a-a6dd-7e3e97ef2dc5",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-89e8d2f6-b4b5-4a0a-a6dd-7e3e97ef2dc5",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000044"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000044), confirmationRef matches"
+    },
+    {
+      "jobId": "169fe8ff-346d-4fad-bce4-e26d11f8d6d4",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-169fe8ff-346d-4fad-bce4-e26d11f8d6d4",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000046"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000046), confirmationRef matches"
+    },
+    {
+      "jobId": "a95c7b85-5246-4f15-96ae-cadc896a7d64",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-a95c7b85-5246-4f15-96ae-cadc896a7d64",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000047"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000047), confirmationRef matches"
+    },
+    {
+      "jobId": "5e346426-6160-495e-aff9-226f8bc81ebb",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-5e346426-6160-495e-aff9-226f8bc81ebb",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000048"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000048), confirmationRef matches"
+    },
+    {
+      "jobId": "3b0da642-6bfe-4d34-b46c-3d2fb1bc4c81",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-3b0da642-6bfe-4d34-b46c-3d2fb1bc4c81",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000049"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000049), confirmationRef matches"
+    },
+    {
+      "jobId": "037da770-d444-456f-a2e8-eece67b39999",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-037da770-d444-456f-a2e8-eece67b39999",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000050"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000050), confirmationRef matches"
+    },
+    {
+      "jobId": "e3accbc0-97ac-424f-a160-fad44c8127ba",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-e3accbc0-97ac-424f-a160-fad44c8127ba",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000051"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000051), confirmationRef matches"
+    },
+    {
+      "jobId": "e92d7d5c-df98-43e1-a6b2-59cb4acc1d59",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-e92d7d5c-df98-43e1-a6b2-59cb4acc1d59",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000052"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000052), confirmationRef matches"
+    },
+    {
+      "jobId": "6ac9fd84-fcbe-4bf5-a055-becd3240c807",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-6ac9fd84-fcbe-4bf5-a055-becd3240c807",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000053"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000053), confirmationRef matches"
+    },
+    {
+      "jobId": "ebf83d1a-1c48-4e99-b729-62646aea52a1",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-ebf83d1a-1c48-4e99-b729-62646aea52a1",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000054"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000054), confirmationRef matches"
+    },
+    {
+      "jobId": "1c5fefbb-b52e-4bda-b785-1046ac85f684",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-1c5fefbb-b52e-4bda-b785-1046ac85f684",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000055"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000055), confirmationRef matches"
+    },
+    {
+      "jobId": "1363bc0b-da10-43ac-bf24-bfee756b9338",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-1363bc0b-da10-43ac-bf24-bfee756b9338",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000056"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000056), confirmationRef matches"
+    },
+    {
+      "jobId": "5623d82e-e0a2-46e6-bbbd-f1745568352d",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-5623d82e-e0a2-46e6-bbbd-f1745568352d",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000057"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000057), confirmationRef matches"
+    },
+    {
+      "jobId": "e8c2abe7-76e1-45b5-b607-1d7ae888a1f8",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-e8c2abe7-76e1-45b5-b607-1d7ae888a1f8",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000058"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000058), confirmationRef matches"
+    },
+    {
+      "jobId": "c0f84c66-b6da-433f-891c-9566396e063f",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-c0f84c66-b6da-433f-891c-9566396e063f",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000059"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000059), confirmationRef matches"
+    },
+    {
+      "jobId": "9cb2df51-122d-4ba2-827c-87eb42103c54",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-9cb2df51-122d-4ba2-827c-87eb42103c54",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000062"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000062), confirmationRef matches"
+    },
+    {
+      "jobId": "f763ffac-0c57-44c7-b4d4-0dfd85381a4f",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-f763ffac-0c57-44c7-b4d4-0dfd85381a4f",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000060"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000060), confirmationRef matches"
+    },
+    {
+      "jobId": "cd0e298c-b75a-4939-b24c-0540aec58879",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-cd0e298c-b75a-4939-b24c-0540aec58879",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000061"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000061), confirmationRef matches"
+    },
+    {
+      "jobId": "62aa8ee2-d261-4a6b-a8d6-0e4197192610",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-62aa8ee2-d261-4a6b-a8d6-0e4197192610",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000063"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000063), confirmationRef matches"
+    },
+    {
+      "jobId": "be38e431-be45-4c41-9ad6-dc99d8afd876",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-be38e431-be45-4c41-9ad6-dc99d8afd876",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000064"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000064), confirmationRef matches"
+    },
+    {
+      "jobId": "015ea2be-a7b3-4104-88d9-6f9a98468bf5",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-015ea2be-a7b3-4104-88d9-6f9a98468bf5",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000065"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000065), confirmationRef matches"
+    },
+    {
+      "jobId": "1d1ed53f-9179-4530-ba2a-33eebf9234f0",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-1d1ed53f-9179-4530-ba2a-33eebf9234f0",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000066"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000066), confirmationRef matches"
+    },
+    {
+      "jobId": "faac8fdb-ea18-43d9-a324-38ce8eac83c7",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 3,
+      "memoKey": "rote-faac8fdb-ea18-43d9-a324-38ce8eac83c7",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000067"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000067), confirmationRef matches"
+    },
+    {
+      "jobId": "1bc23ea8-5627-4274-ab4a-d45131db24f4",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-1bc23ea8-5627-4274-ab4a-d45131db24f4",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000021"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000021), confirmationRef matches"
+    },
+    {
+      "jobId": "4e95cd10-74c1-4d1f-9c40-6b6df390bfe1",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-4e95cd10-74c1-4d1f-9c40-6b6df390bfe1",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000025"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000025), confirmationRef matches"
+    },
+    {
+      "jobId": "e53bf732-1cc7-44f9-a4bb-23263a207068",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-e53bf732-1cc7-44f9-a4bb-23263a207068",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000024"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000024), confirmationRef matches"
+    },
+    {
+      "jobId": "49efcbd8-76a4-40f6-8c9e-1fd3564beb3f",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-49efcbd8-76a4-40f6-8c9e-1fd3564beb3f",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000026"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000026), confirmationRef matches"
+    },
+    {
+      "jobId": "4735123f-ca01-43ef-8707-871fa39c0a2b",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-4735123f-ca01-43ef-8707-871fa39c0a2b",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000027"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000027), confirmationRef matches"
+    },
+    {
+      "jobId": "b401fa2a-83cb-438b-ae1f-ab6d01de630f",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-b401fa2a-83cb-438b-ae1f-ab6d01de630f",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000068"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000068), confirmationRef matches"
+    },
+    {
+      "jobId": "2062dd3a-6420-42c6-ac3f-41e37e0927f9",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-2062dd3a-6420-42c6-ac3f-41e37e0927f9",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000070"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000070), confirmationRef matches"
+    },
+    {
+      "jobId": "000b161c-d93d-472e-8b3e-4a0d84343a38",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-000b161c-d93d-472e-8b3e-4a0d84343a38",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000069"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000069), confirmationRef matches"
+    },
+    {
+      "jobId": "13de50ff-4c9e-413e-b165-28e3549d7d68",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-13de50ff-4c9e-413e-b165-28e3549d7d68",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000071"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000071), confirmationRef matches"
+    },
+    {
+      "jobId": "834f35c2-e2d3-46be-bc5f-dd7bfa3b586a",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-834f35c2-e2d3-46be-bc5f-dd7bfa3b586a",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000072"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000072), confirmationRef matches"
+    },
+    {
+      "jobId": "aef8a73f-3776-4375-8113-c730be300f60",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-aef8a73f-3776-4375-8113-c730be300f60",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000073"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000073), confirmationRef matches"
+    },
+    {
+      "jobId": "fa320a36-5ec4-4a99-9b4b-02de395953c6",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-fa320a36-5ec4-4a99-9b4b-02de395953c6",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000074"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000074), confirmationRef matches"
+    },
+    {
+      "jobId": "5ffcb182-1b2e-4d88-bb99-266f78ba8d30",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-5ffcb182-1b2e-4d88-bb99-266f78ba8d30",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000075"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000075), confirmationRef matches"
+    },
+    {
+      "jobId": "1c944e3b-0431-4cf0-8ba8-4d6eb072d23e",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-1c944e3b-0431-4cf0-8ba8-4d6eb072d23e",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000076"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000076), confirmationRef matches"
+    },
+    {
+      "jobId": "92b47975-add7-4a9e-808f-4ad908dcb485",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-92b47975-add7-4a9e-808f-4ad908dcb485",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000077"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000077), confirmationRef matches"
+    },
+    {
+      "jobId": "ed1395e5-3843-402f-a9ad-0a16e9a76228",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-ed1395e5-3843-402f-a9ad-0a16e9a76228",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000078"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000078), confirmationRef matches"
+    },
+    {
+      "jobId": "7de3d639-1712-463f-95cc-d00130a2d244",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-7de3d639-1712-463f-95cc-d00130a2d244",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000079"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000079), confirmationRef matches"
+    },
+    {
+      "jobId": "91edbf0a-7516-4591-86b7-648e77ed1ecd",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-91edbf0a-7516-4591-86b7-648e77ed1ecd",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000080"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000080), confirmationRef matches"
+    },
+    {
+      "jobId": "bedd1f98-8c51-4656-a72b-495057afe774",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-bedd1f98-8c51-4656-a72b-495057afe774",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000081"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000081), confirmationRef matches"
+    },
+    {
+      "jobId": "3434b816-5c9d-450b-be09-7e21105e0e2a",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-3434b816-5c9d-450b-be09-7e21105e0e2a",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000082"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000082), confirmationRef matches"
+    },
+    {
+      "jobId": "208a8c1c-c27f-4208-b107-e912e84cb140",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-208a8c1c-c27f-4208-b107-e912e84cb140",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000083"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000083), confirmationRef matches"
+    },
+    {
+      "jobId": "6e7caeeb-9212-4012-824c-b51dd0917188",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-6e7caeeb-9212-4012-824c-b51dd0917188",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000017"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000017), confirmationRef matches"
+    },
+    {
+      "jobId": "c7716e9c-7ab7-4998-a750-91a62cc28331",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-c7716e9c-7ab7-4998-a750-91a62cc28331",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000018"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000018), confirmationRef matches"
+    },
+    {
+      "jobId": "6b689322-0a99-4f6f-bf40-4956ff2acb5a",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-6b689322-0a99-4f6f-bf40-4956ff2acb5a",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000019"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000019), confirmationRef matches"
+    },
+    {
+      "jobId": "f9459a70-49ef-4635-9c16-f80fa2b30d0b",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-f9459a70-49ef-4635-9c16-f80fa2b30d0b",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000020"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000020), confirmationRef matches"
+    },
+    {
+      "jobId": "8279ec91-4f45-4821-b8d1-80f8d0cd34ad",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-8279ec91-4f45-4821-b8d1-80f8d0cd34ad",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000022"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000022), confirmationRef matches"
+    },
+    {
+      "jobId": "3ffeb0e0-cb60-4ea1-a5c1-62fe1dcc8440",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-3ffeb0e0-cb60-4ea1-a5c1-62fe1dcc8440",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000023"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000023), confirmationRef matches"
+    },
+    {
+      "jobId": "cd72d929-3d50-4c00-a848-7dd076a53624",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-cd72d929-3d50-4c00-a848-7dd076a53624",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000084"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000084), confirmationRef matches"
+    },
+    {
+      "jobId": "17440f4f-e1a1-4c2c-a738-3b4262da30bb",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-17440f4f-e1a1-4c2c-a738-3b4262da30bb",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000085"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000085), confirmationRef matches"
+    },
+    {
+      "jobId": "b9ed6cd9-cd85-46e8-a1e3-8bba71932eba",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-b9ed6cd9-cd85-46e8-a1e3-8bba71932eba",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000086"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000086), confirmationRef matches"
+    },
+    {
+      "jobId": "1139e027-c570-48db-bdaa-39914608a3fe",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-1139e027-c570-48db-bdaa-39914608a3fe",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000087"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000087), confirmationRef matches"
+    },
+    {
+      "jobId": "e0fdf7d6-73c0-49ee-85a8-28abb14a67fa",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-e0fdf7d6-73c0-49ee-85a8-28abb14a67fa",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000088"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000088), confirmationRef matches"
+    },
+    {
+      "jobId": "76375fd0-0fa4-4d96-ae2c-a0558a812fa2",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-76375fd0-0fa4-4d96-ae2c-a0558a812fa2",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000089"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000089), confirmationRef matches"
+    },
+    {
+      "jobId": "9ed25988-6bc6-47f5-9b5e-69a7910c5096",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-9ed25988-6bc6-47f5-9b5e-69a7910c5096",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000090"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000090), confirmationRef matches"
+    },
+    {
+      "jobId": "5db10f2a-410c-47e9-8efb-e354ad109bb8",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-5db10f2a-410c-47e9-8efb-e354ad109bb8",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000091"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000091), confirmationRef matches"
+    },
+    {
+      "jobId": "239fc5ae-d764-4a73-8e77-eca491833fa2",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-239fc5ae-d764-4a73-8e77-eca491833fa2",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000092"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000092), confirmationRef matches"
+    },
+    {
+      "jobId": "d80c6656-f424-46b9-8b33-bf663a037241",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-d80c6656-f424-46b9-8b33-bf663a037241",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000093"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000093), confirmationRef matches"
+    },
+    {
+      "jobId": "2adf7d7a-54f8-47e9-8e43-6cdf2475d247",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-2adf7d7a-54f8-47e9-8e43-6cdf2475d247",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000094"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000094), confirmationRef matches"
+    },
+    {
+      "jobId": "19a54aa3-f4e2-4361-8dca-0dd870d157e2",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-19a54aa3-f4e2-4361-8dca-0dd870d157e2",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000095"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000095), confirmationRef matches"
+    },
+    {
+      "jobId": "cfdd01c2-a5f5-4497-b0e9-d2dabfe7d673",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-cfdd01c2-a5f5-4497-b0e9-d2dabfe7d673",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000096"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000096), confirmationRef matches"
+    },
+    {
+      "jobId": "0026e990-17bc-438c-975d-9b2eebb2a6af",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-0026e990-17bc-438c-975d-9b2eebb2a6af",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000097"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000097), confirmationRef matches"
+    },
+    {
+      "jobId": "6d84ad53-cd70-4829-a9e6-5049402f3d43",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-6d84ad53-cd70-4829-a9e6-5049402f3d43",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000098"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000098), confirmationRef matches"
+    },
+    {
+      "jobId": "12564e71-1f09-4695-a906-5caf3e3e8c5a",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-12564e71-1f09-4695-a906-5caf3e3e8c5a",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000099"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000099), confirmationRef matches"
+    },
+    {
+      "jobId": "b75b8dc6-ce65-42c6-b0fd-f715069b5f61",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-b75b8dc6-ce65-42c6-b0fd-f715069b5f61",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000100"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000100), confirmationRef matches"
+    }
+  ],
+  "orphans": [],
+  "pass": true
+}

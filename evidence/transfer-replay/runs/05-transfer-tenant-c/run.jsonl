@@ -1,0 +1,26 @@
+{"timestamp":"2026-11-09T23:39:10.362Z","turn":0,"kind":"drift","detail":{"stepId":"step-01","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:10.423Z","turn":0,"kind":"action","detail":{"stepId":"step-01","actionKind":"type","target":"User ID textbox","value":"[REDACTED]","intent":"Enter the operator username to log in."}}
+{"timestamp":"2026-11-09T23:39:10.439Z","turn":1,"kind":"drift","detail":{"stepId":"step-02","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:10.482Z","turn":1,"kind":"action","detail":{"stepId":"step-02","actionKind":"type","target":"Password textbox","value":"[REDACTED]","intent":"Enter the operator password to log in."}}
+{"timestamp":"2026-11-09T23:39:10.538Z","turn":2,"kind":"drift","detail":{"stepId":"step-03","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:10.606Z","turn":2,"kind":"action","detail":{"stepId":"step-03","actionKind":"click","target":"Log In button","intent":"Submit credentials to enter the back office."}}
+{"timestamp":"2026-11-09T23:39:10.623Z","turn":3,"kind":"drift","detail":{"stepId":"step-04","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:10.666Z","turn":3,"kind":"action","detail":{"stepId":"step-04","actionKind":"type","target":"Member ID textbox","value":"10001","intent":"Enter the source member's ID in Member Lookup."}}
+{"timestamp":"2026-11-09T23:39:10.719Z","turn":4,"kind":"drift","detail":{"stepId":"step-05","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:10.782Z","turn":4,"kind":"action","detail":{"stepId":"step-05","actionKind":"click","target":"Search button","intent":"Search for the member to open their record."}}
+{"timestamp":"2026-11-09T23:39:10.834Z","turn":5,"kind":"drift","detail":{"stepId":"step-06","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:10.906Z","turn":5,"kind":"action","detail":{"stepId":"step-06","actionKind":"click","target":"Transfer button","intent":"Open the transfer form for this member."}}
+{"timestamp":"2026-11-09T23:39:10.928Z","turn":6,"kind":"drift","detail":{"stepId":"step-07","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:10.970Z","turn":6,"kind":"action","detail":{"stepId":"step-07","actionKind":"type","target":"To Member ID textbox","value":"10002","intent":"Enter the recipient's member ID."}}
+{"timestamp":"2026-11-09T23:39:10.984Z","turn":7,"kind":"drift","detail":{"stepId":"step-08","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:11.019Z","turn":7,"kind":"action","detail":{"stepId":"step-08","actionKind":"type","target":"Amount textbox","value":"12.34","intent":"Enter the amount to transfer."}}
+{"timestamp":"2026-11-09T23:39:11.043Z","turn":8,"kind":"drift","detail":{"stepId":"step-09","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:11.095Z","turn":8,"kind":"action","detail":{"stepId":"step-09","actionKind":"type","target":"Memo textbox","value":"rote-evidence-tenant-c","intent":"Enter the memo that identifies this transfer in the history."}}
+{"timestamp":"2026-11-09T23:39:11.172Z","turn":9,"kind":"drift","detail":{"stepId":"step-10","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:11.287Z","turn":9,"kind":"action","detail":{"stepId":"step-10","actionKind":"click","target":"Continue button","intent":"Continue to the confirmation screen; the bank validates the transfer here."}}
+{"timestamp":"2026-11-09T23:39:11.288Z","turn":10,"kind":"risk_approved","detail":{"stepId":"step-11","reason":"Click target \"Submit\" matches a risky/irreversible action pattern."}}
+{"timestamp":"2026-11-09T23:39:11.353Z","turn":10,"kind":"drift","detail":{"stepId":"step-11","expectedStrategy":"roleName","actualStrategy":"textAnchor"}}
+{"timestamp":"2026-11-09T23:39:11.425Z","turn":10,"kind":"action","detail":{"stepId":"step-11","actionKind":"click","target":"Submit button","intent":"Submit the transfer. Irreversible: the bank records it in its ledger."}}
+{"timestamp":"2026-11-09T23:39:11.431Z","turn":11,"kind":"drift","detail":{"stepId":"step-12","expectedStrategy":"tableCell","actualStrategy":"css"}}
+{"timestamp":"2026-11-09T23:39:11.470Z","turn":11,"kind":"action","detail":{"stepId":"step-12","actionKind":"readText","target":"Transfer reference value","intent":"Read the bank's reference for the submitted transfer."}}
+{"timestamp":"2026-11-09T23:39:11.501Z","turn":-1,"kind":"result","detail":{"status":"success","confidence":0}}

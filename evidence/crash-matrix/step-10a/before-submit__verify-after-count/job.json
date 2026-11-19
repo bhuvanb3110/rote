@@ -1,0 +1,37 @@
+[
+  {
+    "id": "7220ce58-1a9a-46d3-9ab0-c13699177f79",
+    "idempotency_key": "crash-before-submit>verify-after-count",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 2,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 5,
+    "trace_id": "001895188e59a83f7e775433736338a6",
+    "commit_intent_at": "2026-11-14T16:42:17.619Z",
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000001"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/crash-matrix/step-10a/before-submit__verify-after-count/worker-evidence/transfer-2026-11-14T16-42-16-479Z-dcf5e5aa/run.jsonl"
+    },
+    "memo_key": "rote-7220ce58-1a9a-46d3-9ab0-c13699177f79",
+    "created_at": "2026-11-14T16:41:54.230Z",
+    "updated_at": "2026-11-14T16:42:34.497Z",
+    "not_before": null,
+    "reconcile_after": "2026-11-14T16:42:32.912Z",
+    "reconciled_at": "2026-11-14T16:42:34.497Z"
+  }
+]

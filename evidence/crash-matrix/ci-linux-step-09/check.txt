@@ -1,0 +1,215 @@
+Crash-point matrix, started 2026-11-14T08:03:26.016Z
+scenarios: after-dequeue, after-step-01, after-step-02, after-step-03, after-step-04, after-step-05, after-step-06, after-step-07, after-step-08, after-step-09, after-step-10, before-submit, after-submit, after-step-12, before-complete, after-complete, after-submit>verify-after-login, after-submit>verify-after-count, after-submit>verify-before-result, before-submit>verify-after-count, before-submit>verify-before-requeue, before-submit>verify-after-requeue, after-dequeue>recover-in-transaction
+expectations: step-09 (src/chaos/crashExpected.ts)
+tenant: tenant-a; lease: 5 s; heartbeat: 2 s; verify settle: the worker default (5 s); drain timeout per scenario: 60000 ms; workers: child processes (node --import tsx src/worker/main.ts)
+
+== after-dequeue: after-dequeue: fired (signal SIGKILL); drain ended after 6251 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-01: after-step-01: fired (signal SIGKILL); drain ended after 6242 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-02: after-step-02: fired (signal SIGKILL); drain ended after 7251 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-03: after-step-03: fired (signal SIGKILL); drain ended after 7252 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-04: after-step-04: fired (signal SIGKILL); drain ended after 7247 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-05: after-step-05: fired (signal SIGKILL); drain ended after 7248 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-06: after-step-06: fired (signal SIGKILL); drain ended after 6252 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-07: after-step-07: fired (signal SIGKILL); drain ended after 7244 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-08: after-step-08: fired (signal SIGKILL); drain ended after 7244 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-09: after-step-09: fired (signal SIGKILL); drain ended after 7248 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-10: after-step-10: fired (signal SIGKILL); drain ended after 6248 ms
+verify phases: -
+expected (step-09): requeued (T6.1), attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== before-submit: before-submit: fired (signal SIGKILL); drain ended after 13269 ms
+verify phases: resubmitted[0,0]
+expected (step-09): T6.4 verify [0, 0] -> resubmitted -> attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-submit: after-submit: fired (signal SIGKILL); drain ended after 6243 ms
+verify phases: already_done[1]
+expected (step-09): T6.4 verify [1] -> succeeded / already_done, attempt 1, 1 row; got succeeded/already_done, attempt 1, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-step-12: after-step-12: fired (signal SIGKILL); drain ended after 7245 ms
+verify phases: already_done[1]
+expected (step-09): T6.4 verify [1] -> succeeded / already_done, attempt 1, 1 row; got succeeded/already_done, attempt 1, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== before-complete: before-complete: fired (signal SIGKILL); drain ended after 6245 ms
+verify phases: already_done[1]
+expected (step-09): T6.4 verify [1] -> succeeded / already_done, attempt 1, 1 row; got succeeded/already_done, attempt 1, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-complete: after-complete: fired (signal SIGKILL); drain ended after 206 ms
+verify phases: -
+expected (step-09): succeeded before the kill, 1 row; got succeeded/success, attempt 1, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-submit>verify-after-login: after-submit: fired; verify-after-login: fired (signal SIGKILL; then signal SIGKILL); drain ended after 6245 ms
+verify phases: crashed, already_done[1]
+expected (step-09): re-verify (T6.5) [1] -> succeeded / already_done, 1 row; got succeeded/already_done, attempt 1, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-submit>verify-after-count: after-submit: fired; verify-after-count: fired (signal SIGKILL; then signal SIGKILL); drain ended after 7245 ms
+verify phases: crashed, already_done[1]
+expected (step-09): re-verify (T6.5) [1] -> succeeded / already_done, 1 row; got succeeded/already_done, attempt 1, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-submit>verify-before-result: after-submit: fired; verify-before-result: fired (signal SIGKILL; then signal SIGKILL); drain ended after 5239 ms
+verify phases: crashed, already_done[1]
+expected (step-09): re-verify (T6.5) [1] -> succeeded / already_done, 1 row; got succeeded/already_done, attempt 1, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== before-submit>verify-after-count: before-submit: fired; verify-after-count: fired (signal SIGKILL; then signal SIGKILL); drain ended after 13259 ms
+verify phases: crashed, resubmitted[0,0]
+expected (step-09): re-verify (T6.5) [0, 0] -> requeued -> attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== before-submit>verify-before-requeue: before-submit: fired; verify-before-requeue: fired (signal SIGKILL; then signal SIGKILL); drain ended after 13264 ms
+verify phases: crashed, resubmitted[0,0]
+expected (step-09): re-verify (T6.5) -> requeued -> attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== before-submit>verify-after-requeue: before-submit: fired; verify-after-requeue: fired (signal SIGKILL; then signal SIGKILL); drain ended after 2236 ms
+verify phases: resubmitted[0,0]
+expected (step-09): already requeued; dequeued normally -> attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+== after-dequeue>recover-in-transaction: after-dequeue: fired; recover-in-transaction: fired (signal SIGKILL; then signal SIGKILL); drain ended after 2238 ms
+verify phases: -
+expected (step-09): rollback releases the lock; another recoverer requeues (T6.1) -> attempt 2 succeeded, 1 row; got succeeded/success, attempt 2, 1 row(s): ok
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 1; ledger rows: 1; drain timed out: no
+job states: succeeded=1
+verdicts: ok=1, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS
+
+green: 23/23
+RESULT: PASS

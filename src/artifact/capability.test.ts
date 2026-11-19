@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CURRENT_SCHEMA_VERSION, CapabilitySchema, type Capability } from "./schema.js";
 import { deserializeCapability, serializeCapability } from "./serialize.js";
-import { ReplayResultSchema, type ReplayResult } from "./replayResult.js";
+import { ReplayResultSchema, commitUncertainWarning, type ReplayResult } from "./replayResult.js";
 
 // Hand-written example: look up member 10001 and read their current savings balance. Mirrors
 // the mock-app routes/markup exercised in src/surface/locate.test.ts.
@@ -210,5 +210,41 @@ describe("ReplayResult", () => {
     } else {
       throw new Error("expected failure to narrow");
     }
+  });
+});
+
+describe("ReplayResult.commitUncertain (docs/DECISIONS.md D10)", () => {
+  const marker = { irreversibleStepId: "step-11", detail: "failure (unexpected-state) after the attempt" };
+  const nonSuccess: ReplayResult[] = [
+    { status: "business_outcome", code: "INSUFFICIENT_FUNDS", detail: "x", evidenceRef: "evidence://r" },
+    { status: "needs_human", reason: "x", atStepId: "step-11", contextRef: "evidence://r" },
+    { status: "failure", atStepId: "step-12", expected: "x", observed: "y", category: "unknown", evidenceRef: "evidence://r" },
+  ];
+
+  it("every non-success member parses with and without the field", () => {
+    for (const result of nonSuccess) {
+      expect(ReplayResultSchema.parse(result)).toEqual(result);
+      const marked = { ...result, commitUncertain: marker };
+      expect(ReplayResultSchema.parse(marked)).toEqual(marked);
+      expect(commitUncertainWarning(result)).toBeNull();
+      expect(commitUncertainWarning(ReplayResultSchema.parse(marked))).toBe(
+        "commit may have happened at step-11 -- verify before retrying (failure (unexpected-state) after the attempt)",
+      );
+    }
+  });
+
+  it("the field is not part of success: Zod strips it, so it can never reach a caller", () => {
+    const parsed = ReplayResultSchema.parse({
+      status: "success",
+      outputs: {},
+      evidenceRef: "evidence://r",
+      commitUncertain: marker,
+    });
+    expect(parsed).not.toHaveProperty("commitUncertain");
+    expect(commitUncertainWarning(parsed)).toBeNull();
+  });
+
+  it("a malformed marker is rejected", () => {
+    expect(() => ReplayResultSchema.parse({ ...nonSuccess[2], commitUncertain: { irreversibleStepId: "" } })).toThrow();
   });
 });

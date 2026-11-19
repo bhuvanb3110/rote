@@ -1,0 +1,6 @@
+artifact versions: transfer 1.1.0, transfer-history-lookup 1.1.0
+mode: PRE-APPROVAL: approveUnattended on every run, throwaway statusDir (committed status/ neither read by the gate nor written)
+
+checkApproval from the committed status/ files, before the run:
+  transfer 1.1.0: allowed=false -- Capability "transfer" was approved for 1.0.0, artifact is 1.1.0; re-approve (see "catalog approve") before unattended replay.
+  transfer-history-lookup 1.1.0: allowed=false -- Capability "transfer-history-lookup" was approved for 1.0.0, artifact is 1.1.0; re-approve (see "catalog approve") before unattended replay.

@@ -1,0 +1,85 @@
+// Zod schemas for queue rows: rows coming back from Postgres are PARSED, never cast (CLAUDE.md:
+// schema-first, one definition = type + runtime validator). Column names stay snake_case, exactly
+// as in db/migrations/0001_init.sql, so the SQL and the types read the same.
+import { z } from "zod";
+
+export const JOB_STATES = [
+  "queued",
+  "running",
+  "committing",
+  "verifying",
+  "succeeded",
+  "business_outcome",
+  "failed",
+  "needs_human",
+] as const;
+export const JobStateSchema = z.enum(JOB_STATES);
+export type JobState = z.infer<typeof JobStateSchema>;
+
+/** States that hold a lease and count toward the tenant's max_concurrent (reviewer decision 4). */
+export const ACTIVE_STATES = ["running", "committing", "verifying"] as const satisfies readonly JobState[];
+/** No further transitions. business_outcome is terminal: a bank refusal is final, never retried (D21). */
+export const TERMINAL_STATES = ["succeeded", "business_outcome", "failed", "needs_human"] as const satisfies readonly JobState[];
+
+/** The crash cap's default, jobs.max_crashes DEFAULT 5 (0006, D57, D58): the 5th worker death on a job fails or escalates it / crash_limit. */
+export const DEFAULT_MAX_CRASHES = 5;
+
+export const JobRowSchema = z.object({
+  id: z.uuid(),
+  idempotency_key: z.string().min(1).max(255),
+  request_hash: z.string().regex(/^[0-9a-f]{64}$/),
+  tenant_id: z.string().min(1),
+  capability_id: z.string().min(1),
+  params: z.record(z.string(), z.unknown()),
+  state: JobStateSchema,
+  attempt: z.number().int().nonnegative(),
+  max_attempts: z.number().int().min(1),
+  lease_owner: z.string().nullable(),
+  lease_expires_at: z.date().nullable(),
+  fencing_token: z.number().int().nonnegative(),
+  trace_id: z.string().regex(/^[0-9a-f]{32}$/),
+  commit_intent_at: z.date().nullable(),
+  outcome: z.string().nullable(),
+  error: z.string().nullable(),
+  result: z.unknown().nullable(),
+  memo_key: z.string().length(41),
+  created_at: z.date(),
+  updated_at: z.date(),
+  /** 0004 (D49): a queued job is not dequeued before this (the requeue backoff); NULL = at once. */
+  not_before: z.date().nullable(),
+  /** 0004 (D50): set when a job succeeds after a resubmit; the reconcile pass re-reads it from then. */
+  reconcile_after: z.date().nullable(),
+  /** 0004 (D50): when the reconcile pass decided (reconciled, duplicate_suspected or reconcile_unreadable). */
+  reconciled_at: z.date().nullable(),
+  /**
+   * 0006, 0007 (D57, D58): every worker death on the job (a lease that expired in running, committing or a
+   * dying verify phase): ONE budget. At max_crashes the job fails / crash_limit before any intent (T6.2), or
+   * goes to needs_human / crash_limit after one (T6.6).
+   */
+  crashes: z.number().int().nonnegative(),
+  max_crashes: z.number().int().min(1),
+  /** 0007 (D58): the deaths before the intent only (T6.1 / T6.2): not own attempts, so own = attempt - lease_crashes. */
+  lease_crashes: z.number().int().nonnegative(),
+  /** 0008 (D59): reconcilers that died on this (terminal) job: counted apart from `crashes`, capped by max_crashes. */
+  reconcile_crashes: z.number().int().nonnegative(),
+  /** 0008 (D59): the workers' reconcile pass gave up at the cap (R3); `rote reconcile --since` still re-reads the job. */
+  reconcile_abandoned_at: z.date().nullable(),
+});
+export type JobRow = z.infer<typeof JobRowSchema>;
+
+export const AttemptRowSchema = z.object({
+  id: z.number().int().positive(),
+  job_id: z.uuid(),
+  attempt: z.number().int().min(1),
+  worker_id: z.string().min(1),
+  fencing_token: z.number().int().min(1),
+  started_at: z.date(),
+  ended_at: z.date().nullable(),
+  outcome: z.string().nullable(),
+  commit_uncertain: z.boolean(),
+  trace_id: z.string().nullable(),
+  /** 0002_day2: when this attempt's commit intent (T3) was written; null if it never was. */
+  commit_intent_at: z.date().nullable(),
+  error: z.string().nullable(),
+});
+export type AttemptRow = z.infer<typeof AttemptRowSchema>;

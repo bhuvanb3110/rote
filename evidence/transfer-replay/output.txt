@@ -1,0 +1,25 @@
+# transfer + transfer-history-lookup on 3 tenants, 2026-11-09T23:39:04.782Z
+# bank http://localhost:4100, ledger reset; approval from status/ (no approveUnattended); approveRisky for transfer only
+tenant-a transfer {"memberId":"10001","toMemberId":"10002","amount":"12.34","memo":"rote-evidence-tenant-a"} -> {"status":"success","outputs":{"confirmationRef":"TXN-000001"},"evidenceRef":"evidence://evidence/transfer-replay/runs/01-transfer-tenant-a/run.jsonl"}
+tenant-a lookup {"memberId":"10001","memo":"rote-evidence-tenant-a"} -> {"status":"success","outputs":{"matchingCount":"1"},"evidenceRef":"evidence://evidence/transfer-replay/runs/02-lookup-tenant-a/run.jsonl"}
+tenant-b transfer {"memberId":"10001","toMemberId":"10002","amount":"12.34","memo":"rote-evidence-tenant-b"} -> {"status":"success","outputs":{"confirmationRef":"TXN-000002"},"evidenceRef":"evidence://evidence/transfer-replay/runs/03-transfer-tenant-b/run.jsonl"}
+tenant-b lookup {"memberId":"10001","memo":"rote-evidence-tenant-b"} -> {"status":"success","outputs":{"matchingCount":"1"},"evidenceRef":"evidence://evidence/transfer-replay/runs/04-lookup-tenant-b/run.jsonl"}
+tenant-c transfer {"memberId":"10001","toMemberId":"10002","amount":"12.34","memo":"rote-evidence-tenant-c"} -> {"status":"success","outputs":{"confirmationRef":"TXN-000003"},"evidenceRef":"evidence://evidence/transfer-replay/runs/05-transfer-tenant-c/run.jsonl"}
+tenant-c lookup {"memberId":"10001","memo":"rote-evidence-tenant-c"} -> {"status":"success","outputs":{"matchingCount":"1"},"evidenceRef":"evidence://evidence/transfer-replay/runs/06-lookup-tenant-c/run.jsonl"}
+
+PASS  ledger has exactly 3 rows (got 3)
+PASS  no duplicate memo in the ledger
+PASS  tenant-a: transfer status is success (got success)
+PASS  tenant-a: exactly one ledger row with memo "rote-evidence-tenant-a" (got 1)
+PASS  tenant-a: confirmationRef TXN-000001 == ledger row id TXN-000001
+PASS  tenant-a: lookup status success and matchingCount "1" (got 1)
+PASS  tenant-b: transfer status is success (got success)
+PASS  tenant-b: exactly one ledger row with memo "rote-evidence-tenant-b" (got 1)
+PASS  tenant-b: confirmationRef TXN-000002 == ledger row id TXN-000002
+PASS  tenant-b: lookup status success and matchingCount "1" (got 1)
+PASS  tenant-c: transfer status is success (got success)
+PASS  tenant-c: exactly one ledger row with memo "rote-evidence-tenant-c" (got 1)
+PASS  tenant-c: confirmationRef TXN-000003 == ledger row id TXN-000003
+PASS  tenant-c: lookup status success and matchingCount "1" (got 1)
+
+RESULT: PASS

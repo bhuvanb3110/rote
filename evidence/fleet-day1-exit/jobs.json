@@ -1,0 +1,3202 @@
+[
+  {
+    "id": "d1a0ed1b-4425-4bef-92af-52f2ee3e5783",
+    "idempotency_key": "day1-exit-1794287169563-000",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "164df64f29c682c2dd3a92000895bcf8",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000001"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-34-483Z-4d81d4c9/run.jsonl"
+    },
+    "memo_key": "rote-d1a0ed1b-4425-4bef-92af-52f2ee3e5783",
+    "created_at": "2026-11-10T05:06:34.101Z",
+    "updated_at": "2026-11-10T05:06:42.229Z"
+  },
+  {
+    "id": "a99b61ad-091b-48a1-9e46-05040139728a",
+    "idempotency_key": "day1-exit-1794287169563-001",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "804e06a8ebdb51b64b7ed6e7e3a4db1d",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000002"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-34-784Z-adfde441/run.jsonl"
+    },
+    "memo_key": "rote-a99b61ad-091b-48a1-9e46-05040139728a",
+    "created_at": "2026-11-10T05:06:34.131Z",
+    "updated_at": "2026-11-10T05:06:42.646Z"
+  },
+  {
+    "id": "34203b29-68d4-430e-8d4f-7422416b6e9e",
+    "idempotency_key": "day1-exit-1794287169563-002",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "77ce4023d645926f66a3ab6338ee73bf",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000003"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-35-791Z-0702bff5/run.jsonl"
+    },
+    "memo_key": "rote-34203b29-68d4-430e-8d4f-7422416b6e9e",
+    "created_at": "2026-11-10T05:06:34.147Z",
+    "updated_at": "2026-11-10T05:06:43.256Z"
+  },
+  {
+    "id": "9f71a315-c8c3-4b59-b6cf-85ae59e8e1d4",
+    "idempotency_key": "day1-exit-1794287169563-003",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "0844dffc1c9ce1733f4e7ecf62270d53",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000004"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-35-958Z-3cf389eb/run.jsonl"
+    },
+    "memo_key": "rote-9f71a315-c8c3-4b59-b6cf-85ae59e8e1d4",
+    "created_at": "2026-11-10T05:06:34.163Z",
+    "updated_at": "2026-11-10T05:06:43.960Z"
+  },
+  {
+    "id": "ee0817f5-6736-4223-bb83-d70f87878525",
+    "idempotency_key": "day1-exit-1794287169563-004",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "9230f5976d1e816d8c5da0660216284b",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000005"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-42-358Z-ce2f38c8/run.jsonl"
+    },
+    "memo_key": "rote-ee0817f5-6736-4223-bb83-d70f87878525",
+    "created_at": "2026-11-10T05:06:34.177Z",
+    "updated_at": "2026-11-10T05:06:47.619Z"
+  },
+  {
+    "id": "529ad552-5e3b-4280-9a3a-b075ea7781a1",
+    "idempotency_key": "day1-exit-1794287169563-005",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "4f28ceecb40c170aefa4f067b2e4256b",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000006"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-42-735Z-d9f13f33/run.jsonl"
+    },
+    "memo_key": "rote-529ad552-5e3b-4280-9a3a-b075ea7781a1",
+    "created_at": "2026-11-10T05:06:34.188Z",
+    "updated_at": "2026-11-10T05:06:48.007Z"
+  },
+  {
+    "id": "f730a61f-a2fc-4a19-bbed-afd873a6ddd5",
+    "idempotency_key": "day1-exit-1794287169563-006",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "61b2e5f758ca8570ffc06df658d2eceb",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000007"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-43-413Z-4ed46338/run.jsonl"
+    },
+    "memo_key": "rote-f730a61f-a2fc-4a19-bbed-afd873a6ddd5",
+    "created_at": "2026-11-10T05:06:34.198Z",
+    "updated_at": "2026-11-10T05:06:48.144Z"
+  },
+  {
+    "id": "d71b3279-5180-4ed4-ae12-478e6bec3a53",
+    "idempotency_key": "day1-exit-1794287169563-007",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "0811c8dc13e96d5718f47f5b01daacc8",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000008"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-44-211Z-0033a89a/run.jsonl"
+    },
+    "memo_key": "rote-d71b3279-5180-4ed4-ae12-478e6bec3a53",
+    "created_at": "2026-11-10T05:06:34.208Z",
+    "updated_at": "2026-11-10T05:06:48.845Z"
+  },
+  {
+    "id": "8f415f9f-f55e-4e8e-91bf-ecd8a89b2ef7",
+    "idempotency_key": "day1-exit-1794287169563-008",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "d83476ceb4fdf6f27d495d284e2c668b",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000009"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-47-712Z-55f0bd34/run.jsonl"
+    },
+    "memo_key": "rote-8f415f9f-f55e-4e8e-91bf-ecd8a89b2ef7",
+    "created_at": "2026-11-10T05:06:34.219Z",
+    "updated_at": "2026-11-10T05:06:52.543Z"
+  },
+  {
+    "id": "d5156df6-f688-4da3-b641-e0f1092c7d67",
+    "idempotency_key": "day1-exit-1794287169563-009",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "cf3bbce3ead9f7953c6f00551f20aa10",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000010"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-48-036Z-f4fc8cd9/run.jsonl"
+    },
+    "memo_key": "rote-d5156df6-f688-4da3-b641-e0f1092c7d67",
+    "created_at": "2026-11-10T05:06:34.229Z",
+    "updated_at": "2026-11-10T05:06:52.614Z"
+  },
+  {
+    "id": "c5d43692-735a-45c5-8697-c4367394c729",
+    "idempotency_key": "day1-exit-1794287169563-010",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "b4a48d1820989a999f09de395cb00865",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000011"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-48-176Z-32ab6098/run.jsonl"
+    },
+    "memo_key": "rote-c5d43692-735a-45c5-8697-c4367394c729",
+    "created_at": "2026-11-10T05:06:34.238Z",
+    "updated_at": "2026-11-10T05:06:52.977Z"
+  },
+  {
+    "id": "f7b46cd5-3888-4b78-8ccf-69209191b7d5",
+    "idempotency_key": "day1-exit-1794287169563-011",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "de4d61bceab165145e1848d26951eec4",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000012"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-48-960Z-fc408a3e/run.jsonl"
+    },
+    "memo_key": "rote-f7b46cd5-3888-4b78-8ccf-69209191b7d5",
+    "created_at": "2026-11-10T05:06:34.248Z",
+    "updated_at": "2026-11-10T05:06:53.864Z"
+  },
+  {
+    "id": "6886730b-4746-4c7b-809f-3aaac5abcf76",
+    "idempotency_key": "day1-exit-1794287169563-012",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "899daa36c5dcc9ef396ac2e559002b27",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000013"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-52-666Z-36bc694f/run.jsonl"
+    },
+    "memo_key": "rote-6886730b-4746-4c7b-809f-3aaac5abcf76",
+    "created_at": "2026-11-10T05:06:34.257Z",
+    "updated_at": "2026-11-10T05:06:57.408Z"
+  },
+  {
+    "id": "8627eb5c-1338-4c4a-867b-20a4e846bc5a",
+    "idempotency_key": "day1-exit-1794287169563-013",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "a50fb88dca95471d8e2c8fdca9942f5d",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000014"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-52-677Z-c162222a/run.jsonl"
+    },
+    "memo_key": "rote-8627eb5c-1338-4c4a-867b-20a4e846bc5a",
+    "created_at": "2026-11-10T05:06:34.266Z",
+    "updated_at": "2026-11-10T05:06:57.567Z"
+  },
+  {
+    "id": "0f3b4f4c-558a-49ec-b01f-3d2456554429",
+    "idempotency_key": "day1-exit-1794287169563-014",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "bc418a879df22d6f629fd0286aee404f",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000015"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-53-046Z-3a8adf9d/run.jsonl"
+    },
+    "memo_key": "rote-0f3b4f4c-558a-49ec-b01f-3d2456554429",
+    "created_at": "2026-11-10T05:06:34.274Z",
+    "updated_at": "2026-11-10T05:06:57.698Z"
+  },
+  {
+    "id": "67a60850-47e8-4e70-aa08-9cfd3b153370",
+    "idempotency_key": "day1-exit-1794287169563-015",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "ce4b6e662ba2361852d554e926e77358",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000016"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-53-932Z-df80633b/run.jsonl"
+    },
+    "memo_key": "rote-67a60850-47e8-4e70-aa08-9cfd3b153370",
+    "created_at": "2026-11-10T05:06:34.283Z",
+    "updated_at": "2026-11-10T05:06:58.212Z"
+  },
+  {
+    "id": "ac1f7bd0-c0bd-4d81-939e-cb62e104c2c8",
+    "idempotency_key": "day1-exit-1794287169563-016",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "66649b7da840b482dedd495ec6ee5121",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000017"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-57-448Z-b15efda9/run.jsonl"
+    },
+    "memo_key": "rote-ac1f7bd0-c0bd-4d81-939e-cb62e104c2c8",
+    "created_at": "2026-11-10T05:06:34.293Z",
+    "updated_at": "2026-11-10T05:07:01.540Z"
+  },
+  {
+    "id": "99daad12-f8ca-46cb-8d64-c1ce204e88b5",
+    "idempotency_key": "day1-exit-1794287169563-017",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "97651a8e89912c177e85dd0368992510",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000018"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-57-600Z-76934485/run.jsonl"
+    },
+    "memo_key": "rote-99daad12-f8ca-46cb-8d64-c1ce204e88b5",
+    "created_at": "2026-11-10T05:06:34.302Z",
+    "updated_at": "2026-11-10T05:07:01.946Z"
+  },
+  {
+    "id": "3760c700-36db-4a1b-a114-5bbfab18f36b",
+    "idempotency_key": "day1-exit-1794287169563-018",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "6ba46de663e546b7e13a3b9b47bb8df6",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000019"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-57-732Z-287ed881/run.jsonl"
+    },
+    "memo_key": "rote-3760c700-36db-4a1b-a114-5bbfab18f36b",
+    "created_at": "2026-11-10T05:06:34.311Z",
+    "updated_at": "2026-11-10T05:07:02.050Z"
+  },
+  {
+    "id": "77b2fc9a-c05f-4572-ab02-98d5cd99272d",
+    "idempotency_key": "day1-exit-1794287169563-019",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "fc920ce5983cb0de7e39d7eb1ae899b1",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000020"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-06-58-475Z-9c468028/run.jsonl"
+    },
+    "memo_key": "rote-77b2fc9a-c05f-4572-ab02-98d5cd99272d",
+    "created_at": "2026-11-10T05:06:34.321Z",
+    "updated_at": "2026-11-10T05:07:02.502Z"
+  },
+  {
+    "id": "9ae9f343-557b-41c7-9d96-fe2ac5d04da5",
+    "idempotency_key": "day1-exit-1794287169563-020",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "310f2eda080da00d3193fb58c6b8986a",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000022"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-01-567Z-2d79a7dc/run.jsonl"
+    },
+    "memo_key": "rote-9ae9f343-557b-41c7-9d96-fe2ac5d04da5",
+    "created_at": "2026-11-10T05:06:34.331Z",
+    "updated_at": "2026-11-10T05:07:05.629Z"
+  },
+  {
+    "id": "90c48f55-c2a4-4501-98b3-2cb4fcc10c25",
+    "idempotency_key": "day1-exit-1794287169563-021",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "98437d466c14a395601e36ecc4371480",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000021"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-01-994Z-d6758528/run.jsonl"
+    },
+    "memo_key": "rote-90c48f55-c2a4-4501-98b3-2cb4fcc10c25",
+    "created_at": "2026-11-10T05:06:34.339Z",
+    "updated_at": "2026-11-10T05:07:05.467Z"
+  },
+  {
+    "id": "043133d7-fd8a-404e-b64a-89451235116a",
+    "idempotency_key": "day1-exit-1794287169563-022",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "1b6d2408273679725f2056f5c805d551",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000023"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-02-082Z-7a2fa557/run.jsonl"
+    },
+    "memo_key": "rote-043133d7-fd8a-404e-b64a-89451235116a",
+    "created_at": "2026-11-10T05:06:34.347Z",
+    "updated_at": "2026-11-10T05:07:05.666Z"
+  },
+  {
+    "id": "d2e89ca7-8216-4c3c-b687-2950695f4cf7",
+    "idempotency_key": "day1-exit-1794287169563-023",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "69d8e3300b12147e80e7ed1786c25f8e",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000024"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-02-528Z-ca24e5a8/run.jsonl"
+    },
+    "memo_key": "rote-d2e89ca7-8216-4c3c-b687-2950695f4cf7",
+    "created_at": "2026-11-10T05:06:34.357Z",
+    "updated_at": "2026-11-10T05:07:06.414Z"
+  },
+  {
+    "id": "6d2ea543-0990-47e8-b72a-688c74094f76",
+    "idempotency_key": "day1-exit-1794287169563-024",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "5a00abbbb7793382b9dac5ba5db9d9d1",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000025"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-05-538Z-913c3e72/run.jsonl"
+    },
+    "memo_key": "rote-6d2ea543-0990-47e8-b72a-688c74094f76",
+    "created_at": "2026-11-10T05:06:34.366Z",
+    "updated_at": "2026-11-10T05:07:09.045Z"
+  },
+  {
+    "id": "ba0bff8d-2c57-464e-ab40-dc9ad53b10fe",
+    "idempotency_key": "day1-exit-1794287169563-025",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "3495a6939ab1b7ff53de825e33f5ba73",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000026"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-05-682Z-21207f4d/run.jsonl"
+    },
+    "memo_key": "rote-ba0bff8d-2c57-464e-ab40-dc9ad53b10fe",
+    "created_at": "2026-11-10T05:06:34.376Z",
+    "updated_at": "2026-11-10T05:07:09.205Z"
+  },
+  {
+    "id": "e3bbc20b-0eee-4bd0-aff7-0359afed54b5",
+    "idempotency_key": "day1-exit-1794287169563-026",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "aa63199a8f25acb543a2e42bc47bc0cb",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000027"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-05-731Z-56bf6cc4/run.jsonl"
+    },
+    "memo_key": "rote-e3bbc20b-0eee-4bd0-aff7-0359afed54b5",
+    "created_at": "2026-11-10T05:06:34.388Z",
+    "updated_at": "2026-11-10T05:07:09.485Z"
+  },
+  {
+    "id": "d0f3c84f-49f3-4d0e-96ba-43e4a3942646",
+    "idempotency_key": "day1-exit-1794287169563-027",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "4f2643de46bab1d949cc007f74aa29e6",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000028"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-06-449Z-8a8983f1/run.jsonl"
+    },
+    "memo_key": "rote-d0f3c84f-49f3-4d0e-96ba-43e4a3942646",
+    "created_at": "2026-11-10T05:06:34.399Z",
+    "updated_at": "2026-11-10T05:07:09.918Z"
+  },
+  {
+    "id": "bfa5547b-1991-44ea-9bc4-f89f300c7578",
+    "idempotency_key": "day1-exit-1794287169563-028",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "8ac62e6926c44e22b1e34870363e4cad",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000029"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-09-086Z-f527ef52/run.jsonl"
+    },
+    "memo_key": "rote-bfa5547b-1991-44ea-9bc4-f89f300c7578",
+    "created_at": "2026-11-10T05:06:34.412Z",
+    "updated_at": "2026-11-10T05:07:12.754Z"
+  },
+  {
+    "id": "f46d51bd-6a02-4ae9-8401-dc964451d52c",
+    "idempotency_key": "day1-exit-1794287169563-029",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "04fbfa00ae542202112157bbcd7364e3",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000030"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-09-247Z-af9768c0/run.jsonl"
+    },
+    "memo_key": "rote-f46d51bd-6a02-4ae9-8401-dc964451d52c",
+    "created_at": "2026-11-10T05:06:34.425Z",
+    "updated_at": "2026-11-10T05:07:13.024Z"
+  },
+  {
+    "id": "144f9985-0057-478c-878f-abfcc81e7cb7",
+    "idempotency_key": "day1-exit-1794287169563-030",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "787e2875a75a1c37c874da5675d295e6",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000031"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-09-516Z-5402764a/run.jsonl"
+    },
+    "memo_key": "rote-144f9985-0057-478c-878f-abfcc81e7cb7",
+    "created_at": "2026-11-10T05:06:34.436Z",
+    "updated_at": "2026-11-10T05:07:13.053Z"
+  },
+  {
+    "id": "4f37655e-b992-4db7-bb72-3fb153dde9ad",
+    "idempotency_key": "day1-exit-1794287169563-031",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "07381ced626814255508f3c801460259",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000032"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-09-957Z-f1d19aaf/run.jsonl"
+    },
+    "memo_key": "rote-4f37655e-b992-4db7-bb72-3fb153dde9ad",
+    "created_at": "2026-11-10T05:06:34.446Z",
+    "updated_at": "2026-11-10T05:07:13.241Z"
+  },
+  {
+    "id": "e532bd46-6764-4a6a-8501-d3e50395521b",
+    "idempotency_key": "day1-exit-1794287169563-032",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "e7300b9921a2a11a2e64d1aa064e1c3f",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000033"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-12-790Z-cf192c6a/run.jsonl"
+    },
+    "memo_key": "rote-e532bd46-6764-4a6a-8501-d3e50395521b",
+    "created_at": "2026-11-10T05:06:34.456Z",
+    "updated_at": "2026-11-10T05:07:15.838Z"
+  },
+  {
+    "id": "7244e013-782f-430f-a045-e907d1c20916",
+    "idempotency_key": "day1-exit-1794287169563-033",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "2a0d3e8b744b74d6a7946e64d0a07ad4",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000034"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-13-067Z-cf762f51/run.jsonl"
+    },
+    "memo_key": "rote-7244e013-782f-430f-a045-e907d1c20916",
+    "created_at": "2026-11-10T05:06:34.466Z",
+    "updated_at": "2026-11-10T05:07:16.043Z"
+  },
+  {
+    "id": "47c2003a-bfe0-4872-a3eb-b14a17ca770d",
+    "idempotency_key": "day1-exit-1794287169563-034",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "af24b9c40f3f13a0b3e32f2e910365e7",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000035"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-13-077Z-b9055aa8/run.jsonl"
+    },
+    "memo_key": "rote-47c2003a-bfe0-4872-a3eb-b14a17ca770d",
+    "created_at": "2026-11-10T05:06:34.479Z",
+    "updated_at": "2026-11-10T05:07:16.209Z"
+  },
+  {
+    "id": "93ed62f5-d0ca-4ba9-965c-125956927a9d",
+    "idempotency_key": "day1-exit-1794287169563-035",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "54d2e69907e74ae183038e541b1ca31a",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000036"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-13-264Z-62229ffd/run.jsonl"
+    },
+    "memo_key": "rote-93ed62f5-d0ca-4ba9-965c-125956927a9d",
+    "created_at": "2026-11-10T05:06:34.508Z",
+    "updated_at": "2026-11-10T05:07:16.767Z"
+  },
+  {
+    "id": "36bfe961-14a8-4ebb-a672-6f65f4b3c195",
+    "idempotency_key": "day1-exit-1794287169563-036",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "768d30d73301a69e379f2e3a24c6387a",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000037"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-15-869Z-9e3f6957/run.jsonl"
+    },
+    "memo_key": "rote-36bfe961-14a8-4ebb-a672-6f65f4b3c195",
+    "created_at": "2026-11-10T05:06:34.522Z",
+    "updated_at": "2026-11-10T05:07:19.602Z"
+  },
+  {
+    "id": "7864f2b2-ea96-4e65-917b-dced08c766ff",
+    "idempotency_key": "day1-exit-1794287169563-037",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "ba1f71b871de791848f93ad38c5595e0",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000038"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-16-077Z-1dfc2b7e/run.jsonl"
+    },
+    "memo_key": "rote-7864f2b2-ea96-4e65-917b-dced08c766ff",
+    "created_at": "2026-11-10T05:06:34.535Z",
+    "updated_at": "2026-11-10T05:07:19.594Z"
+  },
+  {
+    "id": "c6a7026a-4daa-4fd0-bc84-2ddf35efd04d",
+    "idempotency_key": "day1-exit-1794287169563-038",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "51c65c555dbb6f9496cf0f6af3c0e575",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000039"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-16-291Z-5a98b15f/run.jsonl"
+    },
+    "memo_key": "rote-c6a7026a-4daa-4fd0-bc84-2ddf35efd04d",
+    "created_at": "2026-11-10T05:06:34.565Z",
+    "updated_at": "2026-11-10T05:07:19.986Z"
+  },
+  {
+    "id": "f5a5abdf-f9e5-4382-9a8a-706d05cc4974",
+    "idempotency_key": "day1-exit-1794287169563-039",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "32c432f0ee1f349092980d053e4f4c66",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000040"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-16-811Z-b186ac3a/run.jsonl"
+    },
+    "memo_key": "rote-f5a5abdf-f9e5-4382-9a8a-706d05cc4974",
+    "created_at": "2026-11-10T05:06:34.587Z",
+    "updated_at": "2026-11-10T05:07:20.186Z"
+  },
+  {
+    "id": "50310fed-5cea-4a62-91dc-38f86104fdeb",
+    "idempotency_key": "day1-exit-1794287169563-040",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "b87f87a2ce1726c8a8b8cf05e5cebb81",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000041"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-19-635Z-24952bae/run.jsonl"
+    },
+    "memo_key": "rote-50310fed-5cea-4a62-91dc-38f86104fdeb",
+    "created_at": "2026-11-10T05:06:34.605Z",
+    "updated_at": "2026-11-10T05:07:23.023Z"
+  },
+  {
+    "id": "331d73e4-60ba-4619-b740-c2eecb485041",
+    "idempotency_key": "day1-exit-1794287169563-041",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "c0a78037ffb76a01140ea794b349b026",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000042"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-19-650Z-16030b63/run.jsonl"
+    },
+    "memo_key": "rote-331d73e4-60ba-4619-b740-c2eecb485041",
+    "created_at": "2026-11-10T05:06:34.623Z",
+    "updated_at": "2026-11-10T05:07:23.392Z"
+  },
+  {
+    "id": "b66b2d17-d1b2-4625-942c-989ed8de9048",
+    "idempotency_key": "day1-exit-1794287169563-042",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "9c33c1b0684102f35a1e776869c0c841",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000043"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-20-013Z-aa887e60/run.jsonl"
+    },
+    "memo_key": "rote-b66b2d17-d1b2-4625-942c-989ed8de9048",
+    "created_at": "2026-11-10T05:06:34.641Z",
+    "updated_at": "2026-11-10T05:07:23.552Z"
+  },
+  {
+    "id": "71f9fc11-b9f3-426e-8a24-3f6e09d3d310",
+    "idempotency_key": "day1-exit-1794287169563-043",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "02a8c9a0ebc9e54e65fd13aba5a13157",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000044"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-20-249Z-ce13d04c/run.jsonl"
+    },
+    "memo_key": "rote-71f9fc11-b9f3-426e-8a24-3f6e09d3d310",
+    "created_at": "2026-11-10T05:06:34.654Z",
+    "updated_at": "2026-11-10T05:07:23.726Z"
+  },
+  {
+    "id": "dc8d316d-d407-414d-80f7-c1c9a28e75b8",
+    "idempotency_key": "day1-exit-1794287169563-044",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "90bd0a040c5289244b7cb7c7f6f0ecdd",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000045"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-23-049Z-8e358747/run.jsonl"
+    },
+    "memo_key": "rote-dc8d316d-d407-414d-80f7-c1c9a28e75b8",
+    "created_at": "2026-11-10T05:06:34.675Z",
+    "updated_at": "2026-11-10T05:07:26.858Z"
+  },
+  {
+    "id": "536cb38c-3c85-4dff-aeff-825a88bef62f",
+    "idempotency_key": "day1-exit-1794287169563-045",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "70fea2ad24ab66b362824e6724a80453",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000046"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-23-482Z-7ffd3181/run.jsonl"
+    },
+    "memo_key": "rote-536cb38c-3c85-4dff-aeff-825a88bef62f",
+    "created_at": "2026-11-10T05:06:34.693Z",
+    "updated_at": "2026-11-10T05:07:26.986Z"
+  },
+  {
+    "id": "b9e25a33-2074-4c9a-9a73-c50b93f6d9ac",
+    "idempotency_key": "day1-exit-1794287169563-046",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "72886bdff3c1d2ac2b47c506f0083e67",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000047"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-23-627Z-3ac7bd82/run.jsonl"
+    },
+    "memo_key": "rote-b9e25a33-2074-4c9a-9a73-c50b93f6d9ac",
+    "created_at": "2026-11-10T05:06:34.707Z",
+    "updated_at": "2026-11-10T05:07:27.159Z"
+  },
+  {
+    "id": "36390370-b20a-4359-b381-bd20a841b307",
+    "idempotency_key": "day1-exit-1794287169563-047",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "09e0e4a8f50354fe14ee2506e8540951",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000048"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-23-769Z-2756c951/run.jsonl"
+    },
+    "memo_key": "rote-36390370-b20a-4359-b381-bd20a841b307",
+    "created_at": "2026-11-10T05:06:34.720Z",
+    "updated_at": "2026-11-10T05:07:27.567Z"
+  },
+  {
+    "id": "6e914221-8585-47bc-af84-07460bb6db8a",
+    "idempotency_key": "day1-exit-1794287169563-048",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "422082807dc502ca0987b5fd60584e50",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000049"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-26-889Z-6eab7e9f/run.jsonl"
+    },
+    "memo_key": "rote-6e914221-8585-47bc-af84-07460bb6db8a",
+    "created_at": "2026-11-10T05:06:34.734Z",
+    "updated_at": "2026-11-10T05:07:29.969Z"
+  },
+  {
+    "id": "ab596d65-ba00-46d3-96d3-92e6dfa52d5d",
+    "idempotency_key": "day1-exit-1794287169563-049",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "d73e54631519707bd80606d46b1aefae",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000050"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-27-011Z-c695cc82/run.jsonl"
+    },
+    "memo_key": "rote-ab596d65-ba00-46d3-96d3-92e6dfa52d5d",
+    "created_at": "2026-11-10T05:06:34.749Z",
+    "updated_at": "2026-11-10T05:07:30.168Z"
+  },
+  {
+    "id": "720a0739-ff2c-44f2-880f-30bda3e7f067",
+    "idempotency_key": "day1-exit-1794287169563-050",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "d4569fa8dc2f611f5677eb491eb3d344",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000051"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-27-189Z-17ae1146/run.jsonl"
+    },
+    "memo_key": "rote-720a0739-ff2c-44f2-880f-30bda3e7f067",
+    "created_at": "2026-11-10T05:06:34.763Z",
+    "updated_at": "2026-11-10T05:07:30.815Z"
+  },
+  {
+    "id": "295be72a-ea30-413a-9cde-cf5e827e2b51",
+    "idempotency_key": "day1-exit-1794287169563-051",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "8bf00d09aebed3aeea607320dc1db842",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000052"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-27-614Z-dee74077/run.jsonl"
+    },
+    "memo_key": "rote-295be72a-ea30-413a-9cde-cf5e827e2b51",
+    "created_at": "2026-11-10T05:06:34.780Z",
+    "updated_at": "2026-11-10T05:07:31.084Z"
+  },
+  {
+    "id": "2ebc3e7f-d519-4fd6-9c19-45a467ed94e9",
+    "idempotency_key": "day1-exit-1794287169563-052",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "330a44ef4259315fc77dcbee864907b6",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000053"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-30-002Z-d674ceb7/run.jsonl"
+    },
+    "memo_key": "rote-2ebc3e7f-d519-4fd6-9c19-45a467ed94e9",
+    "created_at": "2026-11-10T05:06:34.792Z",
+    "updated_at": "2026-11-10T05:07:33.876Z"
+  },
+  {
+    "id": "ead7fef8-b677-410c-991b-38497f0df168",
+    "idempotency_key": "day1-exit-1794287169563-053",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "ab275fa16145c64e85efa703838e6775",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000055"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-30-227Z-f8fd200f/run.jsonl"
+    },
+    "memo_key": "rote-ead7fef8-b677-410c-991b-38497f0df168",
+    "created_at": "2026-11-10T05:06:34.803Z",
+    "updated_at": "2026-11-10T05:07:34.145Z"
+  },
+  {
+    "id": "b232a5f6-79c4-46e7-af0c-bdb1aec8858f",
+    "idempotency_key": "day1-exit-1794287169563-054",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "d27c3ccd5c4f0ed7d1a4c5d7eb8d6883",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000054"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-30-877Z-cc8e3768/run.jsonl"
+    },
+    "memo_key": "rote-b232a5f6-79c4-46e7-af0c-bdb1aec8858f",
+    "created_at": "2026-11-10T05:06:34.815Z",
+    "updated_at": "2026-11-10T05:07:34.135Z"
+  },
+  {
+    "id": "cbc82731-4e6e-4903-bb4b-499651c25007",
+    "idempotency_key": "day1-exit-1794287169563-055",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "6dec9bcfb8de68bf02d7b2597bc7ce80",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000056"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-31-112Z-5c84d842/run.jsonl"
+    },
+    "memo_key": "rote-cbc82731-4e6e-4903-bb4b-499651c25007",
+    "created_at": "2026-11-10T05:06:34.832Z",
+    "updated_at": "2026-11-10T05:07:34.299Z"
+  },
+  {
+    "id": "8b030a1b-1e1c-4c82-91a2-b6e57f3ad221",
+    "idempotency_key": "day1-exit-1794287169563-056",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "7d792eb6adde9c169b25260ebdf96b2e",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000057"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-33-906Z-ffa02b86/run.jsonl"
+    },
+    "memo_key": "rote-8b030a1b-1e1c-4c82-91a2-b6e57f3ad221",
+    "created_at": "2026-11-10T05:06:34.858Z",
+    "updated_at": "2026-11-10T05:07:38.744Z"
+  },
+  {
+    "id": "b541b9dc-5b00-4cb9-a0a5-8f83169aaad1",
+    "idempotency_key": "day1-exit-1794287169563-057",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "f69b26cb54a41f1e4f4491bfb17b4a0f",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000059"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-34-162Z-138782d3/run.jsonl"
+    },
+    "memo_key": "rote-b541b9dc-5b00-4cb9-a0a5-8f83169aaad1",
+    "created_at": "2026-11-10T05:06:34.879Z",
+    "updated_at": "2026-11-10T05:07:38.894Z"
+  },
+  {
+    "id": "d6ae5743-f8d8-4568-a048-bb4721e767c7",
+    "idempotency_key": "day1-exit-1794287169563-058",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "bd02dba6c0470ea4087adff27a126ebc",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000058"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-34-175Z-aab95f0a/run.jsonl"
+    },
+    "memo_key": "rote-d6ae5743-f8d8-4568-a048-bb4721e767c7",
+    "created_at": "2026-11-10T05:06:34.893Z",
+    "updated_at": "2026-11-10T05:07:38.873Z"
+  },
+  {
+    "id": "87346947-2e52-4c71-af07-5377871e4183",
+    "idempotency_key": "day1-exit-1794287169563-059",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "358bd8e64fa6ea69ca9bf7f73684f744",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000060"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-34-325Z-54342ee4/run.jsonl"
+    },
+    "memo_key": "rote-87346947-2e52-4c71-af07-5377871e4183",
+    "created_at": "2026-11-10T05:06:34.907Z",
+    "updated_at": "2026-11-10T05:07:39.407Z"
+  },
+  {
+    "id": "d03fecec-8931-472c-8467-f309d5acf024",
+    "idempotency_key": "day1-exit-1794287169563-060",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "29d66dbcd7e8a33c60cb1e71f4f394b7",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000061"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-38-786Z-18e7be70/run.jsonl"
+    },
+    "memo_key": "rote-d03fecec-8931-472c-8467-f309d5acf024",
+    "created_at": "2026-11-10T05:06:34.918Z",
+    "updated_at": "2026-11-10T05:07:43.204Z"
+  },
+  {
+    "id": "4faf2c4b-6641-4505-a1e9-23518e1ce379",
+    "idempotency_key": "day1-exit-1794287169563-061",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "23ba4f80a689d8acd76dbf8c5ff58352",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000062"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-38-918Z-5b25de33/run.jsonl"
+    },
+    "memo_key": "rote-4faf2c4b-6641-4505-a1e9-23518e1ce379",
+    "created_at": "2026-11-10T05:06:34.934Z",
+    "updated_at": "2026-11-10T05:07:43.266Z"
+  },
+  {
+    "id": "e6daf837-08a2-43f9-8054-ebf9e86c51ad",
+    "idempotency_key": "day1-exit-1794287169563-062",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "e57b14f677c0b68f2353ef146530765a",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000063"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-38-943Z-432a6e9b/run.jsonl"
+    },
+    "memo_key": "rote-e6daf837-08a2-43f9-8054-ebf9e86c51ad",
+    "created_at": "2026-11-10T05:06:34.953Z",
+    "updated_at": "2026-11-10T05:07:43.382Z"
+  },
+  {
+    "id": "0e5c92d6-3480-42dc-a9ce-55f1ea231a27",
+    "idempotency_key": "day1-exit-1794287169563-063",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "1083085487346f08ae560d7a574b2294",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000064"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-39-483Z-c6916f6d/run.jsonl"
+    },
+    "memo_key": "rote-0e5c92d6-3480-42dc-a9ce-55f1ea231a27",
+    "created_at": "2026-11-10T05:06:34.968Z",
+    "updated_at": "2026-11-10T05:07:43.967Z"
+  },
+  {
+    "id": "2eaedc93-ce6c-40a3-9912-a620ef91c337",
+    "idempotency_key": "day1-exit-1794287169563-064",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "d7d901f1224204b618ecf069a5d258f1",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000065"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-43-242Z-5171323a/run.jsonl"
+    },
+    "memo_key": "rote-2eaedc93-ce6c-40a3-9912-a620ef91c337",
+    "created_at": "2026-11-10T05:06:35.001Z",
+    "updated_at": "2026-11-10T05:07:47.211Z"
+  },
+  {
+    "id": "d8f2b7d0-1264-428a-ad75-b90c34270bdb",
+    "idempotency_key": "day1-exit-1794287169563-065",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "91bd70a52eb2fdb3fd5fc3a9fedf9e94",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000067"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-43-295Z-8204f197/run.jsonl"
+    },
+    "memo_key": "rote-d8f2b7d0-1264-428a-ad75-b90c34270bdb",
+    "created_at": "2026-11-10T05:06:35.041Z",
+    "updated_at": "2026-11-10T05:07:47.290Z"
+  },
+  {
+    "id": "fa110ebd-6230-416b-be7c-280ec4f84d06",
+    "idempotency_key": "day1-exit-1794287169563-066",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "e0dcc6be0610d67feb495622d24507e3",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000066"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-43-412Z-46a08379/run.jsonl"
+    },
+    "memo_key": "rote-fa110ebd-6230-416b-be7c-280ec4f84d06",
+    "created_at": "2026-11-10T05:06:35.054Z",
+    "updated_at": "2026-11-10T05:07:47.276Z"
+  },
+  {
+    "id": "1700e633-042c-4f2b-b5ba-f12f1b3efce8",
+    "idempotency_key": "day1-exit-1794287169563-067",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "dd1d7d5a693fed43167a98a902db1de8",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000068"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-44-008Z-47f17aca/run.jsonl"
+    },
+    "memo_key": "rote-1700e633-042c-4f2b-b5ba-f12f1b3efce8",
+    "created_at": "2026-11-10T05:06:35.100Z",
+    "updated_at": "2026-11-10T05:07:47.791Z"
+  },
+  {
+    "id": "c54103be-060f-483b-ac27-dd17621d5a9f",
+    "idempotency_key": "day1-exit-1794287169563-068",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "d47f82a8dba57a5cae44b1e2a31212cc",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000071"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-47-235Z-cab86c58/run.jsonl"
+    },
+    "memo_key": "rote-c54103be-060f-483b-ac27-dd17621d5a9f",
+    "created_at": "2026-11-10T05:06:35.112Z",
+    "updated_at": "2026-11-10T05:07:50.887Z"
+  },
+  {
+    "id": "219adcf2-46d8-4683-b385-e413e4f68b12",
+    "idempotency_key": "day1-exit-1794287169563-069",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "870e8eecb7f38151f8c4560b52f389c2",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000070"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-47-321Z-0684f69e/run.jsonl"
+    },
+    "memo_key": "rote-219adcf2-46d8-4683-b385-e413e4f68b12",
+    "created_at": "2026-11-10T05:06:35.124Z",
+    "updated_at": "2026-11-10T05:07:50.751Z"
+  },
+  {
+    "id": "b4c7876a-71c7-44ff-94a5-21a97eaa2537",
+    "idempotency_key": "day1-exit-1794287169563-070",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "97f762ebfb7b2c40e235ae28114b8a45",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000069"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-47-323Z-856b0d50/run.jsonl"
+    },
+    "memo_key": "rote-b4c7876a-71c7-44ff-94a5-21a97eaa2537",
+    "created_at": "2026-11-10T05:06:35.150Z",
+    "updated_at": "2026-11-10T05:07:50.710Z"
+  },
+  {
+    "id": "219c3d35-6163-4db7-a5e3-90fea29a976f",
+    "idempotency_key": "day1-exit-1794287169563-071",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "8162fd90342a873568a523b5f8492963",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000072"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-47-826Z-998d8d4c/run.jsonl"
+    },
+    "memo_key": "rote-219c3d35-6163-4db7-a5e3-90fea29a976f",
+    "created_at": "2026-11-10T05:06:35.172Z",
+    "updated_at": "2026-11-10T05:07:51.428Z"
+  },
+  {
+    "id": "c17c8572-8967-4aea-8365-416eba796c57",
+    "idempotency_key": "day1-exit-1794287169563-072",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "9c494347b34a25178e133d6e30ec3181",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000073"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-50-744Z-9c0d7892/run.jsonl"
+    },
+    "memo_key": "rote-c17c8572-8967-4aea-8365-416eba796c57",
+    "created_at": "2026-11-10T05:06:35.223Z",
+    "updated_at": "2026-11-10T05:07:53.927Z"
+  },
+  {
+    "id": "3efc5d90-919d-4725-8f12-51cf2bc72d1a",
+    "idempotency_key": "day1-exit-1794287169563-073",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "d628896aa59315e5852163f332e9666a",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000074"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-50-783Z-5700f9f4/run.jsonl"
+    },
+    "memo_key": "rote-3efc5d90-919d-4725-8f12-51cf2bc72d1a",
+    "created_at": "2026-11-10T05:06:35.250Z",
+    "updated_at": "2026-11-10T05:07:53.946Z"
+  },
+  {
+    "id": "f1925a0b-9a2b-4648-aaa8-8a9be6eab024",
+    "idempotency_key": "day1-exit-1794287169563-074",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "eafc986c26bd066fff28a833784e3e06",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000075"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-50-914Z-98a4ea26/run.jsonl"
+    },
+    "memo_key": "rote-f1925a0b-9a2b-4648-aaa8-8a9be6eab024",
+    "created_at": "2026-11-10T05:06:35.274Z",
+    "updated_at": "2026-11-10T05:07:54.124Z"
+  },
+  {
+    "id": "090da57c-8def-4fa8-911b-6fb81c45cb8d",
+    "idempotency_key": "day1-exit-1794287169563-075",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "a99dd8e3268c5bfd4ccddd64d3edb74d",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000076"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-51-456Z-d021cdf0/run.jsonl"
+    },
+    "memo_key": "rote-090da57c-8def-4fa8-911b-6fb81c45cb8d",
+    "created_at": "2026-11-10T05:06:35.321Z",
+    "updated_at": "2026-11-10T05:07:54.688Z"
+  },
+  {
+    "id": "ea0bf2ca-6c46-458e-9a4f-c55c9ca4b8d1",
+    "idempotency_key": "day1-exit-1794287169563-076",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "55d246a7800ef2714b37fb289926e0fc",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000077"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-53-961Z-1d9569b0/run.jsonl"
+    },
+    "memo_key": "rote-ea0bf2ca-6c46-458e-9a4f-c55c9ca4b8d1",
+    "created_at": "2026-11-10T05:06:35.704Z",
+    "updated_at": "2026-11-10T05:07:57.526Z"
+  },
+  {
+    "id": "d4af8bce-9fa6-4b19-aa8d-df8efa6fbf13",
+    "idempotency_key": "day1-exit-1794287169563-077",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "1f9ffaff517821dde7972de501ad5ffe",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000079"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-53-976Z-c695db50/run.jsonl"
+    },
+    "memo_key": "rote-d4af8bce-9fa6-4b19-aa8d-df8efa6fbf13",
+    "created_at": "2026-11-10T05:06:35.749Z",
+    "updated_at": "2026-11-10T05:07:57.778Z"
+  },
+  {
+    "id": "65a470be-7f13-4964-8e6c-ca3394bfe1e6",
+    "idempotency_key": "day1-exit-1794287169563-078",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "e0d2bb1c734662699aa7c022d60e4243",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000078"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-54-164Z-3c0822d2/run.jsonl"
+    },
+    "memo_key": "rote-65a470be-7f13-4964-8e6c-ca3394bfe1e6",
+    "created_at": "2026-11-10T05:06:35.768Z",
+    "updated_at": "2026-11-10T05:07:57.741Z"
+  },
+  {
+    "id": "465dec35-51d9-4358-9d70-c25228702427",
+    "idempotency_key": "day1-exit-1794287169563-079",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "d51d17aeaf1c1680cdb3d3d0905cec3a",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000080"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-54-735Z-f6e09159/run.jsonl"
+    },
+    "memo_key": "rote-465dec35-51d9-4358-9d70-c25228702427",
+    "created_at": "2026-11-10T05:06:35.800Z",
+    "updated_at": "2026-11-10T05:07:58.490Z"
+  },
+  {
+    "id": "63f4ea97-33f4-42fa-8f65-d410567c47f2",
+    "idempotency_key": "day1-exit-1794287169563-080",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "3d6510189f12f29926ef05a2e6bbda6d",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000083"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-57-564Z-a64460d9/run.jsonl"
+    },
+    "memo_key": "rote-63f4ea97-33f4-42fa-8f65-d410567c47f2",
+    "created_at": "2026-11-10T05:06:35.850Z",
+    "updated_at": "2026-11-10T05:08:01.990Z"
+  },
+  {
+    "id": "12214ff2-7245-472d-8469-57ba9c1ce693",
+    "idempotency_key": "day1-exit-1794287169563-081",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "c0d7157f3f7c0b2a936c6e308a438317",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000081"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-57-797Z-9b3610b1/run.jsonl"
+    },
+    "memo_key": "rote-12214ff2-7245-472d-8469-57ba9c1ce693",
+    "created_at": "2026-11-10T05:06:35.871Z",
+    "updated_at": "2026-11-10T05:08:02.018Z"
+  },
+  {
+    "id": "b6b64757-4dde-405a-bcf9-beb952acf8dd",
+    "idempotency_key": "day1-exit-1794287169563-082",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "145fd180d9b8f41275743f179258ec2d",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000082"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-57-813Z-eed2ad33/run.jsonl"
+    },
+    "memo_key": "rote-b6b64757-4dde-405a-bcf9-beb952acf8dd",
+    "created_at": "2026-11-10T05:06:35.903Z",
+    "updated_at": "2026-11-10T05:08:02.080Z"
+  },
+  {
+    "id": "8c8d12ec-dd8f-4135-a24f-0c32fa9817d9",
+    "idempotency_key": "day1-exit-1794287169563-083",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "5fcd4c130fde5447b0906bb0d284d97e",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000084"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-07-58-529Z-140cd8e9/run.jsonl"
+    },
+    "memo_key": "rote-8c8d12ec-dd8f-4135-a24f-0c32fa9817d9",
+    "created_at": "2026-11-10T05:06:35.927Z",
+    "updated_at": "2026-11-10T05:08:03.225Z"
+  },
+  {
+    "id": "885e8803-dbc0-4ac9-8d88-75701b31c05e",
+    "idempotency_key": "day1-exit-1794287169563-084",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "19e64ad6932ff613d58a6e48fe3954c2",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000086"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-02-044Z-8c50d185/run.jsonl"
+    },
+    "memo_key": "rote-885e8803-dbc0-4ac9-8d88-75701b31c05e",
+    "created_at": "2026-11-10T05:06:35.958Z",
+    "updated_at": "2026-11-10T05:08:06.405Z"
+  },
+  {
+    "id": "a17f3095-f9ec-4115-971d-d9e508761473",
+    "idempotency_key": "day1-exit-1794287169563-085",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "479197d787c81abef1b90ce623f92338",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000085"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-02-055Z-9e708ab9/run.jsonl"
+    },
+    "memo_key": "rote-a17f3095-f9ec-4115-971d-d9e508761473",
+    "created_at": "2026-11-10T05:06:35.984Z",
+    "updated_at": "2026-11-10T05:08:06.290Z"
+  },
+  {
+    "id": "4dff56e2-7299-45e9-bd89-522cb4efed68",
+    "idempotency_key": "day1-exit-1794287169563-086",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "9a2589947182e47088b4fe3ef7221e18",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000087"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-02-111Z-ba2f3b60/run.jsonl"
+    },
+    "memo_key": "rote-4dff56e2-7299-45e9-bd89-522cb4efed68",
+    "created_at": "2026-11-10T05:06:36.005Z",
+    "updated_at": "2026-11-10T05:08:06.966Z"
+  },
+  {
+    "id": "88672888-f809-4396-baa5-29c031e8e431",
+    "idempotency_key": "day1-exit-1794287169563-087",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "0729bead767b5b6f6ca288bc6393eebd",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000088"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-03-263Z-ac179ef2/run.jsonl"
+    },
+    "memo_key": "rote-88672888-f809-4396-baa5-29c031e8e431",
+    "created_at": "2026-11-10T05:06:36.021Z",
+    "updated_at": "2026-11-10T05:08:07.078Z"
+  },
+  {
+    "id": "e6be8048-af53-49fc-b3bf-4534097963ad",
+    "idempotency_key": "day1-exit-1794287169563-088",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "8059f0588d6ec53048fac16cc6aecb73",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000089"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-06-321Z-c459a76a/run.jsonl"
+    },
+    "memo_key": "rote-e6be8048-af53-49fc-b3bf-4534097963ad",
+    "created_at": "2026-11-10T05:06:36.048Z",
+    "updated_at": "2026-11-10T05:08:09.326Z"
+  },
+  {
+    "id": "90807628-08cb-4d9a-810c-4b12a4df4a27",
+    "idempotency_key": "day1-exit-1794287169563-089",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "4a6ce67d437d91a8b89253c1d6029fad",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000090"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-06-437Z-df70329b/run.jsonl"
+    },
+    "memo_key": "rote-90807628-08cb-4d9a-810c-4b12a4df4a27",
+    "created_at": "2026-11-10T05:06:36.066Z",
+    "updated_at": "2026-11-10T05:08:09.701Z"
+  },
+  {
+    "id": "ad2f1c76-4eca-4628-b0c7-edb1dc7fb617",
+    "idempotency_key": "day1-exit-1794287169563-090",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "5a4c2c337bd59e8ed60b706d1ef4574f",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000091"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-06-998Z-da03c5fe/run.jsonl"
+    },
+    "memo_key": "rote-ad2f1c76-4eca-4628-b0c7-edb1dc7fb617",
+    "created_at": "2026-11-10T05:06:36.089Z",
+    "updated_at": "2026-11-10T05:08:10.065Z"
+  },
+  {
+    "id": "7a1b05df-ad72-4e6d-a29e-d93454cb1458",
+    "idempotency_key": "day1-exit-1794287169563-091",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "deb146b8d6d95981e88dcec4650cf4f9",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000092"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-07-103Z-4caece29/run.jsonl"
+    },
+    "memo_key": "rote-7a1b05df-ad72-4e6d-a29e-d93454cb1458",
+    "created_at": "2026-11-10T05:06:36.112Z",
+    "updated_at": "2026-11-10T05:08:10.146Z"
+  },
+  {
+    "id": "8f0c25c9-0b18-40df-8c4e-5cdcc217d4e9",
+    "idempotency_key": "day1-exit-1794287169563-092",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "14fd7c7150cba7a618b36606babc24e4",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000093"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-09-355Z-315a8cf7/run.jsonl"
+    },
+    "memo_key": "rote-8f0c25c9-0b18-40df-8c4e-5cdcc217d4e9",
+    "created_at": "2026-11-10T05:06:36.143Z",
+    "updated_at": "2026-11-10T05:08:13.040Z"
+  },
+  {
+    "id": "0759e5c3-5909-49af-9861-6c79227fca2e",
+    "idempotency_key": "day1-exit-1794287169563-093",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "18ff66217ed9acc6a866db109b1ff114",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000094"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-09-761Z-c7f3c1f1/run.jsonl"
+    },
+    "memo_key": "rote-0759e5c3-5909-49af-9861-6c79227fca2e",
+    "created_at": "2026-11-10T05:06:36.157Z",
+    "updated_at": "2026-11-10T05:08:13.217Z"
+  },
+  {
+    "id": "e4be1b33-f369-4749-bed4-71c9326c6cee",
+    "idempotency_key": "day1-exit-1794287169563-094",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "bd8906248be810ae5cc64d80047e5848",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000095"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-10-088Z-fa2568ac/run.jsonl"
+    },
+    "memo_key": "rote-e4be1b33-f369-4749-bed4-71c9326c6cee",
+    "created_at": "2026-11-10T05:06:36.175Z",
+    "updated_at": "2026-11-10T05:08:13.288Z"
+  },
+  {
+    "id": "ae359d17-ff1e-46e1-8b2e-f185986ce99a",
+    "idempotency_key": "day1-exit-1794287169563-095",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "658fa51fddb1a58bd0d75be0b0cc86e8",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000096"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-10-194Z-ae9f39e8/run.jsonl"
+    },
+    "memo_key": "rote-ae359d17-ff1e-46e1-8b2e-f185986ce99a",
+    "created_at": "2026-11-10T05:06:36.194Z",
+    "updated_at": "2026-11-10T05:08:13.660Z"
+  },
+  {
+    "id": "54d73a43-c410-4245-af86-526d75fde6bc",
+    "idempotency_key": "day1-exit-1794287169563-096",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "d5dc266f9647f80ba4bc4921ae711c1a",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000097"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-13-063Z-b7cbf097/run.jsonl"
+    },
+    "memo_key": "rote-54d73a43-c410-4245-af86-526d75fde6bc",
+    "created_at": "2026-11-10T05:06:36.269Z",
+    "updated_at": "2026-11-10T05:08:16.073Z"
+  },
+  {
+    "id": "b270d11e-674b-4e21-8ffe-324188a63d77",
+    "idempotency_key": "day1-exit-1794287169563-097",
+    "request_hash": "354acc41d1cafcbadd3494a56bcf5e0e3a23f7953e87f353e9a7f82cd02c7f5d",
+    "tenant_id": "tenant-b",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "e539254fc8e2470e0177fd8732775e66",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000098"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-13-250Z-c73f7ffb/run.jsonl"
+    },
+    "memo_key": "rote-b270d11e-674b-4e21-8ffe-324188a63d77",
+    "created_at": "2026-11-10T05:06:36.291Z",
+    "updated_at": "2026-11-10T05:08:16.222Z"
+  },
+  {
+    "id": "23951c52-2026-48c3-893a-3b2fad9f7967",
+    "idempotency_key": "day1-exit-1794287169563-098",
+    "request_hash": "a3adcd8cf38faf4b810b55ac48f10647603229f355d8314a3ae7385f75368956",
+    "tenant_id": "tenant-c",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "80253d99826eb0f95b7d5be7494242a4",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000099"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-13-328Z-0b8a5e40/run.jsonl"
+    },
+    "memo_key": "rote-23951c52-2026-48c3-893a-3b2fad9f7967",
+    "created_at": "2026-11-10T05:06:36.317Z",
+    "updated_at": "2026-11-10T05:08:16.446Z"
+  },
+  {
+    "id": "5d3a9b85-595b-4601-a9a2-4f23c1b0ea11",
+    "idempotency_key": "day1-exit-1794287169563-099",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 1,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 1,
+    "trace_id": "23f661d10ae3fa960ed2abd6d09e030b",
+    "commit_intent_at": null,
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000100"
+      },
+      "evidenceRef": "evidence:///evidence/transfer-2026-11-10T05-08-13-681Z-0b743c33/run.jsonl"
+    },
+    "memo_key": "rote-5d3a9b85-595b-4601-a9a2-4f23c1b0ea11",
+    "created_at": "2026-11-10T05:06:36.358Z",
+    "updated_at": "2026-11-10T05:08:16.668Z"
+  }
+]

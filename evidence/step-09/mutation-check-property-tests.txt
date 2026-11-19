@@ -1,0 +1,27 @@
+﻿M1 no second lookup: a single 0 decides: exit=1 (expect 1 = caught)
+    × property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups 20ms
+    × property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal 472ms
+    × over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate 346ms
+    × crash after the intent, before the click: verify [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row 2ms
+    × the settle period: a second lookup before SETTLE seconds have passed is not taken 1ms
+    × history lag 3 s < settle 5 s, the bank's answer lost after it committed (T5 verifies at once): [0, 1] -> already_done, 1 row 1ms
+    × history lag 8 s > settle 5 s, the same crash: [0, 0] -> resubmitted -> a second transfer: DUPLICATE (the settle must exceed the lag) 3ms
+    × frozen after the intent, and its heartbeat fires first on waking: the run is aborted, no click; verify resubmits; 1 row 2ms
+M2 T6.4 requeues an expired committing job (Step 8 mutant): exit=1 (expect 1 = caught)
+    × property 1: no duplicate unless a zombie clicked (frozen across its own lease expiry) or the history lag exceeds the settle period 38ms
+    × property 2: no duplicate at all when no pause spans lease + settle (no click lands that long after its lease was extended) and there is no history lag 9ms
+    × property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups 5ms
+    × property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal 10ms
+    × crash after the click: T6.4 claims the job, verify [1] -> succeeded / already_done with the row's id; 1 row, attempt 1 2ms
+    × crash after the intent, before the click: verify [0, 0] -> resubmitted; attempt 2 succeeds; exactly 1 row 1ms
+    × the settle period: a second lookup before SETTLE seconds have passed is not taken 0ms
+    × frozen after the intent, and its heartbeat fires first on waking: the run is aborted, no click; verify resubmits; 1 row 0ms
+    × the bank down during the verify: deferred (T8), resumed after the backoff (T6.7) while still down, then the outage ends -> [1] already_done; deferrals never exhaust the 3-phase cap 1ms
+    × the bank down for longer than the deferral budget: needs_human / verify_unavailable (and only after looking once more) 1ms
+    × three verifiers die in a row: T6.6 escalates needs_human / verify_exhausted 1ms
+M3 [0, 1] read as not committed: exit=1 (expect 1 = caught)
+    × property 5: no blind retry after the intent -- every requeue of a job past its intent passed through a verify with two 0-match lookups 74ms
+    × property 6: the oracle agrees with the model -- PASS whenever property 1's preconditions hold, DUPLICATE whenever there are 2+ rows, and a PASS means <= 1 row and terminal 437ms
+    × history lag 3 s < settle 5 s, the bank's answer lost after it committed (T5 verifies at once): [0, 1] -> already_done, 1 row 1ms
+M4 a refusal after Submit is retried instead of final: exit=1 (expect 1 = caught)
+    × over the same sequences: every verify decision, deferrals and their exhaustion, re-claims, lagged [0, 1], the zombie's duplicate 247ms

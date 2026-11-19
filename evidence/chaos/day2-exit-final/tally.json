@@ -1,0 +1,27 @@
+{
+  "result": "PASS_WITH_ATTRIBUTED_ESCALATIONS",
+  "finished": 20,
+  "passed": 20,
+  "seeds": 20,
+  "recoveryTotals": {
+    "requeuedAfterCrash": 548,
+    "requeuedAfterFailure": 0,
+    "failedByRecovery": 0,
+    "claimedToVerify": 99,
+    "reclaimedVerify": 6,
+    "resumedVerify": 0,
+    "escalatedByRecovery": 1,
+    "ownVerify": 0,
+    "already_done": 89,
+    "resubmitted": 9,
+    "exhausted": 0,
+    "not_committed_final": 0,
+    "deferred": 0,
+    "escalated": 0,
+    "reconciled": 9,
+    "duplicate_suspected": 0,
+    "unrecorded_commit_suspected": 0,
+    "reconcile_unreadable": 0,
+    "reconcile_deferred": 0
+  }
+}

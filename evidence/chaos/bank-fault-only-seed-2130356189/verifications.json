@@ -1,0 +1,78 @@
+[
+  {
+    "id": 1,
+    "job_id": "2da542a5-e25a-45ba-9091-dd25a8422f46",
+    "fencing_token": 2,
+    "worker_id": "fa1eaedbc1b5-7-149c",
+    "reason": "commit_uncertain",
+    "prior_status": "failure",
+    "started_at": "2026-11-17T19:17:32.067Z",
+    "ended_at": "2026-11-17T19:17:33.066Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 5 s (deferral 1; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 2,
+    "job_id": "2da542a5-e25a-45ba-9091-dd25a8422f46",
+    "fencing_token": 4,
+    "worker_id": "9665a8a0ad69-7-20e2",
+    "reason": "resumed",
+    "prior_status": "failure",
+    "started_at": "2026-11-17T19:17:38.104Z",
+    "ended_at": "2026-11-17T19:17:38.976Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 10 s (deferral 2; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 3,
+    "job_id": "2da542a5-e25a-45ba-9091-dd25a8422f46",
+    "fencing_token": 6,
+    "worker_id": "fa1eaedbc1b5-7-149c",
+    "reason": "resumed",
+    "prior_status": "failure",
+    "started_at": "2026-11-17T19:17:49.018Z",
+    "ended_at": "2026-11-17T19:17:49.884Z",
+    "lookups": [
+      null
+    ],
+    "decision": "deferred",
+    "error": "verify deferred 20 s (deferral 3; the bank is unavailable): the bank is unavailable (BANK_UNAVAILABLE: The bank answered with its 503 \"System unavailable\" page: nothing could be read; try again later.)"
+  },
+  {
+    "id": 4,
+    "job_id": "2da542a5-e25a-45ba-9091-dd25a8422f46",
+    "fencing_token": 8,
+    "worker_id": "fa1eaedbc1b5-7-149c",
+    "reason": "resumed",
+    "prior_status": "failure",
+    "started_at": "2026-11-17T19:18:11.615Z",
+    "ended_at": "2026-11-17T19:18:30.928Z",
+    "lookups": [
+      0,
+      0
+    ],
+    "decision": "resubmitted",
+    "error": "verified not committed (lookups [0,0]): resubmitting as attempt 2/3"
+  },
+  {
+    "id": 5,
+    "job_id": "2da542a5-e25a-45ba-9091-dd25a8422f46",
+    "fencing_token": 10,
+    "worker_id": "f47f84aeaca8-7-681a",
+    "reason": "reconcile",
+    "prior_status": null,
+    "started_at": "2026-11-17T19:19:46.853Z",
+    "ended_at": "2026-11-17T19:19:48.192Z",
+    "lookups": [
+      1
+    ],
+    "decision": "reconciled",
+    "error": null
+  }
+]

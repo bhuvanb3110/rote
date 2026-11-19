@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "completed": true,
+  "seed": 1980443797,
+  "family": "standard",
+  "jobs": 500,
+  "workers": 4,
+  "durationMs": 800000,
+  "pauseMs": 45000,
+  "drainTimeoutMs": 900000,
+  "commit": "d84b556",
+  "startedAt": "2026-11-18T17:42:33.130Z",
+  "wallMs": 863726,
+  "workMs": 828923,
+  "drainMs": 35652,
+  "drainTimedOut": false,
+  "kills": 83,
+  "restarts": 83,
+  "actionErrors": 0,
+  "pause": {
+    "replica": 4,
+    "fromMs": 61070,
+    "toMs": 106070
+  },
+  "bank": null,
+  "bankControlsApplied": 0,
+  "oracle": {
+    "pass": true,
+    "counts": {
+      "ok": 500,
+      "DUPLICATE": 0,
+      "MISSING_COMMIT": 0,
+      "UNRECORDED_COMMIT": 0,
+      "MISMATCH": 0,
+      "LOST": 0,
+      "PENDING": 0,
+      "ORPHAN": 0
+    },
+    "ledgerRows": 500
+  },
+  "finals": {
+    "succeeded/success": 491,
+    "succeeded/already_done": 9
+  },
+  "needsHuman": [],
+  "failed": [],
+  "notSettled": 0,
+  "recoveries": {
+    "requeuedAfterCrash": 55,
+    "requeuedAfterFailure": 0,
+    "failedByRecovery": 0,
+    "claimedToVerify": 10,
+    "reclaimedVerify": 3,
+    "resumedVerify": 0,
+    "escalatedByRecovery": 0,
+    "ownVerify": 0,
+    "already_done": 9,
+    "resubmitted": 1,
+    "exhausted": 0,
+    "not_committed_final": 0,
+    "deferred": 0,
+    "escalated": 0,
+    "reconciled": 1,
+    "duplicate_suspected": 0,
+    "unrecorded_commit_suspected": 0,
+    "reconcile_unreadable": 0,
+    "reconcile_deferred": 0
+  },
+  "crashBudget": {
+    "jobsWithCrashes": 59,
+    "totalCrashes": 68,
+    "maxCrashesOnOneJob": 3,
+    "jobsLeasedPastMaxAttempts": 2,
+    "crashLimit": 0
+  },
+  "escalatedByCrashCapAttributed": [],
+  "workerProtections": {
+    "heartbeatLeaseLost": 1,
+    "fencedCommitIntent": 0,
+    "completionFencedOut": 0,
+    "runAbortedOnLostLease": 1,
+    "verifyPhaseAborted": 0,
+    "verifyDecisionFencedOut": 0,
+    "reconcileDecisionFencedOut": 0,
+    "duplicatesDetected": 0,
+    "unrecordedCommitsDetected": 0
+  },
+  "leaks": [],
+  "oom": [],
+  "problems": [],
+  "pass": true
+}

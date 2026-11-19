@@ -1,0 +1,5 @@
+{"level":40,"time":1794640291422,"service":"worker","workerId":"fault-after-step-01","faultPoint":"after-step-01","msg":"worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)"}
+{"level":30,"time":1794640291423,"service":"worker","workerId":"fault-after-step-01","playwrightVersion":"1.62.1","leaseSeconds":5,"heartbeatSeconds":2,"shutdownGraceMs":10000,"settleMs":5000,"defer":{"budgetSeconds":600,"backoffBaseSeconds":5,"backoffCapSeconds":60},"evidenceBaseDir":"C:\\Users\\hp\\Downloads\\rote\\evidence\\crash-matrix\\step-09\\after-step-01\\worker-evidence","db":"postgres://rote:***@127.0.0.1:55432/rote_test?options=-c+search_path%3Dt_crash_after_step_01_554aa983","tenants":["tenant-a","tenant-b","tenant-c"],"msg":"worker: ready"}
+{"level":30,"time":1794640291423,"service":"worker","workerId":"fault-after-step-01","leaseSeconds":5,"msg":"worker: started"}
+{"level":30,"time":1794640291466,"service":"worker","workerId":"fault-after-step-01","jobId":"4cebb358-25a3-4cc9-aed9-cf4038aa04dd","tenant":"tenant-a","capability":"transfer","attempt":1,"msg":"worker: job leased"}
+ROTE_FAULT firing at after-step-01 (pid 4460)

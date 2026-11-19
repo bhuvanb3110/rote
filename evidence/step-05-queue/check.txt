@@ -1,0 +1,15 @@
+# fleet Step 5 queue evidence, 2026-11-10T02:29:44.751Z (scripts/evidence-queue.ts)
+PASS  app database has 0001_init applied (schema_migrations: 0001_init)
+PASS  every tenant at the dev cap max_concurrent = 2
+PASS  same key: 25/25 rounds -> exactly 1 job, all 20 callers got its id, exactly one created
+PASS  same key in 3 tenants -> 3 distinct jobs, all created
+PASS  credentials in params -> CredentialsInParamsError, 0 rows stored
+PASS  300 dequeues returned 300 distinct job ids (0 duplicate ids; got 300 / 300)
+PASS  every job succeeded with fencing_token 1 and attempt 1
+PASS  job_attempts: 300 rows for 300 jobs, 0 jobs with more than one
+PASS  every completion was fenced by its own token (0 stale)
+PASS  cap never exceeded: max active per tenant {"tenant-a":2,"tenant-b":2,"tenant-c":2} <= 2 over 2045 samples
+PASS  the cap was actually reached (each tenant hit 2 at least once)
+PASS  starvation: tenant-a's older job row locked by another transaction -> dequeue returned tenant-b's job
+
+RESULT: PASS

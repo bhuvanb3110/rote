@@ -4,7 +4,7 @@
 // over what already exists.
 import { z } from "zod";
 import type { ReplayResult } from "../artifact/index.js";
-import { runReplay } from "../replay/index.js";
+import { runReplay, type ReplayOptions } from "../replay/index.js";
 import { resolveTenant, DEFAULT_OVERRIDES_DIR } from "../tenant/index.js";
 import { findCapability, DEFAULT_ARTIFACTS_DIR } from "./registry.js";
 import { inputsToZodSchema } from "./schema.js";
@@ -21,6 +21,14 @@ export interface InvokeCapabilityOptions {
   headless?: boolean;
   approveRisky?: boolean;
   approveUnattended?: boolean;
+  // Passed straight through to runReplay (see ReplayOptions for each contract). Fleet workers call
+  // invokeCapability, not runReplay, so tenant overrides are resolved the same way everywhere.
+  browser?: ReplayOptions["browser"];
+  onIrreversible?: ReplayOptions["onIrreversible"];
+  onStep?: ReplayOptions["onStep"];
+  signal?: ReplayOptions["signal"];
+  evidenceBaseDir?: ReplayOptions["evidenceBaseDir"];
+  statusDir?: ReplayOptions["statusDir"];
 }
 
 export async function invokeCapability(options: InvokeCapabilityOptions): Promise<ReplayResult> {
@@ -36,7 +44,7 @@ export async function invokeCapability(options: InvokeCapabilityOptions): Promis
     );
   }
 
-  const { capability: effective, entryUrl } = await resolveTenant(
+  const { capability: effective, entryUrl, override } = await resolveTenant(
     capability,
     options.tenant,
     options.entryUrl ?? DEFAULT_ENTRY_URL,
@@ -45,10 +53,20 @@ export async function invokeCapability(options: InvokeCapabilityOptions): Promis
 
   return runReplay({
     capability: effective,
+    // The approval covers the artifact as committed, not the tenant-merged copy (D24).
+    approvalArtifact: capability,
+    // ...and the tenant's override must be one the approval covers (D30).
+    approvalOverride: override,
     params: parsedParams.data,
     entryUrl,
     headless: options.headless ?? true,
     approveRisky: options.approveRisky ?? false,
     approveUnattended: options.approveUnattended ?? false,
+    browser: options.browser,
+    onIrreversible: options.onIrreversible,
+    onStep: options.onStep,
+    signal: options.signal,
+    evidenceBaseDir: options.evidenceBaseDir,
+    statusDir: options.statusDir,
   });
 }

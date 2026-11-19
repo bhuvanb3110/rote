@@ -1,0 +1,5 @@
+{"level":40,"time":1794453237573,"service":"worker","workerId":"fault-after-dequeue","faultPoint":"after-dequeue","msg":"worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)"}
+{"level":30,"time":1794453237574,"service":"worker","workerId":"fault-after-dequeue","playwrightVersion":"1.62.1","leaseSeconds":5,"heartbeatSeconds":2,"shutdownGraceMs":10000,"evidenceBaseDir":"C:\\Users\\hp\\Downloads\\rote\\evidence\\crash-matrix\\step-08\\after-dequeue\\worker-evidence","db":"postgres://rote:***@127.0.0.1:55432/rote_test?options=-c+search_path%3Dt_crash_after_dequeue_e8748897","tenants":["tenant-a","tenant-b","tenant-c"],"msg":"worker: ready"}
+{"level":30,"time":1794453237574,"service":"worker","workerId":"fault-after-dequeue","leaseSeconds":5,"msg":"worker: started"}
+{"level":30,"time":1794453237620,"service":"worker","workerId":"fault-after-dequeue","jobId":"62e8170d-7b7e-4ac3-aad8-60611102f9d6","tenant":"tenant-a","capability":"transfer","attempt":1,"msg":"worker: job leased"}
+ROTE_FAULT firing at after-dequeue (pid 1672)

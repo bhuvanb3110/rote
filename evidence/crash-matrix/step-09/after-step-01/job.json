@@ -1,0 +1,34 @@
+[
+  {
+    "id": "4cebb358-25a3-4cc9-aed9-cf4038aa04dd",
+    "idempotency_key": "crash-after-step-01",
+    "request_hash": "da277414038e124fc93cf9665c248adbddbbec57439220af7d83da5ad1f7f440",
+    "tenant_id": "tenant-a",
+    "capability_id": "transfer",
+    "params": {
+      "amount": "1.00",
+      "memberId": "10001",
+      "toMemberId": "10002"
+    },
+    "state": "succeeded",
+    "attempt": 2,
+    "max_attempts": 3,
+    "lease_owner": null,
+    "lease_expires_at": null,
+    "fencing_token": 3,
+    "trace_id": "cf995d4bbf37f3611383e1be9538ba3b",
+    "commit_intent_at": "2026-11-14T07:11:38.002Z",
+    "outcome": "success",
+    "error": null,
+    "result": {
+      "status": "success",
+      "outputs": {
+        "confirmationRef": "TXN-000001"
+      },
+      "evidenceRef": "evidence://C:/Users/hp/Downloads/rote/evidence/crash-matrix/step-09/after-step-01/worker-evidence/transfer-2026-11-14T07-11-36-911Z-a151e09f/run.jsonl"
+    },
+    "memo_key": "rote-4cebb358-25a3-4cc9-aed9-cf4038aa04dd",
+    "created_at": "2026-11-14T07:11:30.596Z",
+    "updated_at": "2026-11-14T07:11:38.258Z"
+  }
+]

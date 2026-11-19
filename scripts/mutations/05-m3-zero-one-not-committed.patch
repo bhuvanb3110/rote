@@ -1,0 +1,13 @@
+diff --git a/src/fleet/stateMachine.ts b/src/fleet/stateMachine.ts
+index 94b8122..8cd262a 100644
+--- a/src/fleet/stateMachine.ts
++++ b/src/fleet/stateMachine.ts
+@@ -599,7 +599,7 @@ export function verifyDecision(input: VerifyInput): VerifyDecision {
+   }
+   // Every reading is a count from here on.
+   const counts = readings as ReadonlyArray<Extract<LookupReading, { kind: "count" }>>;
+-  const decisive = counts.find((r) => r.n !== 0);
++  const decisive = counts.length === 1 ? counts.find((r) => r.n !== 0) : counts[1]!.n >= 2 ? counts[1] : undefined;
+   if (decisive && decisive.n >= 2) {
+     return {
+       decision: "escalated",

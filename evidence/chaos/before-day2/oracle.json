@@ -1,0 +1,1448 @@
+{
+  "jobs": 100,
+  "ledgerRows": 62,
+  "drainTimedOut": true,
+  "byState": {
+    "succeeded": 61,
+    "running": 4,
+    "queued": 35
+  },
+  "counts": {
+    "ok": 61,
+    "DUPLICATE": 0,
+    "MISSING_COMMIT": 0,
+    "UNRECORDED_COMMIT": 0,
+    "MISMATCH": 0,
+    "LOST": 39,
+    "PENDING": 0,
+    "ORPHAN": 0
+  },
+  "findings": [
+    {
+      "jobId": "c0431d37-1538-4f0a-8f6d-7664e34f1ef5",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-c0431d37-1538-4f0a-8f6d-7664e34f1ef5",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000001"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000001), confirmationRef matches"
+    },
+    {
+      "jobId": "aeb6f7b3-06a6-4989-bcdd-9d5c096be45c",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-aeb6f7b3-06a6-4989-bcdd-9d5c096be45c",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000002"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000002), confirmationRef matches"
+    },
+    {
+      "jobId": "b7267a90-8aa0-46cc-a628-bda43539b67e",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-b7267a90-8aa0-46cc-a628-bda43539b67e",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000003"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000003), confirmationRef matches"
+    },
+    {
+      "jobId": "12037bf9-e8e0-4f5d-b886-eb94746f43d0",
+      "tenant": "tenant-a",
+      "state": "running",
+      "outcome": null,
+      "attempt": 1,
+      "memoKey": "rote-12037bf9-e8e0-4f5d-b886-eb94746f43d0",
+      "leaseOwner": "3f906deea9ee-7-ccca",
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still running after the drain timeout, lease_owner 3f906deea9ee-7-ccca (no ledger row)"
+    },
+    {
+      "jobId": "26140512-7c67-46c2-b710-da893dbb5350",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-26140512-7c67-46c2-b710-da893dbb5350",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000004"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000004), confirmationRef matches"
+    },
+    {
+      "jobId": "bc301f56-e2f1-4550-b97f-ed0d6bc5532f",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-bc301f56-e2f1-4550-b97f-ed0d6bc5532f",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000006"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000006), confirmationRef matches"
+    },
+    {
+      "jobId": "a803baa5-9344-484b-be45-a6e301c1b665",
+      "tenant": "tenant-a",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-a803baa5-9344-484b-be45-a6e301c1b665",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000005"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000005), confirmationRef matches"
+    },
+    {
+      "jobId": "1a48ad0e-7402-4578-b3f4-35641b068ea3",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-1a48ad0e-7402-4578-b3f4-35641b068ea3",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000007"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000007), confirmationRef matches"
+    },
+    {
+      "jobId": "448b3fbd-7920-4e5b-bc5c-af0fdc1ac342",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-448b3fbd-7920-4e5b-bc5c-af0fdc1ac342",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000008"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000008), confirmationRef matches"
+    },
+    {
+      "jobId": "b52bffb9-1719-4d2f-825b-fb8c52ae9426",
+      "tenant": "tenant-a",
+      "state": "running",
+      "outcome": null,
+      "attempt": 1,
+      "memoKey": "rote-b52bffb9-1719-4d2f-825b-fb8c52ae9426",
+      "leaseOwner": "6713fa4939b1-7-cd20",
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still running after the drain timeout, lease_owner 6713fa4939b1-7-cd20 (no ledger row)"
+    },
+    {
+      "jobId": "4de43a98-b473-4ec8-ba80-1b404c65224e",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-4de43a98-b473-4ec8-ba80-1b404c65224e",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000009"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000009), confirmationRef matches"
+    },
+    {
+      "jobId": "7085fd08-67d4-48e2-b7c8-40d6590bb0c7",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-7085fd08-67d4-48e2-b7c8-40d6590bb0c7",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000010"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000010), confirmationRef matches"
+    },
+    {
+      "jobId": "ee01daeb-488b-4d1f-9a78-f0122839d364",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-ee01daeb-488b-4d1f-9a78-f0122839d364",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "c5a4768b-feca-4441-9a9d-8570274722a7",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-c5a4768b-feca-4441-9a9d-8570274722a7",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000011"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000011), confirmationRef matches"
+    },
+    {
+      "jobId": "dfb81b18-e611-4cbb-a973-5b856c573946",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-dfb81b18-e611-4cbb-a973-5b856c573946",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000012"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000012), confirmationRef matches"
+    },
+    {
+      "jobId": "6e7aff44-d13e-45bf-8d1f-8c41441df359",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-6e7aff44-d13e-45bf-8d1f-8c41441df359",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "758cca19-244b-4c70-96e5-9f09670af874",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-758cca19-244b-4c70-96e5-9f09670af874",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000013"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000013), confirmationRef matches"
+    },
+    {
+      "jobId": "9a01b555-5e1e-4d67-ac0b-5c0d9879a475",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-9a01b555-5e1e-4d67-ac0b-5c0d9879a475",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000014"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000014), confirmationRef matches"
+    },
+    {
+      "jobId": "d8902ff5-595a-46ca-b9ff-56145414302b",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-d8902ff5-595a-46ca-b9ff-56145414302b",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "f1ad58e1-35b2-45db-bdb1-b06b12cbbaf4",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-f1ad58e1-35b2-45db-bdb1-b06b12cbbaf4",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000015"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000015), confirmationRef matches"
+    },
+    {
+      "jobId": "5912880e-5e2d-4e46-8b60-4fc58ad069ff",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-5912880e-5e2d-4e46-8b60-4fc58ad069ff",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000016"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000016), confirmationRef matches"
+    },
+    {
+      "jobId": "5bddcd98-ab8a-4335-a2b4-886dfa4956b3",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-5bddcd98-ab8a-4335-a2b4-886dfa4956b3",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "b44c059a-e4ec-420f-8a8a-4c845322c64b",
+      "tenant": "tenant-b",
+      "state": "running",
+      "outcome": null,
+      "attempt": 1,
+      "memoKey": "rote-b44c059a-e4ec-420f-8a8a-4c845322c64b",
+      "leaseOwner": "3f906deea9ee-7-cd64",
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still running after the drain timeout, lease_owner 3f906deea9ee-7-cd64 (no ledger row)"
+    },
+    {
+      "jobId": "51dc7d5f-a384-4fb1-898a-e900b9de8043",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-51dc7d5f-a384-4fb1-898a-e900b9de8043",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000018"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000018), confirmationRef matches"
+    },
+    {
+      "jobId": "696122f8-7908-4137-ab3d-235bdfb19b15",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-696122f8-7908-4137-ab3d-235bdfb19b15",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "9ec78a16-b88a-4887-a9f5-8f685a252f7f",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-9ec78a16-b88a-4887-a9f5-8f685a252f7f",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000017"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000017), confirmationRef matches"
+    },
+    {
+      "jobId": "ad52719e-cb64-4d27-bcd3-277d9c20b45a",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-ad52719e-cb64-4d27-bcd3-277d9c20b45a",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000019"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000019), confirmationRef matches"
+    },
+    {
+      "jobId": "7b72cdce-f594-4a19-8e8f-dfd42fc5abcf",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-7b72cdce-f594-4a19-8e8f-dfd42fc5abcf",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "bd5e6bcf-c333-48e1-a3f3-ddc824f60272",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 2,
+      "memoKey": "rote-bd5e6bcf-c333-48e1-a3f3-ddc824f60272",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000044"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000044), confirmationRef matches"
+    },
+    {
+      "jobId": "711f3e39-f662-4d2f-9f8f-6fa49b2e0ca9",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-711f3e39-f662-4d2f-9f8f-6fa49b2e0ca9",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000020"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000020), confirmationRef matches"
+    },
+    {
+      "jobId": "68b5892a-d7f2-427c-ba04-232afe41ef28",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-68b5892a-d7f2-427c-ba04-232afe41ef28",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "bfefe795-edff-4798-b979-8c4bcd2ee8ae",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-bfefe795-edff-4798-b979-8c4bcd2ee8ae",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000045"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000045), confirmationRef matches"
+    },
+    {
+      "jobId": "05cbb2d0-6dab-4523-a803-f5ec319ed698",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-05cbb2d0-6dab-4523-a803-f5ec319ed698",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000021"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000021), confirmationRef matches"
+    },
+    {
+      "jobId": "9e336cc6-6c16-4bd1-a883-cbe041c13491",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-9e336cc6-6c16-4bd1-a883-cbe041c13491",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "32a6805b-a706-4531-a134-cdceb61d74f3",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-32a6805b-a706-4531-a134-cdceb61d74f3",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000046"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000046), confirmationRef matches"
+    },
+    {
+      "jobId": "3bb81f70-a6ef-4018-9415-97b0efe9c34f",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-3bb81f70-a6ef-4018-9415-97b0efe9c34f",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000022"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000022), confirmationRef matches"
+    },
+    {
+      "jobId": "634eafe4-0773-4846-894d-88ee3bf004f9",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-634eafe4-0773-4846-894d-88ee3bf004f9",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "c6d4b2bc-b947-46ec-8dbd-babfeb66147d",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-c6d4b2bc-b947-46ec-8dbd-babfeb66147d",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000047"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000047), confirmationRef matches"
+    },
+    {
+      "jobId": "d9e09bfb-664f-4a70-a706-af303860845a",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-d9e09bfb-664f-4a70-a706-af303860845a",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000023"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000023), confirmationRef matches"
+    },
+    {
+      "jobId": "43657bc4-8322-48f7-822e-ffc7e7d0599f",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-43657bc4-8322-48f7-822e-ffc7e7d0599f",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "376c761b-6227-4188-a768-45d03f85254f",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-376c761b-6227-4188-a768-45d03f85254f",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000048"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000048), confirmationRef matches"
+    },
+    {
+      "jobId": "cb0f74af-e9dd-4194-98a5-981e605b90e3",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-cb0f74af-e9dd-4194-98a5-981e605b90e3",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000024"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000024), confirmationRef matches"
+    },
+    {
+      "jobId": "34ba53fa-f0af-4bd3-b429-33bb9c928cd2",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-34ba53fa-f0af-4bd3-b429-33bb9c928cd2",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "91dbfb2d-ca55-42aa-9947-92d091ce71fb",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-91dbfb2d-ca55-42aa-9947-92d091ce71fb",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000049"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000049), confirmationRef matches"
+    },
+    {
+      "jobId": "b2b7841f-a22c-4b5f-86f4-fbc7c76bb381",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-b2b7841f-a22c-4b5f-86f4-fbc7c76bb381",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000025"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000025), confirmationRef matches"
+    },
+    {
+      "jobId": "819b645f-266b-46c5-b19a-1d00b0b7d32c",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-819b645f-266b-46c5-b19a-1d00b0b7d32c",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "099c16d2-9553-4b19-acd3-00fb51150d4e",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-099c16d2-9553-4b19-acd3-00fb51150d4e",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000050"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000050), confirmationRef matches"
+    },
+    {
+      "jobId": "4bc3d2e7-3414-4d2e-bc6a-80679bdf1e79",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-4bc3d2e7-3414-4d2e-bc6a-80679bdf1e79",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000026"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000026), confirmationRef matches"
+    },
+    {
+      "jobId": "737cd085-0d4c-4333-a29d-f86d2931be15",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-737cd085-0d4c-4333-a29d-f86d2931be15",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "5f45a0d1-ef80-458b-bf78-91ce2ffd2cec",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-5f45a0d1-ef80-458b-bf78-91ce2ffd2cec",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000051"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000051), confirmationRef matches"
+    },
+    {
+      "jobId": "d5c93ab1-77cb-4a30-b553-0682627de2ef",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-d5c93ab1-77cb-4a30-b553-0682627de2ef",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000027"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000027), confirmationRef matches"
+    },
+    {
+      "jobId": "1496af73-968d-45c8-92a6-8b56deea72a0",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-1496af73-968d-45c8-92a6-8b56deea72a0",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "0d69f124-ff15-42fc-9636-30d385b33dc1",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-0d69f124-ff15-42fc-9636-30d385b33dc1",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000052"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000052), confirmationRef matches"
+    },
+    {
+      "jobId": "c5f49f25-fc4e-484f-9bdd-5cb0cf34269d",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-c5f49f25-fc4e-484f-9bdd-5cb0cf34269d",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000028"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000028), confirmationRef matches"
+    },
+    {
+      "jobId": "360444cd-c503-47f2-9370-ea8872a1ef4d",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-360444cd-c503-47f2-9370-ea8872a1ef4d",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "ea53c7bd-485e-4db1-9ea9-a26580f01339",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-ea53c7bd-485e-4db1-9ea9-a26580f01339",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000053"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000053), confirmationRef matches"
+    },
+    {
+      "jobId": "c15a91e3-3e7d-4768-be6e-35fee2f5c3cb",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-c15a91e3-3e7d-4768-be6e-35fee2f5c3cb",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000029"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000029), confirmationRef matches"
+    },
+    {
+      "jobId": "11d57b90-29ee-4900-8137-57cc652219a8",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-11d57b90-29ee-4900-8137-57cc652219a8",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "eb48d58a-4185-4511-a279-3a78c509c78e",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-eb48d58a-4185-4511-a279-3a78c509c78e",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000054"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000054), confirmationRef matches"
+    },
+    {
+      "jobId": "16225d61-c91e-4a6b-b209-fb97a486de13",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-16225d61-c91e-4a6b-b209-fb97a486de13",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000030"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000030), confirmationRef matches"
+    },
+    {
+      "jobId": "4d6bb13d-07d2-4d21-81c3-ced56029deec",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-4d6bb13d-07d2-4d21-81c3-ced56029deec",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "f04c8cd0-12ae-4f94-947a-d3e6bf81a835",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-f04c8cd0-12ae-4f94-947a-d3e6bf81a835",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000055"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000055), confirmationRef matches"
+    },
+    {
+      "jobId": "1490f13e-2f22-474f-b730-baa84fe6e72f",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-1490f13e-2f22-474f-b730-baa84fe6e72f",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000031"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000031), confirmationRef matches"
+    },
+    {
+      "jobId": "48ebfcb9-d8d7-484b-85e8-5de98b5fc45d",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-48ebfcb9-d8d7-484b-85e8-5de98b5fc45d",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "92a984f8-6a2c-4acf-bdb5-5239ddf872bd",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-92a984f8-6a2c-4acf-bdb5-5239ddf872bd",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000056"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000056), confirmationRef matches"
+    },
+    {
+      "jobId": "d1a0e218-e3df-408e-9943-6e82174a723b",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-d1a0e218-e3df-408e-9943-6e82174a723b",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000033"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000033), confirmationRef matches"
+    },
+    {
+      "jobId": "87fabb2c-5801-4d41-998d-4dad7440a3d6",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-87fabb2c-5801-4d41-998d-4dad7440a3d6",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "5c7fdfb2-61e2-4e03-aebc-77be7bd2be27",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-5c7fdfb2-61e2-4e03-aebc-77be7bd2be27",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000057"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000057), confirmationRef matches"
+    },
+    {
+      "jobId": "2fcbfe8d-68ee-40b3-84c8-779ff2832c4d",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-2fcbfe8d-68ee-40b3-84c8-779ff2832c4d",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000032"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000032), confirmationRef matches"
+    },
+    {
+      "jobId": "91c9a560-71e5-41ca-8547-65bf17e8006d",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-91c9a560-71e5-41ca-8547-65bf17e8006d",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "e243fba7-d7eb-419a-b7d5-8f87a200d7ca",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-e243fba7-d7eb-419a-b7d5-8f87a200d7ca",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000058"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000058), confirmationRef matches"
+    },
+    {
+      "jobId": "85862c21-f74d-4fde-8105-cb7be1b37b5b",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-85862c21-f74d-4fde-8105-cb7be1b37b5b",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000035"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000035), confirmationRef matches"
+    },
+    {
+      "jobId": "d9693621-19dc-4541-a502-7312a40c7bc1",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-d9693621-19dc-4541-a502-7312a40c7bc1",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "cc0ddb1a-636a-4fed-8585-86c15cbe0354",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-cc0ddb1a-636a-4fed-8585-86c15cbe0354",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000059"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000059), confirmationRef matches"
+    },
+    {
+      "jobId": "52248f87-aa6b-46ab-9f5e-8c413d9decc3",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-52248f87-aa6b-46ab-9f5e-8c413d9decc3",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000034"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000034), confirmationRef matches"
+    },
+    {
+      "jobId": "722bdf89-986f-4dd8-843e-37310531a2d1",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-722bdf89-986f-4dd8-843e-37310531a2d1",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "09c666fd-b143-4681-8b7b-0c8e9bdf86ac",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-09c666fd-b143-4681-8b7b-0c8e9bdf86ac",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000060"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000060), confirmationRef matches"
+    },
+    {
+      "jobId": "98dad6e7-9338-4c07-aa48-d220392ae458",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-98dad6e7-9338-4c07-aa48-d220392ae458",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000036"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000036), confirmationRef matches"
+    },
+    {
+      "jobId": "f45b9695-6b03-4d7c-96f1-3ce9edf126fa",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-f45b9695-6b03-4d7c-96f1-3ce9edf126fa",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "7edfdb75-e69f-4d8f-822a-39335a81cb22",
+      "tenant": "tenant-b",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-7edfdb75-e69f-4d8f-822a-39335a81cb22",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000061"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000061), confirmationRef matches"
+    },
+    {
+      "jobId": "a3b380dc-b141-46e0-b24d-fd5df4d02be6",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-a3b380dc-b141-46e0-b24d-fd5df4d02be6",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000037"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000037), confirmationRef matches"
+    },
+    {
+      "jobId": "f4fa3dcd-4291-4039-92e5-6bb4ae04edd1",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-f4fa3dcd-4291-4039-92e5-6bb4ae04edd1",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "67bb92d5-e2b0-4635-8b05-6b18650e36f3",
+      "tenant": "tenant-b",
+      "state": "running",
+      "outcome": null,
+      "attempt": 1,
+      "memoKey": "rote-67bb92d5-e2b0-4635-8b05-6b18650e36f3",
+      "leaseOwner": "b3bfd668c3b0-8-506c",
+      "rows": 1,
+      "rowIds": [
+        "TXN-000062"
+      ],
+      "verdict": "LOST",
+      "detail": "still running after the drain timeout, lease_owner b3bfd668c3b0-8-506c (lost after commit: ledger row TXN-000062 exists)"
+    },
+    {
+      "jobId": "681ac3ad-07e4-4352-9c30-877d7eb4f457",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-681ac3ad-07e4-4352-9c30-877d7eb4f457",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000039"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000039), confirmationRef matches"
+    },
+    {
+      "jobId": "b0cd25a9-3bde-4dfe-a354-60be7487175f",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-b0cd25a9-3bde-4dfe-a354-60be7487175f",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "47a6545b-51a1-4222-8f4d-7626bfd1c1e5",
+      "tenant": "tenant-b",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-47a6545b-51a1-4222-8f4d-7626bfd1c1e5",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "ba19f27c-ff9e-4bf1-aec9-5c7446168720",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-ba19f27c-ff9e-4bf1-aec9-5c7446168720",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000038"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000038), confirmationRef matches"
+    },
+    {
+      "jobId": "d96bdfea-93f5-475e-9731-8cf52f69dcff",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-d96bdfea-93f5-475e-9731-8cf52f69dcff",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "2ca6e39a-a8e4-450f-96d3-373fd12cb592",
+      "tenant": "tenant-b",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-2ca6e39a-a8e4-450f-96d3-373fd12cb592",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "fc9e1059-a62b-4e75-96ae-09efab40f9f7",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-fc9e1059-a62b-4e75-96ae-09efab40f9f7",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000040"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000040), confirmationRef matches"
+    },
+    {
+      "jobId": "414ecec3-022a-401b-8328-629ac6e9b316",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-414ecec3-022a-401b-8328-629ac6e9b316",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "be8ed616-f76f-44cb-985f-de034b08ae7c",
+      "tenant": "tenant-b",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-be8ed616-f76f-44cb-985f-de034b08ae7c",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "0f197ec1-d769-4b92-a255-717fa68583f3",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-0f197ec1-d769-4b92-a255-717fa68583f3",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000041"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000041), confirmationRef matches"
+    },
+    {
+      "jobId": "708ff11f-197e-4261-ad7b-f26325192079",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-708ff11f-197e-4261-ad7b-f26325192079",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "e6452668-0f64-4159-94d9-56bc1100febc",
+      "tenant": "tenant-b",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-e6452668-0f64-4159-94d9-56bc1100febc",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "3cbe22d5-b39c-4f80-a015-6191e09dbaab",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-3cbe22d5-b39c-4f80-a015-6191e09dbaab",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000042"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000042), confirmationRef matches"
+    },
+    {
+      "jobId": "9e3fae71-36c1-427d-9369-1b49b98fe960",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-9e3fae71-36c1-427d-9369-1b49b98fe960",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "d6826a09-dc9e-40ba-826b-31fad34bf9aa",
+      "tenant": "tenant-b",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-d6826a09-dc9e-40ba-826b-31fad34bf9aa",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    },
+    {
+      "jobId": "07efa341-cd4a-402b-8982-9206bca097f5",
+      "tenant": "tenant-c",
+      "state": "succeeded",
+      "outcome": "success",
+      "attempt": 1,
+      "memoKey": "rote-07efa341-cd4a-402b-8982-9206bca097f5",
+      "leaseOwner": null,
+      "rows": 1,
+      "rowIds": [
+        "TXN-000043"
+      ],
+      "verdict": "ok",
+      "detail": "1 row (TXN-000043), confirmationRef matches"
+    },
+    {
+      "jobId": "f2d43e7c-ef7f-41e4-ab26-5a113249f6eb",
+      "tenant": "tenant-a",
+      "state": "queued",
+      "outcome": null,
+      "attempt": 0,
+      "memoKey": "rote-f2d43e7c-ef7f-41e4-ab26-5a113249f6eb",
+      "leaseOwner": null,
+      "rows": 0,
+      "rowIds": [],
+      "verdict": "LOST",
+      "detail": "still queued after the drain timeout, lease_owner none (no ledger row)"
+    }
+  ],
+  "orphans": [],
+  "pass": false
+}

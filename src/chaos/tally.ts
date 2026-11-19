@@ -1,0 +1,300 @@
+// Chaos at scale (step-10 reviewer decisions 1 and 8; docs/plans/step-10.md section 5; D56): what one chaos
+// run reports about itself (SeedSummary, written by scripts/chaos.ts as summary.json), the recovery kinds
+// counted from its job_attempts / job_verifications rows, and the batch tally that scripts/chaos-seeds.ts
+// rebuilds after every seed. Pure: no I/O.
+import type { ChaosFamily } from "./families.js";
+
+/**
+ * Each recovery kind (decision 8), counted from the rows, so the tally shows whether chaos exercised each
+ * path at all -- the resubmit path above all.
+ */
+export interface RecoveryKinds {
+  /** T6.1: a dead worker's job (before its intent) requeued at once; a crash, not an attempt (D57). */
+  requeuedAfterCrash: number;
+  /** T4: an attempt that failed before its intent, requeued with a backoff (D49). */
+  requeuedAfterFailure: number;
+  /** T6.2: the crash cap (D57): the job's max_crashes-th worker death before its intent: failed / crash_limit. (Before D57: the last attempt's, lease_expired.) */
+  failedByRecovery: number;
+  /** T6.4: an expired commit claimed to verify. */
+  claimedToVerify: number;
+  /** T6.5: a dead verifier's job re-claimed. */
+  reclaimedVerify: number;
+  /** T6.7: a deferred (or handed-off) verify resumed. */
+  resumedVerify: number;
+  /** T6.6: the crash cap reached after the intent: needs_human / crash_limit (D58; before D58: 3 dead verify phases, verify_exhausted). */
+  escalatedByRecovery: number;
+  /** T5: the live owner verified its own uncertain run. */
+  ownVerify: number;
+  // The verify decisions (job_verifications, verify phases).
+  already_done: number;
+  resubmitted: number;
+  exhausted: number;
+  not_committed_final: number;
+  deferred: number;
+  escalated: number;
+  // The reconcile decisions (reason 'reconcile'; D50, D55).
+  reconciled: number;
+  duplicate_suspected: number;
+  unrecorded_commit_suspected: number;
+  reconcile_unreadable: number;
+  reconcile_deferred: number;
+}
+
+export const RECOVERY_KIND_LABELS: Record<keyof RecoveryKinds, string> = {
+  requeuedAfterCrash: "requeued after a crash, no attempt used (T6.1, D57)",
+  requeuedAfterFailure: "requeued after a failure, with a backoff (T4, D49)",
+  failedByRecovery: "failed by recovery at the crash cap (T6.2 crash_limit, D57)",
+  claimedToVerify: "expired commit claimed to verify (T6.4)",
+  reclaimedVerify: "dead verifier re-claimed (T6.5)",
+  resumedVerify: "deferred verify resumed (T6.7)",
+  escalatedByRecovery: "escalated at the crash cap after the intent (T6.6 crash_limit, D58)",
+  ownVerify: "own uncertain run verified (T5)",
+  already_done: "verify: already_done",
+  resubmitted: "verify: resubmitted",
+  exhausted: "verify: exhausted",
+  not_committed_final: "verify: not_committed_final",
+  deferred: "verify: deferred (bank unavailable)",
+  escalated: "verify: escalated (needs_human)",
+  reconciled: "reconcile: reconciled",
+  duplicate_suspected: "reconcile: duplicate_suspected",
+  unrecorded_commit_suspected: "reconcile: unrecorded_commit_suspected",
+  reconcile_unreadable: "reconcile: reconcile_unreadable",
+  reconcile_deferred: "reconcile: reconcile_deferred",
+};
+
+export const EMPTY_RECOVERY_KINDS: RecoveryKinds = Object.fromEntries(Object.keys(RECOVERY_KIND_LABELS).map((k) => [k, 0])) as unknown as RecoveryKinds;
+
+export interface AttemptRowLike {
+  outcome: string | null;
+  error: string | null;
+}
+export interface PhaseRowLike {
+  reason: string;
+  decision: string | null;
+  error: string | null;
+}
+
+/** Counts every recovery kind in one run's rows. */
+export function recoveryKinds(attempts: readonly AttemptRowLike[], phases: readonly PhaseRowLike[]): RecoveryKinds {
+  const k: RecoveryKinds = { ...EMPTY_RECOVERY_KINDS };
+  for (const a of attempts) {
+    // recover.ts closes the dead holder's attempt "... (T6.x kind)"; jobOutcomeFor's requeue says "(retrying)".
+    // A frozen (paused) holder that wakes after the recovery re-labels its own attempt lease_lost, keeping
+    // recovery's note ("[recovery had recorded: ...]", MARK_LEASE_LOST_SQL): still that recovery.
+    const recovered = a.outcome === "crashed" || a.outcome === "lease_lost";
+    if (recovered && a.error?.includes("(T6.1 requeue)")) k.requeuedAfterCrash += 1;
+    if (recovered && a.error?.includes("(T6.2 fail)")) k.failedByRecovery += 1;
+    if ((a.outcome === "failure" || a.outcome === "aborted") && a.error?.includes("(retrying)")) k.requeuedAfterFailure += 1;
+  }
+  for (const p of phases) {
+    if (p.decision === "crashed" && p.error?.includes("(T6.6 escalate)")) k.escalatedByRecovery += 1;
+    if (p.reason === "reconcile") {
+      if (p.decision && p.decision in k && p.decision !== "crashed") k[p.decision as keyof RecoveryKinds] += 1;
+      continue;
+    }
+    if (p.reason === "lease_expired_in_committing") k.claimedToVerify += 1;
+    else if (p.reason === "lease_expired_in_verifying") k.reclaimedVerify += 1;
+    else if (p.reason === "resumed") k.resumedVerify += 1;
+    else if (p.reason === "commit_uncertain" && p.decision !== "handed_off") k.ownVerify += 1;
+    if (p.decision && ["already_done", "resubmitted", "exhausted", "not_committed_final", "deferred", "escalated"].includes(p.decision)) {
+      k[p.decision as keyof RecoveryKinds] += 1;
+    }
+  }
+  return k;
+}
+
+/** What scripts/chaos.ts writes as summary.json: everything the tally needs, nothing it must re-derive. */
+export interface SeedSummary {
+  version: 1;
+  /** false: the run threw before it finished (check.txt has the stack). */
+  completed: boolean;
+  error?: string;
+  seed: number;
+  family: ChaosFamily;
+  jobs: number;
+  workers: number;
+  durationMs: number;
+  pauseMs: number;
+  drainTimeoutMs: number;
+  /** git rev-parse --short HEAD, with "+dirty" if the tree had changes. */
+  commit: string;
+  startedAt: string;
+  wallMs: number;
+  /** From the first enqueue to the last job settled. */
+  workMs: number | null;
+  drainMs: number | null;
+  drainTimedOut: boolean;
+  kills: number;
+  restarts: number;
+  actionErrors: number;
+  pause: { replica: number; fromMs: number; toMs: number } | null;
+  bank: { outage: { fromMs: number; toMs: number }; slow: { fromMs: number; toMs: number; latencyMs: number } } | null;
+  bankControlsApplied: number;
+  oracle: { pass: boolean; counts: Record<string, number>; ledgerRows: number };
+  finals: Record<string, number>;
+  needsHuman: Array<{ id: string; outcome: string | null }>;
+  failed: Array<{ id: string; outcome: string | null; attempts: string[] }>;
+  notSettled: number;
+  recoveries: RecoveryKinds;
+  /** The two budgets (D57), from jobs; absent in summaries written before D57. */
+  crashBudget?: { jobsWithCrashes: number; totalCrashes: number; maxCrashesOnOneJob: number; jobsLeasedPastMaxAttempts: number; crashLimit: number };
+  /**
+   * The needs_human / crash_limit jobs the family accepted because every death was attributed to a scheduled kill
+   * or pause and the ledger has at most 1 row (D58). A seed with any is never a plain pass. Absent before D58.
+   */
+  escalatedByCrashCapAttributed?: Array<{
+    jobId: string;
+    crashes: number;
+    ledgerRows: number;
+    deaths: Array<{ row: string; n: number; holder: string; recovery: string; event: { kind: string; container: string; at: string; tMs: number | null } | null }>;
+  }>;
+  /** Jobs whose reconcile the workers' pass abandoned (R3, D59); any fails the seed. Absent before D59. */
+  reconcileAbandoned?: string[];
+  workerProtections: Record<string, number>;
+  leaks: string[];
+  oom: string[];
+  problems: string[];
+  pass: boolean;
+}
+
+export interface TallyInput {
+  outDir: string;
+  /** Every seed the batch draws, in order (index 1 = seeds[0]). */
+  seeds: readonly number[];
+  config: { jobs: number; workers: number; durationMs: number; drainTimeoutMs: number; family: ChaosFamily };
+  /** By 1-based index; null = not run yet. */
+  summaries: ReadonlyMap<number, SeedSummary | null>;
+  /** Runs that were interrupted and re-run (their partial evidence was set aside). */
+  interruptions: ReadonlyArray<{ index: number; seed: number; movedTo: string; at: string }>;
+  generatedAt: string;
+}
+
+export interface Tally {
+  markdown: string;
+  totals: RecoveryKinds;
+  finished: number;
+  passed: number;
+  /**
+   * PASS_WITH_ATTRIBUTED_ESCALATIONS: every seed passed its family judge, and at least one job was accepted as
+   * "escalated by crash cap (attributed)" (D58). Never reported as a plain PASS (the reviewer decision during
+   * 10b, decision 3).
+   */
+  result: "PASS" | "PASS_WITH_ATTRIBUTED_ESCALATIONS" | "FAIL" | "INCOMPLETE";
+  /** Every accepted escalation across the finished seeds, with its seed. */
+  escalations: Array<{ index: number; seed: number; jobId: string; deaths: number; events: string[] }>;
+}
+
+/** "kill of rote-worker-3 at 139.5 s" for each death of an accepted escalation. */
+function eventsOf(e: NonNullable<SeedSummary["escalatedByCrashCapAttributed"]>[number]): string[] {
+  return e.deaths.map((d) => (d.event ? `${d.event.kind} of ${d.event.container} at ${d.event.tMs === null ? d.event.at : `${(d.event.tMs / 1000).toFixed(1)} s`}` : "(unattributed)"));
+}
+
+const sec = (ms: number | null) => (ms === null ? "-" : `${Math.round(ms / 1000)} s`);
+const okJobs = (s: SeedSummary) => s.oracle.counts.ok ?? 0;
+
+export function buildTally(input: TallyInput): Tally {
+  const done = input.seeds.map((seed, i) => ({ index: i + 1, seed, s: input.summaries.get(i + 1) ?? null }));
+  const finished = done.filter((d) => d.s !== null);
+  const passed = finished.filter((d) => d.s!.pass).length;
+  const totals: RecoveryKinds = { ...EMPTY_RECOVERY_KINDS };
+  const seedsWith: Record<string, number> = {};
+  for (const d of finished) {
+    for (const key of Object.keys(totals) as Array<keyof RecoveryKinds>) {
+      const n = d.s!.recoveries[key] ?? 0;
+      totals[key] += n;
+      if (n > 0) seedsWith[key] = (seedsWith[key] ?? 0) + 1;
+    }
+  }
+  const failedSeeds = finished.filter((d) => !d.s!.pass);
+  const escalations = finished.flatMap((d) =>
+    (d.s!.escalatedByCrashCapAttributed ?? []).map((e) => ({ index: d.index, seed: d.seed, jobId: e.jobId, deaths: e.deaths.length, events: eventsOf(e) })),
+  );
+  const result: Tally["result"] =
+    failedSeeds.length > 0 ? "FAIL" : finished.length < input.seeds.length ? "INCOMPLETE" : escalations.length > 0 ? "PASS_WITH_ATTRIBUTED_ESCALATIONS" : "PASS";
+  const c = input.config;
+  const lines: string[] = [];
+  lines.push("# Day-2 exit: chaos at scale -- the tally");
+  lines.push("");
+  lines.push(`Generated by \`scripts/chaos-seeds.ts\` at ${input.generatedAt}, in \`${input.outDir}\`. **${finished.length} of ${input.seeds.length} seeds finished.**`);
+  lines.push("");
+  lines.push(
+    `Every seed: family \`${c.family}\`, ${c.jobs} jobs, ${c.workers} workers, a ${c.durationMs / 1000} s schedule (a kill every 5-15 s, one 45 s ` +
+      `\`docker pause\`), drained until every job is settled (timeout ${c.drainTimeoutMs / 1000} s), then the ledger oracle (D32) and the ` +
+      "family judge (D56). The seeds were drawn once, up front, and saved in `seeds.json`; none is ever re-drawn or dropped.",
+  );
+  lines.push("");
+  lines.push(
+    "| # | seed | commit | kills | ok | DUPLICATE | LOST | needs_human | of which escalated by crash cap (attributed) | failed | not settled | T6.1 | T6.4 | already_done | resubmitted | reconciled | flagged by reconcile | work | wall | result |",
+  );
+  lines.push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  for (const d of done) {
+    const s = d.s;
+    if (!s) {
+      lines.push(`| ${d.index} | ${d.seed} | | | | | | | | | | | | | | | | | | not run yet |`);
+      continue;
+    }
+    if (!s.completed) {
+      lines.push(`| ${d.index} | [${d.seed}](${dirName(d.index, d.seed)}/check.txt) | ${s.commit} | | | | | | | | | | | | | | | | ${sec(s.wallMs)} | **FAIL**: the run did not complete (${s.error ?? "?"}) |`);
+      continue;
+    }
+    const r = s.recoveries;
+    const flagged = r.duplicate_suspected + r.unrecorded_commit_suspected + r.reconcile_unreadable;
+    const escalated = s.escalatedByCrashCapAttributed?.length ?? 0;
+    const verdict = !s.pass ? `**FAIL**: ${s.problems.join("; ")}` : escalated > 0 ? `PASS with ${escalated} escalated by crash cap (attributed): not a plain pass` : "PASS";
+    lines.push(
+      `| ${d.index} | [${d.seed}](${dirName(d.index, d.seed)}/check.txt) | ${s.commit} | ${s.kills} | ${okJobs(s)} | ${s.oracle.counts.DUPLICATE ?? 0} | ${s.oracle.counts.LOST ?? 0} | ` +
+        `${s.needsHuman.length} | ${escalated} | ${s.failed.length} | ${s.notSettled} | ${r.requeuedAfterCrash} | ${r.claimedToVerify} | ${r.already_done} | ${r.resubmitted} | ${r.reconciled} | ${flagged} | ` +
+        `${sec(s.workMs)} | ${sec(s.wallMs)} | ${verdict} |`,
+    );
+  }
+  lines.push("");
+  lines.push("## Recovery kinds across all finished seeds (reviewer decision 8)");
+  lines.push("");
+  lines.push("| kind | total | seeds with it |");
+  lines.push("| --- | --- | --- |");
+  for (const key of Object.keys(RECOVERY_KIND_LABELS) as Array<keyof RecoveryKinds>) {
+    lines.push(`| ${RECOVERY_KIND_LABELS[key]} | ${totals[key]} | ${seedsWith[key] ?? 0} of ${finished.length} |`);
+  }
+  lines.push("");
+  lines.push(
+    totals.resubmitted > 0
+      ? `**The resubmit path was exercised**: ${totals.resubmitted} verify decision(s) \`resubmitted\` in ${seedsWith.resubmitted ?? 0} seed(s), each followed by its reconcile.`
+      : "**The resubmit path was NOT exercised by these seeds**: no verify read `[0, 0]` (a kill must land between a worker's commit intent and its " +
+          "Submit, a window of milliseconds). It is covered elsewhere: the crash matrix's `before-submit` scenarios (`evidence/crash-matrix/`), " +
+          "`src/worker/crashSubmit.db.test.ts` in `npm test` and CI, and `verify-scenarios` (`evidence/zombie-window-limit/`, `evidence/verify-bank-outage-30s/`).",
+  );
+  lines.push("");
+  lines.push("## Escalated by crash cap (attributed)");
+  lines.push("");
+  lines.push(
+    "A job the crash cap sent to `needs_human` / `crash_limit` after its commit intent is accepted by the standard family only when every death " +
+      "in its history matches a scheduled kill or pause of that worker and the ledger shows at most 1 row for it (D58). Each one is listed here; " +
+      "a seed with any is never a plain pass.",
+  );
+  lines.push("");
+  if (escalations.length === 0) lines.push("None.");
+  for (const e of escalations) lines.push(`- seed ${e.index} (${e.seed}): job \`${e.jobId}\`, ${e.deaths} deaths: ${e.events.join(", ")}`);
+  if (input.interruptions.length > 0) {
+    lines.push("");
+    lines.push("## Interrupted runs (re-run with the same seed; the partial evidence was set aside, not deleted)");
+    lines.push("");
+    for (const x of input.interruptions) lines.push(`- seed ${x.index} (${x.seed}): interrupted, moved to \`${x.movedTo}\` at ${x.at}`);
+  }
+  lines.push("");
+  lines.push(
+    result === "PASS"
+      ? `RESULT: PASS (${passed}/${input.seeds.length} seeds passed their family judge: 0 DUPLICATE, 0 LOST, 0 needs_human, every job settled)`
+      : result === "PASS_WITH_ATTRIBUTED_ESCALATIONS"
+        ? `RESULT: PASS WITH ${escalations.length} ESCALATION(S) BY CRASH CAP (ATTRIBUTED) (${passed}/${input.seeds.length} seeds passed their family judge: ` +
+          "0 DUPLICATE, 0 LOST, every job settled, no other needs_human; the escalations are listed above; not a plain pass)"
+        : result === "INCOMPLETE"
+          ? `RESULT: INCOMPLETE (${finished.length} of ${input.seeds.length} seeds finished, all passed so far; resume with the same command)`
+          : `RESULT: FAIL (${failedSeeds.length} of ${finished.length} finished seeds failed: ${failedSeeds.map((d) => `#${d.index} seed ${d.seed}`).join(", ")}; each stays in this tally and is investigated)`,
+  );
+  return { markdown: lines.join("\n") + "\n", totals, finished: finished.length, passed, result, escalations };
+}
+
+/** A seed's evidence folder name inside the batch's out dir. */
+export function dirName(index: number, seed: number): string {
+  return `seed-${String(index).padStart(2, "0")}-${seed}`;
+}

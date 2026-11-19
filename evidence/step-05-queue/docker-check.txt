@@ -1,0 +1,20 @@
+# Docker check, fleet Step 5 commit 1 (2026-11-10T01:56:11Z)
+
+$ docker version --format "{{.Client.Version}} / {{.Server.Version}} ({{.Server.Os}}/{{.Server.Arch}})"
+29.9.3 / 29.9.3 (linux/amd64)
+
+$ docker compose version
+Docker Compose version v5.7.0
+
+$ docker compose up -d postgres  &&  wait for healthy
+health: healthy
+
+$ docker compose ps
+NAME              IMAGE         COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+rote-postgres-1   postgres:17   "docker-entrypoint.s…"   postgres   22 seconds ago   Up 21 seconds (healthy)   127.0.0.1:55432->5432/tcp
+
+$ docker image inspect postgres:17 --format "{{index .RepoDigests 0}}"
+postgres@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
+
+$ psql -Atc "select version()"
+PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit

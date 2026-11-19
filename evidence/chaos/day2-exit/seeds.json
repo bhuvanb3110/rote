@@ -1,0 +1,13 @@
+{
+  "seeds": [
+    2080386450,
+    1980443797
+  ],
+  "jobs": 500,
+  "workers": 4,
+  "durationMs": 800000,
+  "drainTimeoutMs": 900000,
+  "family": "standard",
+  "createdAt": "2026-11-18T01:07:16.299Z",
+  "command": "npm run chaos-seeds -- --seeds 2 --jobs 500"
+}

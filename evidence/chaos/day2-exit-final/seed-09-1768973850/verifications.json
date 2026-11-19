@@ -1,0 +1,90 @@
+[
+  {
+    "id": 1,
+    "job_id": "55ad978d-28ce-4228-862f-eb16cd8a63c8",
+    "fencing_token": 2,
+    "worker_id": "d6f39c899b70-7-4e52",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:41:10.242Z",
+    "ended_at": "2026-11-19T04:41:12.122Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 2,
+    "job_id": "4ff0ff6f-a173-42dd-af11-0de69732b228",
+    "fencing_token": 2,
+    "worker_id": "6049abae02b9-7-9dfc",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:41:34.428Z",
+    "ended_at": "2026-11-19T04:41:37.377Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 3,
+    "job_id": "e1bc5e16-b6c2-4e20-8309-e0c64fd7352f",
+    "fencing_token": 2,
+    "worker_id": "d6f39c899b70-8-d919",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:41:55.830Z",
+    "ended_at": "2026-11-19T04:41:57.685Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 4,
+    "job_id": "040423bd-102d-4787-97e2-903bc94ac3f9",
+    "fencing_token": 2,
+    "worker_id": "6049abae02b9-7-e2a4",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:43:19.843Z",
+    "ended_at": "2026-11-19T04:43:49.852Z",
+    "lookups": null,
+    "decision": "crashed",
+    "error": "lease expired in verifying; recovered by 6f8544e01444-7-6b6b (T6.5 verify)"
+  },
+  {
+    "id": 5,
+    "job_id": "52f7b5d6-c461-4363-b671-ad2bb4161582",
+    "fencing_token": 2,
+    "worker_id": "d6f39c899b70-7-4092",
+    "reason": "lease_expired_in_committing",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:43:37.719Z",
+    "ended_at": "2026-11-19T04:43:39.866Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  },
+  {
+    "id": 6,
+    "job_id": "040423bd-102d-4787-97e2-903bc94ac3f9",
+    "fencing_token": 3,
+    "worker_id": "6f8544e01444-7-6b6b",
+    "reason": "lease_expired_in_verifying",
+    "prior_status": null,
+    "started_at": "2026-11-19T04:43:49.852Z",
+    "ended_at": "2026-11-19T04:43:52.452Z",
+    "lookups": [
+      1
+    ],
+    "decision": "already_done",
+    "error": null
+  }
+]

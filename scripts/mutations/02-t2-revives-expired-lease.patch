@@ -1,0 +1,12 @@
+diff --git a/src/worker/heartbeat.ts b/src/worker/heartbeat.ts
+index 21f7096..cac6b12 100644
+--- a/src/worker/heartbeat.ts
++++ b/src/worker/heartbeat.ts
+@@ -28,7 +28,6 @@ UPDATE jobs
+ SET lease_expires_at = now() + make_interval(secs => $4), updated_at = now()
+ WHERE id = $1 AND fencing_token = $2 AND lease_owner = $3
+   AND state IN ('running', 'committing', 'verifying')
+-  AND lease_expires_at > now()
+ RETURNING lease_expires_at`;
+ 
+ export interface LeaseArgs {

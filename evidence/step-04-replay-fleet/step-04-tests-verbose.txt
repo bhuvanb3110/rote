@@ -1,0 +1,31 @@
+﻿ ✓ src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > two sequential runs on one browser both succeed; the browser stays up with 0 contexts 1831ms
+ ✓ src/catalog/invoke.test.ts > invokeCapability passes the fleet options through to runReplay > browser, onIrreversible, signal, evidenceBaseDir and statusDir all reach replay (tenant-b transfer) 1981ms
+ ✓ src/catalog/invoke.test.ts > invokeCapability passes the fleet options through to runReplay > statusDir is the one consulted: an empty one refuses the run before any browser (needs_human) 24ms
+ ✓ src/catalog/invoke.test.ts > invokeCapability passes the fleet options through to runReplay > an aborted signal rejects with its reason before any browser 10ms
+ ✓ src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > two concurrent runs on one browser get their own balances (contexts share no cookies) 984ms
+ ✓ src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > a run that throws after its context opened still closes that context and leaves the browser up 77ms
+ ✓ src/replay/fleet.test.ts > browser: reuse the worker's browser, close only the run's context > headless is ignored (not rejected) when a browser is passed 638ms
+ ✓ src/replay/fleet.test.ts > irreversibility hardening: gate risky OR artifact risky > gate says safe, artifact says risky: refused without approveRisky (0 rows); runs with it (1 row) 2288ms
+ ✓ src/replay/fleet.test.ts > irreversibility hardening: gate risky OR artifact risky > artifact says safe, gate says risky: still irreversible (today's behavior, pinned) 1069ms
+ ✓ src/replay/fleet.test.ts > irreversibility hardening: gate risky OR artifact risky > gate-blind Submit with approveRisky still goes through onIrreversible.before 1256ms
+ ✓ src/replay/fleet.test.ts > onIrreversible hooks > before then after, once each, on step-11; after() runs once the bank answered (ledger already has the row) 1165ms
+ ✓ src/replay/fleet.test.ts > onIrreversible hooks > before() throws: runReplay rejects with that same error, the click never happens, after() never runs 1043ms
+ ✓ src/replay/fleet.test.ts > onIrreversible hooks > after() throws: runReplay rejects with that error and the click happened (exactly 1 row) 985ms
+ ✓ src/replay/fleet.test.ts > onIrreversible hooks > no hooks for an all-safe capability, nor for a transfer without approveRisky 1965ms
+ ✓ src/replay/fleet.test.ts > onIrreversible hooks > no navigation after the irreversible action: the bounded wait times out, is noted in evidence, after() still runs 10570ms
+ ✓ src/replay/fleet.test.ts > after an irreversible action has been attempted > transient interstitial right after Submit: no reload (no re-POST), non-success with commitUncertain, 0 rows 1066ms
+ ✓ src/replay/fleet.test.ts > after an irreversible action has been attempted > transient interstitial BEFORE Submit still recovers (the rules apply only after the attempt) 1788ms
+ ✓ src/replay/fleet.test.ts > after an irreversible action has been attempted > 503 right after Submit, before the write (errors/on armed in before()): failure + commitUncertain, 0 rows 1188ms
+ ✓ src/replay/fleet.test.ts > after an irreversible action has been attempted > 503 right after Submit, after the write (errors/after-write): failure + commitUncertain, 1 row, lookup finds 1 2027ms
+ ✓ src/replay/fleet.test.ts > after an irreversible action has been attempted > a business_outcome after the attempt carries commitUncertain too 1022ms
+ ✓ src/replay/fleet.test.ts > after an irreversible action has been attempted > business outcomes BEFORE the attempt carry no marker (a blind retry is safe) 914ms
+ ✓ src/replay/fleet.test.ts > after an irreversible action has been attempted > a throw after the attempt becomes failure/unknown with the marker (not an exception) 1027ms
+ ✓ src/replay/fleet.test.ts > after an irreversible action has been attempted > operator mode: a no-op hand-back after a failed irreversible step ends in needs_human, never a second click 1138ms
+ ✓ src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > already aborted: rejects with signal.reason before any evidence, browser or context 6ms
+ ✓ src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort during a slow step (bank latency 3 s): AbortError well under 3 s, shared browser up with 0 contexts, 0 rows 1038ms
+ ✓ src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort inside after() (the click happened): still rejects with AbortError, 1 row, aborted entry names step-11 1451ms
+ ✓ src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > abort without a shared browser closes the browser replay launched, and still rejects 1077ms
+ ✓ src/replay/fleet.test.ts > signal: abort always rejects, closes the context at once, records nothing but an `aborted` entry > the abort listener is removed when the run ends (no leak on a long-lived worker) 724ms
+ Test Files  2 passed (2)
+      Tests  28 passed (28)
+   Duration  39.58s (transform 435ms, setup 0ms, import 1.64s, tests 40.83s, environment 0ms)

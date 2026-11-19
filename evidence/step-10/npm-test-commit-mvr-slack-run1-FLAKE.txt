@@ -1,0 +1,32 @@
+
+> rote@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.10 C:/Users/hp/Downloads/rote
+
+ ❯ |unit-db| src/worker/recover.db.test.ts (16 tests | 1 failed) 16796ms
+     × 8 concurrent recoverers over 50 expired jobs: each job recovered exactly once (token + 1 exactly once) 5193ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit-db| src/worker/recover.db.test.ts > T6 under concurrency > 8 concurrent recoverers over 50 expired jobs: each job recovered exactly once (token + 1 exactly once)
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/worker/recover.db.test.ts:251:3
+    249|
+    250| describe("T6 under concurrency", () => {
+    251|   it("8 concurrent recoverers over 50 expired jobs: each job recovered…
+       |   ^
+    252|     await enqueueN(50);
+    253|     for (let i = 0; i < 50; i += 1) await dequeue(pool, { workerId: `d…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 57 passed (58)
+      Tests  1 failed | 571 passed (572)
+   Start at  10:44:14
+   Duration  205.15s (transform 7.55s, setup 0ms, import 42.07s, tests 627.88s, environment 23ms)
+
+exit=1 wall_seconds=206.6

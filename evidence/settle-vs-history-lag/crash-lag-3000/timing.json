@@ -1,0 +1,21 @@
+{
+  "path": "crash",
+  "lagMs": 3000,
+  "settleMs": 5000,
+  "leaseSeconds": 5,
+  "rowAt": "2026-11-14T07:25:32.696Z",
+  "rowVisibleInHistoryAt": "2026-11-14T07:25:35.696Z",
+  "lookups": [
+    {
+      "run": "transfer-history-lookup-2026-11-14T07-25-37-905Z-0ee344be",
+      "status": "success",
+      "renderAfterWriteMs": [
+        6009,
+        6119
+      ],
+      "predicted": 1,
+      "counted": 1
+    }
+  ],
+  "toleranceMs": 250
+}

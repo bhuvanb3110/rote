@@ -1,0 +1,70 @@
+
+> rote@0.1.0 chaos
+> tsx scripts/chaos.ts --seed 14449393 --out evidence/chaos/step-09-seed-14449393
+
+Chaos run, started 2026-11-14T07:35:55.980Z
+seed: 14449393  (reproduce: npm run chaos -- --seed 14449393)
+jobs: 100, workers: 4, schedule 150000 ms: 14 kills (gap 5000-15000 ms), pause replica 3 68074-113074 ms, restart after 2000 ms; drain timeout 600000 ms
+database: postgres://rote:***@127.0.0.1:55432/rote
+reset: queue tables truncated; bank ledger rows: 0
+replicas: rote-worker-1=8f460f0928de, rote-worker-2=0a82308f7753, rote-worker-3=574124e42bb5, rote-worker-4=c27d4d219820
+  event {"tMs":3,"at":"2026-11-14T07:37:11.068Z","kind":"clock-start"}
+  event {"tMs":6484,"at":"2026-11-14T07:37:17.548Z","kind":"enqueue-done","created":100,"of":100}
+enqueued: 100/100 x 201
+  event {"tMs":17953,"at":"2026-11-14T07:37:29.017Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":13943,"heldJobs":[{"id":"517fe035-6dba-4c78-812e-4611df59cffe","state":"running","attempt":1}]}
+  event {"tMs":24629,"at":"2026-11-14T07:37:35.693Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":15943}
+  event {"tMs":29679,"at":"2026-11-14T07:37:40.743Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":27889,"heldJobs":[{"id":"5f4a4f5a-7531-4ed1-90fd-75b4a09a14e2","state":"committing","attempt":1}]}
+  event {"tMs":30698,"at":"2026-11-14T07:37:41.762Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":29889}
+  event {"tMs":38767,"at":"2026-11-14T07:37:49.831Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":37560,"heldJobs":[{"id":"68423110-7f77-47e0-b17e-6553b458977e","state":"committing","attempt":1}]}
+  event {"tMs":40245,"at":"2026-11-14T07:37:51.309Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":39560}
+  event {"tMs":57006,"at":"2026-11-14T07:38:08.070Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":48275,"heldJobs":[{"id":"715de8fc-22af-4b29-9e27-b9a5336650be","state":"running","attempt":1}]}
+  event {"tMs":58227,"at":"2026-11-14T07:38:09.291Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":50275}
+  event {"tMs":59280,"at":"2026-11-14T07:38:10.344Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":55321,"heldJobs":[{"id":"68423110-7f77-47e0-b17e-6553b458977e","state":"committing","attempt":1},{"id":"98ee7ad0-a0b6-4f22-9d41-a8bf4c9418c3","state":"running","attempt":1}]}
+  event {"tMs":59960,"at":"2026-11-14T07:38:11.024Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":57321}
+  event {"tMs":69204,"at":"2026-11-14T07:38:20.268Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":67488,"heldJobs":[{"id":"68423110-7f77-47e0-b17e-6553b458977e","state":"committing","attempt":1},{"id":"98ee7ad0-a0b6-4f22-9d41-a8bf4c9418c3","state":"running","attempt":1}]}
+  event {"tMs":69557,"at":"2026-11-14T07:38:20.621Z","kind":"pause","replica":3,"container":"rote-worker-3","scheduledMs":68074,"heldJobs":[{"id":"0014be44-6969-4d91-b368-3d4e2694d772","state":"running","attempt":1}]}
+  event {"tMs":70789,"at":"2026-11-14T07:38:21.853Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":69488}
+  event {"tMs":78522,"at":"2026-11-14T07:38:29.586Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":76493,"heldJobs":[{"id":"98ee7ad0-a0b6-4f22-9d41-a8bf4c9418c3","state":"running","attempt":1}]}
+  event {"tMs":79907,"at":"2026-11-14T07:38:30.971Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":78493}
+  event {"tMs":87886,"at":"2026-11-14T07:38:38.950Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":87109,"heldJobs":[{"id":"98ee7ad0-a0b6-4f22-9d41-a8bf4c9418c3","state":"running","attempt":1},{"id":"9a21d9c9-492f-4a00-87fa-5b377ee43644","state":"running","attempt":1}]}
+  event {"tMs":89575,"at":"2026-11-14T07:38:40.639Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":89109}
+  event {"tMs":95060,"at":"2026-11-14T07:38:46.124Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":92489,"heldJobs":[{"id":"50af757d-3e62-41b3-ac74-30de1e6ce579","state":"running","attempt":1}]}
+  event {"tMs":95497,"at":"2026-11-14T07:38:46.561Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":94489}
+  event {"tMs":98866,"at":"2026-11-14T07:38:49.930Z","kind":"kill","replica":4,"container":"rote-worker-4","scheduledMs":98047,"heldJobs":[{"id":"0014be44-6969-4d91-b368-3d4e2694d772","state":"running","attempt":2}]}
+  event {"tMs":100450,"at":"2026-11-14T07:38:51.515Z","kind":"start","replica":4,"container":"rote-worker-4","scheduledMs":100047}
+  event {"tMs":113557,"at":"2026-11-14T07:39:04.621Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":112813,"heldJobs":[{"id":"50af757d-3e62-41b3-ac74-30de1e6ce579","state":"running","attempt":1},{"id":"7413dfc2-e2ae-47d1-a574-fd23aa9e8839","state":"running","attempt":1}]}
+  event {"tMs":113735,"at":"2026-11-14T07:39:04.799Z","kind":"unpause","replica":3,"container":"rote-worker-3","scheduledMs":113074,"heldJobs":[]}
+  event {"tMs":115251,"at":"2026-11-14T07:39:06.315Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":114813}
+  event {"tMs":124511,"at":"2026-11-14T07:39:15.575Z","kind":"kill","replica":3,"container":"rote-worker-3","scheduledMs":123771,"heldJobs":[{"id":"1779a4cf-a962-4894-b341-7ca6d9a15a1d","state":"running","attempt":1}]}
+  event {"tMs":126204,"at":"2026-11-14T07:39:17.268Z","kind":"start","replica":3,"container":"rote-worker-3","scheduledMs":125771}
+  event {"tMs":135067,"at":"2026-11-14T07:39:26.131Z","kind":"kill","replica":1,"container":"rote-worker-1","scheduledMs":134291,"heldJobs":[{"id":"8ecfafa3-9bf2-47c8-b555-48b64e0ad348","state":"running","attempt":1}]}
+  event {"tMs":136723,"at":"2026-11-14T07:39:27.787Z","kind":"start","replica":1,"container":"rote-worker-1","scheduledMs":136291}
+  event {"tMs":145407,"at":"2026-11-14T07:39:36.471Z","kind":"kill","replica":2,"container":"rote-worker-2","scheduledMs":144599,"heldJobs":[{"id":"51a807ef-9b68-4b80-b414-755641cb6a29","state":"committing","attempt":1}]}
+  event {"tMs":147193,"at":"2026-11-14T07:39:38.257Z","kind":"start","replica":2,"container":"rote-worker-2","scheduledMs":146599}
+  event {"tMs":147194,"at":"2026-11-14T07:39:38.258Z","kind":"schedule-done"}
+  event {"tMs":177390,"at":"2026-11-14T07:40:08.454Z","kind":"drain-done","timedOut":false,"ms":30195}
+
+kills executed: 14; restarts: 14; errors: 0
+recoveries (T6, from the attempt and verify-phase rows): T6.1 requeue x9, T6.4 verify x3
+verify phases (job_verifications: decision[lookups] (reason)): already_done[1] (lease_expired_in_committing) x3
+needs_human jobs: 0 (Step 9 expects 0: every job killed after its intent is verified)
+attempt outcomes: crashed x12, lease_lost x1, success x97
+final job states: succeeded/already_done x3, succeeded/success x97
+worker containers at the end: rote-worker-1:running, rote-worker-2:running, rote-worker-3:running, rote-worker-4:running
+worker protections fired (container logs): heartbeat lease lost x1, fenced commit intent x0, completion fenced out x0, run aborted on a lost lease x1, verify phase aborted on a lost lease x0, verify decision fenced out x0
+credential values in jobs/attempts/API responses/container logs: none
+docker stats, peak memory per container:
+  rote-api-1: 178.4 MiB
+  rote-bank-1: 98.5 MiB
+  rote-postgres-1: 102.8 MiB
+  rote-worker-1: 237.0 MiB
+  rote-worker-2: 331.6 MiB
+  rote-worker-3: 212.8 MiB
+  rote-worker-4: 225.1 MiB
+
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 100; ledger rows: 100; drain timed out: no
+job states: succeeded=100
+verdicts: ok=100, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+RESULT: PASS

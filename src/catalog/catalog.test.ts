@@ -13,12 +13,23 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import app from "../../mock-app/app.js";
 import { listCapabilities } from "./registry.js";
 import { invokeCapability } from "./invoke.js";
+import { approvalKey, approveCapability } from "../confidence/index.js";
+import { deserializeCapability } from "../artifact/index.js";
+import { listenOnSafePort } from "../testing/listen.js";
 
 describe("catalog list() derives typed contracts from the real artifacts on disk", () => {
   it("lists all saved capabilities with schema-accurate inputSchema/outputSchema", async () => {
     const entries = await listCapabilities({ artifactsDir: "artifacts" });
     const ids = entries.map((entry) => entry.id).sort();
-    expect(ids).toEqual(["member-lookup", "open-sub-account", "open-sub-account-confirmed"].sort());
+    expect(ids).toEqual(
+      [
+        "member-lookup",
+        "open-sub-account",
+        "open-sub-account-confirmed",
+        "transfer",
+        "transfer-history-lookup",
+      ].sort(),
+    );
 
     const memberLookup = entries.find((entry) => entry.id === "member-lookup")!;
     expect(memberLookup.name).toBe("Member Lookup");
@@ -41,7 +52,7 @@ describe("catalog invoke() calls the real replay path", () => {
 
   beforeAll(async () => {
     server = createServer(app);
-    await new Promise<void>((resolve) => server.listen(0, resolve));
+    await listenOnSafePort(server); // never a port Chromium/fetch refuse (D31)
     const { port } = server.address() as AddressInfo;
     baseUrl = `http://localhost:${port}`;
 
@@ -56,6 +67,12 @@ describe("catalog invoke() calls the real replay path", () => {
     };
     tempArtifactsDir = await mkdtemp(path.join(tmpdir(), "catalog-test-"));
     await writeFile(path.join(tempArtifactsDir, "member-lookup.json"), JSON.stringify(relaxed, null, 2));
+    // status/ approves the unrelaxed artifact; the relaxed copy is different content (D24).
+    await approveCapability("member-lookup", {
+      ...approvalKey(deserializeCapability(JSON.stringify(relaxed))),
+      statusDir: path.join(tempArtifactsDir, "status"),
+      reason: "test-only approval of the relaxed copy",
+    });
   });
 
   afterAll(async () => {
@@ -69,6 +86,7 @@ describe("catalog invoke() calls the real replay path", () => {
       params: { username: "operator", password: "operator", memberId: "10001" },
       entryUrl: baseUrl,
       artifactsDir: tempArtifactsDir,
+      statusDir: path.join(tempArtifactsDir, "status"),
       headless: true,
     });
     expect(result.status).toBe("success");
@@ -84,6 +102,7 @@ describe("catalog invoke() calls the real replay path", () => {
         params: { username: "operator" },
         entryUrl: baseUrl,
         artifactsDir: tempArtifactsDir,
+      statusDir: path.join(tempArtifactsDir, "status"),
         headless: true,
       }),
     ).rejects.toThrow(/password|memberId/);
@@ -95,6 +114,7 @@ describe("catalog invoke() calls the real replay path", () => {
         id: "does-not-exist",
         params: {},
         artifactsDir: tempArtifactsDir,
+      statusDir: path.join(tempArtifactsDir, "status"),
       }),
     ).rejects.toThrow(/No capability with id/);
   });

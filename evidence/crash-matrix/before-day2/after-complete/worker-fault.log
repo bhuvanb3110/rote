@@ -1,0 +1,5 @@
+{"level":40,"time":1794421957167,"service":"worker","workerId":"fault-after-complete","faultPoint":"after-complete","msg":"worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)"}
+{"level":30,"time":1794421957167,"service":"worker","workerId":"fault-after-complete","playwrightVersion":"1.62.1","leaseSeconds":30,"shutdownGraceMs":10000,"evidenceBaseDir":"C:\\Users\\hp\\Downloads\\rote\\evidence\\crash-matrix\\before-day2\\after-complete\\worker-evidence","db":"postgres://rote:***@127.0.0.1:55432/rote_test?options=-c+search_path%3Dt_crash_after_complete_32acca89","tenants":["tenant-a","tenant-b","tenant-c"],"msg":"worker: ready"}
+{"level":30,"time":1794421957167,"service":"worker","workerId":"fault-after-complete","leaseSeconds":30,"msg":"worker: started"}
+{"level":30,"time":1794421957195,"service":"worker","workerId":"fault-after-complete","jobId":"3677fbcd-e972-40f6-afa3-1a3d9caa8b1c","tenant":"tenant-a","capability":"transfer","attempt":1,"msg":"worker: job leased"}
+ROTE_FAULT firing at after-complete (pid 3812)

@@ -1,0 +1,39 @@
+Chaos run, started 2026-11-19T05:48:33.565Z (code 9d38bb2)
+family: standard -- kills every 5-15 s and one 45 s pause; no bank faults; expected final states: succeeded/success, succeeded/already_done, failed/crash_limit, failed/not_committed_attempts_exhausted (src/chaos/families.ts)
+seed: 2045087166  (reproduce: npm run chaos -- --seed 2045087166 --jobs 500 --duration 800s)
+jobs: 500, workers: 4, schedule 800000 ms: 77 kills (gap 5000-15000 ms), pause replica 2 690891-735891 ms, bank no faults, restart after 2000 ms; drain (until settled) timeout 900000 ms
+database: postgres://rote:***@127.0.0.1:55432/rote
+reset: queue tables truncated; bank ledger rows: 0; bank knobs: errors: off, latency: 0ms, history lag: 0ms
+replicas: rote-worker-1=d6f39c899b70, rote-worker-2=6049abae02b9, rote-worker-3=6f8544e01444, rote-worker-4=d44b0fe854ff
+enqueued: 500/500 x 201
+
+kills executed: 77; restarts: 77; errors: 0; kills/pauses whose post-call snapshot differed from the pre-call one: 3
+recovery kinds (decision 8): requeuedAfterCrash x25, claimedToVerify x4, already_done x4
+verify and reconcile phases (job_verifications: decision[lookups] (reason)): already_done[1] (lease_expired_in_committing) x4
+needs_human jobs: 0 (the standard family allows none)
+failed jobs: 0
+crash budget (D57): 29 crash(es) on 28 job(s), at most 2 on one job; 0 job(s) leased past max_attempts (crashes used no attempt); 0 at the crash cap
+reconciler deaths (D59): 0 on 0 job(s); 0 reconcile(s) abandoned by the pass
+attempt outcomes: crashed x29, success x496
+final job states: succeeded/already_done x4, succeeded/success x496
+settled: 500/500; drain 2 s
+worker containers at the end: rote-worker-1:running, rote-worker-2:running, rote-worker-3:running, rote-worker-4:running
+worker protections fired (container logs): heartbeatLeaseLost x0, fencedCommitIntent x0, completionFencedOut x0, runAbortedOnLostLease x0, verifyPhaseAborted x0, verifyDecisionFencedOut x0, reconcileDecisionFencedOut x0, duplicatesDetected x0, unrecordedCommitsDetected x0, reconcileAbandoned x0
+credential values in jobs/attempts/API responses/container logs: none
+docker stats, peak memory per container:
+  rote-api-1: 242.5 MiB
+  rote-bank-1: 48.8 MiB
+  rote-postgres-1: 68.3 MiB
+  rote-worker-1: 244.7 MiB
+  rote-worker-2: 236.3 MiB
+  rote-worker-3: 240.7 MiB
+  rote-worker-4: 239.0 MiB
+
+Ledger oracle (docs/DECISIONS.md D32): every job judged by the bank's own ledger, matched by memo_key
+jobs: 500; ledger rows: 500; drain timed out: no
+job states: succeeded=500
+verdicts: ok=500, DUPLICATE=0, MISSING_COMMIT=0, UNRECORDED_COMMIT=0, MISMATCH=0, LOST=0, PENDING=0, ORPHAN=0
+duplicates: 0; lost: 0 (of which after commit: 0); orphan rows: 0
+
+family judge (standard; src/chaos/families.ts): every expectation met
+RESULT: PASS

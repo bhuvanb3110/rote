@@ -1,0 +1,5 @@
+{"level":40,"time":1794453258365,"service":"worker","workerId":"fault-after-step-02","faultPoint":"after-step-02","msg":"worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)"}
+{"level":30,"time":1794453258366,"service":"worker","workerId":"fault-after-step-02","playwrightVersion":"1.62.1","leaseSeconds":5,"heartbeatSeconds":2,"shutdownGraceMs":10000,"evidenceBaseDir":"C:\\Users\\hp\\Downloads\\rote\\evidence\\crash-matrix\\step-08\\after-step-02\\worker-evidence","db":"postgres://rote:***@127.0.0.1:55432/rote_test?options=-c+search_path%3Dt_crash_after_step_02_ff2baa3d","tenants":["tenant-a","tenant-b","tenant-c"],"msg":"worker: ready"}
+{"level":30,"time":1794453258367,"service":"worker","workerId":"fault-after-step-02","leaseSeconds":5,"msg":"worker: started"}
+{"level":30,"time":1794453258399,"service":"worker","workerId":"fault-after-step-02","jobId":"c33d63c8-f995-4af3-b78a-3f7b1ec1ab2e","tenant":"tenant-a","capability":"transfer","attempt":1,"msg":"worker: job leased"}
+ROTE_FAULT firing at after-step-02 (pid 23492)

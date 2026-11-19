@@ -1,0 +1,198 @@
+# CI (docs/plans/step-07.md section 4, reviewer decisions B2/B3, docs/DECISIONS.md D35).
+#   test        Node 22 LTS, postgres:17 service, Playwright Chromium from the lockfile, typecheck,
+#               the full npm test; the full log is uploaded on every run, pass or fail.
+#   unit-node25 the pure unit tests (no browser, no Postgres) on Node 25, the builder's local Node.
+#   docker      builds the fleet image (build only, never pushed), with the GitHub Actions build cache,
+#               so a broken Dockerfile fails fast.
+#   crash-matrix the crash-point matrix (Step 10: no longer report-only, D54); report uploaded.
+#   mutation-check every planted bug in scripts/mutations/ must turn its tests red (D54); report uploaded.
+# Not in CI (README "CI"): the Day-1 exit and chaos. They need the Compose stack and minutes of wall
+# time; they run as scripts with committed evidence.
+#
+# Every action is pinned by full commit SHA, its release in a trailing comment (supply-chain practice:
+# a tag can be moved, a SHA cannot). Each is the current major on a supported Node (runs.using:
+# node24), checked with gh on 2026-11-11 (Step 8 reviewer decision A1). Bump by resolving the new tag
+# to its commit (gh api repos/<owner>/<repo>/git/ref/tags/<tag>, dereferencing an annotated tag).
+name: ci
+
+on:
+  push:
+    branches: ["main", "fleet/**"]
+  pull_request:
+    branches: ["main", "fleet/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: rote
+          POSTGRES_PASSWORD: rote_dev_only
+          POSTGRES_DB: rote
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rote -d rote" --health-interval 2s
+          --health-timeout 3s --health-retries 30
+    env:
+      ROTE_TEST_DATABASE_URL: postgres://rote:rote_dev_only@127.0.0.1:55432/rote_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: node --version && npm --version
+      - run: npm ci
+      # The playwright package installed by npm ci (package-lock.json) decides the browser build.
+      - run: npx playwright --version
+      - run: npx playwright install --with-deps chromium
+      - run: npm run typecheck
+      - name: npm test (full log kept)
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee npm-test.txt
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-test-log
+          path: npm-test.txt
+          if-no-files-found: warn
+
+  unit-node25:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 25
+          cache: npm
+      - run: node --version
+      - run: npm ci
+      - name: unit tests (unit-db project without the *.db.test.ts files; no browser, no Postgres)
+        shell: bash
+        run: |
+          set -o pipefail
+          ROTE_SKIP_DB_TESTS=1 npx vitest run --project unit-db 2>&1 | tee unit-node25.txt
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-node25-log
+          path: unit-node25.txt
+          if-no-files-found: warn
+
+  # The crash-point matrix on Linux, where the fault worker's SIGKILL is a real signal (Step 8 reviewer
+  # decision A3, D35 amendment). Step 10 (D54): no longer report-only -- a red matrix fails the workflow --
+  # and it judges --expect step-10 (Step 9's outcomes, each scenario drained until settled, the reconcile
+  # pass on the resubmit paths). The report (matrix.md, check.txt, per-point logs) is uploaded on every
+  # run and matrix.md is written to the job summary.
+  crash-matrix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: rote
+          POSTGRES_PASSWORD: rote_dev_only
+          POSTGRES_DB: rote
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rote -d rote" --health-interval 2s
+          --health-timeout 3s --health-retries 30
+    env:
+      ROTE_TEST_DATABASE_URL: postgres://rote:rote_dev_only@127.0.0.1:55432/rote_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: crash-point matrix
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run crash-matrix -- --lease-seconds 5 --heartbeat-seconds 2 --expect step-10 --reconcile-margin-seconds 5 --drain-timeout 90s --out crash-matrix-report 2>&1 | tee crash-matrix-stdout.txt
+      - if: always()
+        name: matrix to the job summary
+        shell: bash
+        run: cat crash-matrix-report/matrix.md >> "$GITHUB_STEP_SUMMARY" || echo "no matrix.md" >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: crash-matrix-report
+          path: |
+            crash-matrix-report/
+            crash-matrix-stdout.txt
+          if-no-files-found: warn
+
+  # Every planted bug (scripts/mutations/*.patch) must turn the tests that guard it red, and the tree must be
+  # exactly as before afterwards (D54). Model vs real needs Postgres; no browser is needed.
+  mutation-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: rote
+          POSTGRES_PASSWORD: rote_dev_only
+          POSTGRES_DB: rote
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rote -d rote" --health-interval 2s
+          --health-timeout 3s --health-retries 30
+    env:
+      ROTE_TEST_DATABASE_URL: postgres://rote:rote_dev_only@127.0.0.1:55432/rote_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: mutation check
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run mutation-check -- --out mutation-check-report 2>&1 | tee mutation-check-stdout.txt
+      - if: always()
+        name: report to the job summary
+        shell: bash
+        run: cat mutation-check-report/report.md >> "$GITHUB_STEP_SUMMARY" || echo "no report.md" >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-check-report
+          path: |
+            mutation-check-report/
+            mutation-check-stdout.txt
+          if-no-files-found: warn
+
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: build the fleet image (no push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: false
+          tags: rote-fleet:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

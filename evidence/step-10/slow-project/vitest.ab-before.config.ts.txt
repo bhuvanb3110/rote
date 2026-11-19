@@ -1,0 +1,21 @@
+// TEMPORARY (not committed): the pre-D48 arrangement, for the interleaved A/B only. The slow files are
+// back in the capped browser project; unit-db and browser as before.
+import { defineConfig } from "vitest/config";
+import { BROWSER_TEST_FILES, BROWSER_TEST_WORKERS, SLOW_TEST_FILES } from "./vitest.browser-files.js";
+
+const ALL_BROWSER = [...BROWSER_TEST_FILES, ...SLOW_TEST_FILES];
+
+export default defineConfig({
+  test: {
+    projects: [
+      {
+        extends: true,
+        test: { name: "unit-db", include: ["**/*.test.ts"], exclude: ["**/node_modules/**", "dist/**", ...ALL_BROWSER], sequence: { groupOrder: 0 } },
+      },
+      {
+        extends: true,
+        test: { name: "browser", include: ALL_BROWSER, maxWorkers: BROWSER_TEST_WORKERS, sequence: { groupOrder: 1 } },
+      },
+    ],
+  },
+});
