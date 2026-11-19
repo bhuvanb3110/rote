@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "job_id": "d193b5f1-4bd8-4491-8b2c-891f0133f2a6",
+    "attempt": 1,
+    "worker_id": "fault-before-complete",
+    "fencing_token": 1,
+    "started_at": "2026-11-19T16:28:22.030Z",
+    "ended_at": "2026-11-19T16:28:28.588Z",
+    "outcome": "crashed",
+    "commit_uncertain": false,
+    "trace_id": "d178e691cd9ddd4f23ac36d18737b179",
+    "error": "lease expired in committing; recovered by clean-before-complete (T6.4 verify)",
+    "commit_intent_at": "2026-11-19T16:28:23.290Z"
+  }
+]

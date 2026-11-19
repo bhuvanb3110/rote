@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "job_id": "38651cb6-4cc7-4f38-ad61-03c083933234",
+    "attempt": 1,
+    "worker_id": "fault-after-submit",
+    "fencing_token": 1,
+    "started_at": "2026-11-19T16:28:48.317Z",
+    "ended_at": "2026-11-19T16:28:55.449Z",
+    "outcome": "crashed",
+    "commit_uncertain": false,
+    "trace_id": "2898a2f61acf53949d5495e8a4c4ae61",
+    "error": "lease expired in committing; recovered by fault-verify-after-count (T6.4 verify)",
+    "commit_intent_at": "2026-11-19T16:28:49.337Z"
+  }
+]
