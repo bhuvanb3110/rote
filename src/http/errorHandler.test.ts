@@ -16,7 +16,7 @@ import { createCatalogApp } from "../catalog/http.js";
 import { createOperatorConsole } from "../escalation/console.js";
 import { EscalationController } from "../escalation/controller.js";
 import { listenOnSafePort } from "../testing/listen.js";
-import { redactingErrorHandler, requestId, type ErrorSummary } from "./errorHandler.js";
+import { mountRouter, redactingErrorHandler, requestId, type ErrorSummary } from "./errorHandler.js";
 
 const CRED = "fake-cred-12b";
 /** Short and not JSON: body-parser's strict-mode error quotes all of it (the measured 5.2.1 leak). */
@@ -190,11 +190,16 @@ describe("the mock bank (HTML, default stderr sink)", () => {
     expectNoCredential(sent, summaries);
   });
 
-  it("a prefixed tenant's route is logged as its router-relative pattern (Express has restored baseUrl by then)", async () => {
+  it("a prefixed tenant's route is logged with its mount: /tenant-b/login", async () => {
     const sent = await post(await serve(bankApp), "/tenant-b/login", "application/json", JSON.stringify({ password: CRED }));
     expect(sent.status).toBe(500);
-    expect(stderrSummaries(sent.logged)).toEqual([expect.objectContaining({ route: "/login" })]);
+    expect(stderrSummaries(sent.logged)).toEqual([expect.objectContaining({ route: "/tenant-b/login" })]);
     expectNoCredential(sent);
+  });
+
+  it("the unprefixed tenant (mounted with no path) adds nothing: /login", async () => {
+    const sent = await post(await serve(bankApp), "/login", "application/json", JSON.stringify({ password: CRED }));
+    expect(stderrSummaries(sent.logged)).toEqual([expect.objectContaining({ route: "/login" })]);
   });
 });
 
@@ -221,6 +226,63 @@ describe("the operator console (HTML)", () => {
     expect(sent.status).toBe(500);
     expect(summaries).toEqual([expect.objectContaining({ name: "TypeError", status: 500, route: "/hand-back" })]);
     expectNoCredential(sent, summaries);
+  });
+});
+
+describe("route patterns through mounts: the pattern, never concrete values", () => {
+  const TENANT = "acme-corp-7731"; // stands in for a value a mount's parameter would capture
+  const MEMBER = "10001";
+
+  /** An app with: a parameterized mount via mountRouter, the same router via plain app.use (unregistered), and a nested mount. */
+  function mountedApp(summaries: ErrorSummary[]) {
+    const app = express();
+    app.set("env", "development");
+    app.use(requestId());
+    const members = express.Router({ mergeParams: true });
+    members.post("/member/:id/transfer", () => {
+      throw new Error(`refused ${CRED}`);
+    });
+    const inner = express.Router();
+    inner.post("/history/:memo", () => {
+      throw new Error("x");
+    });
+    mountRouter(members, "/archive/:year", inner);
+    mountRouter(app, "/t/:tenant", members);
+    const plain = express.Router();
+    plain.post("/member/:id/transfer", () => {
+      throw new Error("x");
+    });
+    app.use("/legacy/:tenant", plain);
+    app.use(redactingErrorHandler({ format: "json", log: (s) => summaries.push(s) }));
+    return app;
+  }
+
+  it("a parameterized mount logs /t/:tenant/member/:id/transfer, with neither the tenant nor the member id", async () => {
+    const summaries: ErrorSummary[] = [];
+    const base = await serve(mountedApp(summaries));
+    const sent = await post(base, `/t/${TENANT}/member/${MEMBER}/transfer`, "text/plain", "x");
+    expect(sent.status).toBe(500);
+    expect(summaries).toEqual([expect.objectContaining({ route: "/t/:tenant/member/:id/transfer" })]);
+    const everything = JSON.stringify(summaries) + sent.logged + sent.body + sent.headers;
+    expect(everything).not.toContain(TENANT);
+    expect(everything).not.toContain(MEMBER);
+    expectNoCredential(sent, summaries);
+  });
+
+  it("a nested parameterized mount adds every pattern on the way down", async () => {
+    const summaries: ErrorSummary[] = [];
+    const base = await serve(mountedApp(summaries));
+    await post(base, `/t/${TENANT}/archive/2026/history/rent-${MEMBER}`, "text/plain", "x");
+    expect(summaries).toEqual([expect.objectContaining({ route: "/t/:tenant/archive/:year/history/:memo" })]);
+    expect(JSON.stringify(summaries)).not.toMatch(new RegExp(`${TENANT}|2026|${MEMBER}`));
+  });
+
+  it("a router mounted with plain app.use(path, …) is marked unregistered, never shown by its concrete path", async () => {
+    const summaries: ErrorSummary[] = [];
+    const base = await serve(mountedApp(summaries));
+    await post(base, `/legacy/${TENANT}/member/${MEMBER}/transfer`, "text/plain", "x");
+    expect(summaries).toEqual([expect.objectContaining({ route: "/(unregistered mount)/member/:id/transfer" })]);
+    expect(JSON.stringify(summaries)).not.toMatch(new RegExp(`${TENANT}|${MEMBER}`));
   });
 });
 

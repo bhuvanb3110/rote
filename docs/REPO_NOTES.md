@@ -116,8 +116,11 @@ section is completed then.
   - `createCatalogApp({ logError })` and `createOperatorConsole(controller, { logError })` take a sink. The CLI
     passes pino.
   - The bank writes one JSON line to stderr: `"msg":"http: request failed"` in `docker compose logs bank`.
-  - The route is router-relative inside a mounted router (`/tenant-b/login` logs `/login`). An error before routing
-    logs `(no route)`.
+  - The route is the full *pattern*, mount included (`/tenant-b/login`, `/t/:tenant/member/:id`), never concrete
+    values. An error before routing logs `(no route)`.
+  - **Mount a router with `mountRouter(app, pattern, router)`**, not `app.use(pattern, router)`, or its errors log
+    `/(unregistered mount)/…`. `req.baseUrl` is concrete, and Express has reset it by the time the handler runs
+    (D62 amendment).
 - **Testing an Express app for leaks:** set `app.set("env", "development")`. Under vitest's `NODE_ENV=test`,
   Express's default handler logs nothing, which hides a leak. `src/http/errorHandler.test.ts` has the pattern and a
   control case.

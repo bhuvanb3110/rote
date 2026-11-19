@@ -46,10 +46,9 @@ the three apps has an error handler of its own today, so a malformed POST would 
   - **It logs one safe summary:** `name` (`err.name`, only if it is a plain identifier), `code` (`err.code`, or
     body-parser's `err.type`, only if it matches `[A-Za-z0-9_.:-]{1,64}`), `status`, `method`, `route` and
     `requestId`.
-    - `route` is the matched route's pattern (e.g. `/jobs/:id`). It is never the concrete path, which can carry
-      an id.
-      - Inside a mounted router (the bank's `/tenant-b`) it is the router-relative pattern (`/login`): Express
-        has restored `baseUrl` by the time the error reaches the app-level handler.
+    - `route` is the matched route's pattern, mount included (e.g. `/jobs/:id`, `/tenant-b/login`). It is never
+      the concrete path, which can carry an id.
+      - The mount's pattern comes from `mountRouter` (the D62 amendment, from the part-1 review).
       - A body-parser error happens before routing, so it logs `(no route)`.
   - **It never logs** the error's message or stack, `err.body`, the request body, query, headers or cookies.
   - **It responds** with the status (4xx kept, anything else 500) and the generic text from
@@ -212,5 +211,5 @@ image don't load it (Compose passes the environment).
 - **Item 6:** section 6 is the written plan for the majors. Nothing was bumped.
 - **Item 4 waits for 2026-11-21.** The branch is pushed as a backup, with no PR until then.
 - **Off-plan:** in item 2, the route of an error inside a mounted router turned out to be router-relative
-  (`/tenant-b/login` logs `/login`), because Express restores `baseUrl` before the app-level handler runs. That is
-  documented, not worked around.
+  (`/tenant-b/login` logged `/login`), because Express restores `baseUrl` before the app-level handler runs. The
+  review asked for the mount; see "Part 1 review" below.

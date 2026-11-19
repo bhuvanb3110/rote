@@ -2402,3 +2402,24 @@ to copy holds whatever Express, body-parser or V8 decide to put in an error. The
 would leak and check the bytes that actually go out.
 
 **Date.** 2026-11-19
+
+**Amendment (Step 12b part 1 review, 2026-11-19): the route includes its mount, as a pattern.**
+- **The reviewer asked** for the route to be logged as mount + route pattern (`/tenant-b/login`, not `/login`). A
+  parameterized mount must log its pattern, never its values.
+- **Why not log `req.baseUrl` directly:** router 2.x makes it the *concrete* matched mount (`/t/acme`), and resets
+  it to `""` before the error reaches the app-level handler.
+- **What is done instead:**
+  - `mountRouter(parent, pattern, router)` does `parent.use(pattern, router)` and records `pattern` against the
+    Layer that call created (a WeakMap).
+  - The handler walks `req.app.router.stack` to the Layer whose Route is `req.route`, adding each mount's
+    recorded pattern on the way: `/t/:tenant/member/:id/transfer`.
+  - A mount with no path adds nothing.
+  - A router mounted with plain `use(path, router)` shows as `/(unregistered mount)`. Its concrete path is never
+    used.
+- **The bank's prefixed tenants use `mountRouter`.** The api and the console have no mounts.
+- **It reads router 2.x internals** (`layer.route`, `layer.handle.stack`, `layer.slash`) and Express 5's `app.router`.
+  Four tests pin the result: a static mount, a parameterized one, a nested parameterized one and an unregistered
+  one. None of them lets the tenant, the member id, the year or the memo through.
+- **Alternative considered:** intercept the `req.route` assignment to capture `baseUrl` at dispatch. That value is
+  still concrete for a parameterized mount, so it would not meet the rule.
+- **The mutation check gains mutant 13:** the handler logs `err.message`.

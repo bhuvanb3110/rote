@@ -41,7 +41,7 @@ import {
   renderSystemUnavailable,
   renderTransferHistory,
 } from "./views.js";
-import { redactingErrorHandler, requestId } from "../src/http/errorHandler.js";
+import { mountRouter, redactingErrorHandler, requestId } from "../src/http/errorHandler.js";
 import { MEMO_MAX_LENGTH, truncateMemo, validateTransfer } from "./transfer.js";
 import { TENANTS, TENANT_A, tenantUrl, type TenantConfig } from "./tenants.js";
 
@@ -406,7 +406,8 @@ app.get("/control/unexpected-dialog/:state", (req, res) => {
 const prefixedTenants = TENANTS.filter((tenant) => tenant.pathPrefix);
 const unprefixedTenants = TENANTS.filter((tenant) => !tenant.pathPrefix);
 for (const tenant of prefixedTenants) {
-  app.use(tenant.pathPrefix, createTenantRouter(tenant));
+  // mountRouter = app.use(prefix, router), plus the prefix recorded for the error handler's route pattern (D62).
+  mountRouter(app, tenant.pathPrefix, createTenantRouter(tenant));
 }
 for (const tenant of unprefixedTenants) {
   app.use(createTenantRouter(tenant));

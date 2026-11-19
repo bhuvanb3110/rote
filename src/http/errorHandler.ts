@@ -14,7 +14,7 @@
 // request id, as JSON or a minimal HTML page. No internals.
 import { randomUUID } from "node:crypto";
 import { STATUS_CODES } from "node:http";
-import type { ErrorRequestHandler, Request, RequestHandler, Response } from "express";
+import type { ErrorRequestHandler, Express, Request, RequestHandler, Response, Router } from "express";
 
 /** Everything the handler ever logs about a failed request. Every field is built from an allowlist. */
 export interface ErrorSummary {
@@ -26,10 +26,12 @@ export interface ErrorSummary {
   status: number;
   method: string;
   /**
-   * The matched route's pattern (`/jobs/:id`), or "(no route)" for an error before routing (a body-parser error)
-   * or in a router-level middleware. For a route inside a mounted router (the bank's `/tenant-b`), it is the
-   * pattern relative to that router (`/login`): Express has restored `req.baseUrl` by the time the error
-   * reaches the app-level handler, and the mount is not recovered from the concrete URL, which can carry ids.
+   * The matched route's full PATTERN, mount included (`/jobs/:id`, `/tenant-b/login`, `/t/:tenant/member/:id`),
+   * or "(no route)" for an error before routing (a body-parser error) or in a router-level middleware. Never
+   * concrete values: a mount's pattern comes from `mountRouter` (below), not from `req.baseUrl`, which is the
+   * concrete matched path (`/t/acme`) and is restored to "" before the error reaches the app-level handler. A
+   * router mounted with `app.use(path, router)` instead shows as `/(unregistered mount)` (one mounted with no
+   * path, `app.use(router)`, adds nothing).
    */
   route: string;
   /** The id in the response's X-Request-Id header and body, to find this line from a client's report. */
@@ -74,10 +76,57 @@ function statusOf(err: unknown): number {
   return typeof status === "number" && Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500;
 }
 
+// --- Route patterns, mount included ------------------------------------------------------------------------
+// Express (router 2.x) keeps neither a mount's pattern nor, once the error has left the router, its baseUrl. So
+// `mountRouter` records the pattern against the Layer that `use()` creates, and the handler walks the app's
+// router stack to the Layer whose Route is `req.route`, adding the patterns of the mounts on the way. This reads
+// router 2.x's Layer fields (`route`, `handle`, `slash`) and Express 5's `app.router`; the tests cover a static,
+// a parameterized, an unregistered and a path-less mount, so an upgrade that moves them turns them red.
+
+interface RouterLayer {
+  route?: unknown;
+  handle?: { stack?: unknown };
+  slash?: boolean;
+}
+
+const mountPatterns = new WeakMap<object, string>();
+const UNREGISTERED_MOUNT = "/(unregistered mount)";
+const ROUTE_NOT_FOUND = "(route not in the app's stack)";
+
+/**
+ * `parent.use(pattern, router)`, and remember `pattern` for that mount, so an error inside the router logs
+ * `pattern + route pattern` (`/t/:tenant/member/:id`) and never the concrete `/t/acme/member/10001`.
+ * `parent` is an Express app (its stack is `app.router.stack`) or a Router (`router.stack`).
+ */
+export function mountRouter(parent: Express | Router, pattern: string, router: Router): void {
+  (parent as Router).use(pattern, router); // app.use and router.use take (path, router) alike
+  const holder = parent as unknown as { stack?: unknown[]; router?: { stack?: unknown[] } };
+  const stack = holder.stack ?? holder.router?.stack;
+  const layer = stack?.[stack.length - 1];
+  if (typeof layer === "object" && layer !== null) mountPatterns.set(layer, pattern);
+}
+
+function findRoute(stack: unknown, target: object, prefix: string, depth: number): string | undefined {
+  if (!Array.isArray(stack) || depth > 8) return undefined;
+  for (const item of stack as RouterLayer[]) {
+    if (typeof item !== "object" || item === null) continue;
+    if (item.route === target) return prefix;
+    const sub = item.handle?.stack;
+    if (Array.isArray(sub)) {
+      const mount = mountPatterns.get(item) ?? (item.slash ? "" : UNREGISTERED_MOUNT);
+      const found = findRoute(sub, target, prefix + mount, depth + 1);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
+}
+
 function routeOf(req: Request): string {
   const route = (req as Request & { route?: { path?: unknown } }).route;
-  // baseUrl is the mount of the router the error is still inside, if any ("" at the app level).
-  return route && typeof route.path === "string" ? `${req.baseUrl ?? ""}${route.path}` : NO_ROUTE;
+  if (!route || typeof route.path !== "string") return NO_ROUTE;
+  const appStack = (req.app as unknown as { router?: { stack?: unknown } } | undefined)?.router?.stack;
+  const prefix = findRoute(appStack, route, "", 0);
+  return prefix === undefined ? `${ROUTE_NOT_FOUND}${route.path}` : `${prefix}${route.path}`;
 }
 
 /** The summary of one failed request. Exported for the tests; nothing else reads the error. */
