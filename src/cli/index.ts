@@ -20,6 +20,7 @@ import { chromium, type Browser } from "playwright";
 import { loadCapabilities } from "../catalog/registry.js";
 import { createRedactor, loadTenantCredentials, redactInputNames } from "../worker/credentials.js";
 import { InMemoryCounters } from "../worker/metrics.js";
+import type { ErrorSummary } from "../http/errorHandler.js";
 import { parseDurationSeconds, reconcileWindow } from "../worker/reconcile.js";
 
 const logger = pino();
@@ -219,7 +220,9 @@ program
       }
 
       const controller = new EscalationController();
-      const app = createOperatorConsole(controller);
+      const app = createOperatorConsole(controller, {
+        logError: (summary) => logger.error(summary, "operator: console request failed"),
+      });
       const server = app.listen(opts.port, () => {
         logger.info({ port: opts.port }, `operator: console listening on http://localhost:${opts.port}`);
       });
@@ -391,6 +394,8 @@ catalogCommand
   )
   .action(async (opts: { port: number; queue?: boolean }) => {
     let app;
+    // A failed request is logged as its redacted summary only (D62).
+    const logError = (summary: ErrorSummary) => logger.error(summary, "catalog: request failed");
     if (opts.queue) {
       const url = databaseUrlFromEnv();
       const pool = createPool({
@@ -405,10 +410,10 @@ catalogCommand
         await pool.end();
         return;
       }
-      app = createCatalogApp({ queue: { pool } });
+      app = createCatalogApp({ queue: { pool }, logError });
       logger.info({ database: redactDatabaseUrl(url) }, "catalog: async mode enabled");
     } else {
-      app = createCatalogApp();
+      app = createCatalogApp({ logError });
     }
     const server = app.listen(opts.port, () => {
       logger.info({ port: opts.port }, `catalog: serving on http://localhost:${opts.port}`);

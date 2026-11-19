@@ -99,6 +99,43 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
+## Fleet Step 12b: a redacting error handler, Express 5.3 (2026-11-19)
+
+Branch `chore/deps-held-2026-11`. The plan: `docs/plans/step-12b.md`. The evidence: `evidence/step-12b/README.md`.
+- **Playwright 1.65.1 is Step 12c**, on or after 2026-11-21 (D61's cooling-off) and before Step 13c.
+- **The mutation check has 13 mutants.** 13 is "the error handler logs `err.message`" (13/13 on Windows).
+  Step 13's planned mutants are 14–16.
+
+- **Every Express app ends with `redactingErrorHandler`** (`src/http/errorHandler.ts`, D62). That covers the api,
+  the mock bank and the operator console.
+  - **What it logs:** one allowlisted summary (`name`, `code`, `status`, `method`, the route *pattern*, and
+    `requestId`).
+  - **What it answers:** the status with its generic text, as JSON or HTML. Responses carry a fresh `X-Request-Id`.
+  - **Express's default handler is never reached.** On 5.2.1 it already logged a short non-JSON body verbatim. On
+    5.3.0 it logs every malformed body (`err.body`).
+- **Where the summaries go:**
+  - `createCatalogApp({ logError })` and `createOperatorConsole(controller, { logError })` take a sink. The CLI
+    passes pino.
+  - The bank writes one JSON line to stderr: `"msg":"http: request failed"` in `docker compose logs bank`.
+  - The route is the full *pattern*, mount included (`/tenant-b/login`, `/t/:tenant/member/:id`), never concrete
+    values. An error before routing logs `(no route)`.
+  - **Mount a router with `mountRouter(app, pattern, router)`**, not `app.use(pattern, router)`, or its errors log
+    `/(unregistered mount)/…`. `req.baseUrl` is concrete, and Express has reset it by the time the handler runs
+    (D62 amendment).
+- **Testing an Express app for leaks:** set `app.set("env", "development")`. Under vitest's `NODE_ENV=test`,
+  Express's default handler logs nothing, which hides a leak. `src/http/errorHandler.test.ts` has the pattern and a
+  control case.
+- **Express 5.3.0** (with content-type 2.1.0, content-disposition 2.0.1). The suite is unchanged apart from the
+  handler's 14 tests: **67 files, 737 tests**, 219 s and 236 s.
+- **This machine's `.env` now has the fake `ROTE_CRED_*` lines** from `.env.example`. They were appended; no other
+  line was changed. So `docker compose up` starts workers that run, with no shell variables needed. The Step 12
+  note below is out of date on this point.
+- **Held:**
+  - Playwright 1.65.1 (published 2026-11-13; resolvable under `--before` from 2026-11-21);
+  - fast-check 4.10.3 (until 2026-11-25);
+  - `@anthropic-ai/sdk` 1.x and dotenv 18. For the majors, `docs/plans/step-12b.md` section 6 says what each
+    changes for discovery.
+
 ## Fleet Step 12: dependency upgrades, npm audit 8 → 0 (2026-11-19)
 
 Branch `chore/deps-2026-11`. The plan and every result: `docs/plans/step-12.md`, `evidence/step-12/README.md`.

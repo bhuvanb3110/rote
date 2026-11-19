@@ -33,6 +33,7 @@ import {
 } from "../queue/index.js";
 import { isTransientDbError } from "../queue/index.js";
 import { jobSettled, reconcileStatus } from "../fleet/stateMachine.js";
+import { redactingErrorHandler, requestId, type ErrorSummaryLog } from "../http/errorHandler.js";
 import { DEFAULT_ARTIFACTS_DIR, findCapability, listCapabilities } from "./registry.js";
 import { invokeCapability } from "./invoke.js";
 
@@ -64,6 +65,11 @@ async function enqueueTimeOverride(capabilityId: string, tenant: string, overrid
 
 export interface CatalogAppOptions {
   queue?: CatalogQueueOptions;
+  /**
+   * Where a failed request's redacted summary goes (D62; default: one JSON line on stderr). Only the summary:
+   * never the body, headers or the error's message.
+   */
+  logError?: ErrorSummaryLog;
 }
 
 const MAX_IDEMPOTENCY_KEY_LENGTH = 255;
@@ -239,6 +245,7 @@ async function handleGetJob(queue: CatalogQueueOptions, req: Request, res: Respo
 
 export function createCatalogApp(options: CatalogAppOptions = {}): Express {
   const app = express();
+  app.use(requestId());
   app.use(express.json());
   const queue = options.queue;
 
@@ -310,5 +317,8 @@ export function createCatalogApp(options: CatalogAppOptions = {}): Express {
     });
   }
 
+  // Last: every error that reaches Express (a malformed JSON body above all) is answered and logged
+  // redacted here, never by Express's default handler (D62).
+  app.use(redactingErrorHandler({ format: "json", log: options.logError }));
   return app;
 }
