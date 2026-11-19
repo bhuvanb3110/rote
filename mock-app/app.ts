@@ -41,6 +41,7 @@ import {
   renderSystemUnavailable,
   renderTransferHistory,
 } from "./views.js";
+import { redactingErrorHandler, requestId } from "../src/http/errorHandler.js";
 import { MEMO_MAX_LENGTH, truncateMemo, validateTransfer } from "./transfer.js";
 import { TENANTS, TENANT_A, tenantUrl, type TenantConfig } from "./tenants.js";
 
@@ -322,6 +323,7 @@ function createTenantRouter(tenant: TenantConfig): Router {
 }
 
 const app = express();
+app.use(requestId());
 app.use(express.urlencoded({ extended: true }));
 
 // Fleet/test controls are registered BEFORE the tenants on purpose: tenant-a is mounted at "/", so
@@ -409,5 +411,9 @@ for (const tenant of prefixedTenants) {
 for (const tenant of unprefixedTenants) {
   app.use(createTenantRouter(tenant));
 }
+
+// Last: a login form, a memo and the bank's own errors are never logged, only a redacted summary on stderr
+// (D62). The bank is "the legacy app", but in Compose its logs are the fleet's logs, so the rule holds here too.
+app.use(redactingErrorHandler({ format: "html" }));
 
 export default app;

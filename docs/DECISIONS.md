@@ -2311,3 +2311,75 @@ group with its own green suite means a regression points at one group, and holdi
 build, the image and the evidence in lockstep.
 
 **Date.** 2026-11-19
+
+## D62: Every Express app ends with one redacting error handler: it logs an allowlisted summary and answers a generic error, so Express's default handler never sees an error
+
+(Step 12b item 2; `docs/plans/step-12b.md`; the reviewer's Step 12b instruction, 2026-11-19.)
+
+**Context.**
+- **Three Express apps had no error handler:** the api (`createCatalogApp`), the mock bank (`mock-app/app.ts`) and
+  the operator console (`createOperatorConsole`). Any error that reached Express went to its default handler.
+- **Measured on Express 5.2.1** (`app.set("env", "development")`):
+  - The default handler logs the error's stack.
+  - body-parser's strict-mode JSON error copies the original characters into its message. So a short non-JSON
+    body to the api was logged verbatim: `SyntaxError: Unexpected token 'p', "p=fake-cred-P7" is not valid JSON`.
+  - A longer malformed body was not logged, because V8 quotes only the first 10 characters.
+- **Express 5.3.0** (held by D61 for this reason) logs the *whole* error object. body-parser puts the raw body on
+  its parse errors (`err.body`), so every malformed body would be logged.
+- **Not seen before:** the suite runs under `NODE_ENV=test`, where the default handler logs nothing.
+- CLAUDE.md: credentials and full PII never land in logs.
+
+**Decision.** `src/http/errorHandler.ts`, used by all three apps. Each app takes it through an optional `logError`
+option (the bank uses the default), and every call site is unchanged.
+- **`requestId()`** is the first middleware. It makes a fresh UUID per request and sends it back in `X-Request-Id`.
+  It never reuses the client's header, which would put a client-chosen value in the log.
+- **`redactingErrorHandler({ format, log })`** is the last middleware.
+  - **It logs one summary**, built only from an allowlist:
+    - `name`, only if it is a plain identifier;
+    - `code`: `err.code` or body-parser's `err.type`, only if it matches `[A-Za-z0-9_.:-]{1,64}`;
+    - `status`, `method` and `requestId`;
+    - `route`: the matched route's *pattern*, router-relative inside a mounted router, or `(no route)`.
+  - **It never logs** the message, the stack, `err.body`, a cause, the request body, query, headers, cookies, or
+    the concrete path (it can carry an id).
+  - **It answers** with the status (the error's own 4xx/5xx, else 500), `http.STATUS_CODES`' text and the request
+    id: JSON for the api, a minimal HTML page for the bank and the console.
+  - **After headers are sent**, it closes the socket like Express would, but without logging.
+  - It never calls `next(err)`. A log sink that throws is ignored.
+- **Where the summary goes:** the api and the console get the CLI's pino logger. The bank writes one JSON line to
+  stderr, which Compose collects.
+
+**Tests** (`src/http/errorHandler.test.ts`, 14):
+- **The api:** a short non-JSON body and a malformed JSON body. **The bank and the console:** a too-deeply nested
+  urlencoded body (a 400 parse error that carries the raw body), and a JSON body to a route that has no JSON parser,
+  so the route throws.
+- **Every request** carries the fake credential in the body, an `Authorization` header, a cookie and `X-Request-Id`.
+- **What is checked:**
+  - the credential is in no response body or header, no summary, and nothing written to stdout, stderr or
+    `console.*`;
+  - the summary has exactly the expected fields;
+  - each app runs with `env = development`.
+- **A control case** sends the same body to a bare Express app without the handler and asserts the credential
+  *is* logged, so the capture can see a leak.
+- **Removing the handler from the api** turns both api tests red (checked by hand while building, not a committed
+  mutant).
+- The same tests run again after the Express 5.3.0 bump.
+
+**Alternatives considered.**
+- **Stay on Express 5.2.1:** it already leaks (above). And it only postpones the bump that D61 held.
+- **Set `env = production`** (the default handler then logs nothing): the default handler's behaviour would become
+  load-bearing, and its responses still differ by `env`. It is also one forgotten setting away from a leak.
+- **A pino redaction config** (`redact: ["req.body", …]`): only the api and console use pino, the bank doesn't, and
+  redaction by path misses a credential copied into `err.message` (the measured leak).
+- **Log a sanitized message** (strip anything after a quote): parsers' messages are not a stable format. An
+  allowlist of fields can't leak what it never copies.
+- **Echo a client's `X-Request-Id`** (common for tracing): it would be a client-chosen value in the log. Step 13's
+  traces carry the job's `trace_id` instead.
+- **One handler per app:** three copies of a security-relevant rule.
+- **Keep the mock bank free of `src/` imports:** the bank already imports nothing from `src/`. But in Compose its
+  logs are the fleet's logs, and one shared module is easier to keep right.
+
+**Why.** A redaction rule is only as good as its last path. An error handler that copies nothing it was not told
+to copy holds whatever Express, body-parser or V8 decide to put in an error. The tests run each app the way it
+would leak and check the bytes that actually go out.
+
+**Date.** 2026-11-19

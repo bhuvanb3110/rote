@@ -3,7 +3,13 @@
 // EscalationController's owner token. No framework, no client-side JS -- a self-refreshing
 // server-rendered page is enough for a console whose whole job is "show state, take an action."
 import express, { type Express } from "express";
+import { redactingErrorHandler, requestId, type ErrorSummaryLog } from "../http/errorHandler.js";
 import type { EscalationController } from "./controller.js";
+
+export interface OperatorConsoleOptions {
+  /** Where a failed request's redacted summary goes (D62; default: one JSON line on stderr). */
+  logError?: ErrorSummaryLog;
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -72,8 +78,9 @@ ${body}
 </html>`;
 }
 
-export function createOperatorConsole(controller: EscalationController): Express {
+export function createOperatorConsole(controller: EscalationController, options: OperatorConsoleOptions = {}): Express {
   const app = express();
+  app.use(requestId());
   app.use(express.urlencoded({ extended: true }));
 
   app.get("/", (_req, res) => {
@@ -100,5 +107,7 @@ export function createOperatorConsole(controller: EscalationController): Express
     res.redirect("/");
   });
 
+  // Last: a malformed form body (the note may hold anything an operator typed) is never logged (D62).
+  app.use(redactingErrorHandler({ format: "html", log: options.logError }));
   return app;
 }

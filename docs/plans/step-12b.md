@@ -46,9 +46,11 @@ the three apps has an error handler of its own today, so a malformed POST would 
   - **It logs one safe summary:** `name` (`err.name`, only if it is a plain identifier), `code` (`err.code`, or
     body-parser's `err.type`, only if it matches `[A-Za-z0-9_.:-]{1,64}`), `status`, `method`, `route` and
     `requestId`.
-    - `route` is the matched route's pattern (`baseUrl` + `route.path`, e.g. `/jobs/:id`). It is never the
-      concrete path, which can carry an id. A body-parser error happens before routing, so it logs
-      `(before routing)`.
+    - `route` is the matched route's pattern (e.g. `/jobs/:id`). It is never the concrete path, which can carry
+      an id.
+      - Inside a mounted router (the bank's `/tenant-b`) it is the router-relative pattern (`/login`): Express
+        has restored `baseUrl` by the time the error reaches the app-level handler.
+      - A body-parser error happens before routing, so it logs `(no route)`.
   - **It never logs** the error's message or stack, `err.body`, the request body, query, headers or cookies.
   - **It responds** with the status (4xx kept, anything else 500) and the generic text from
     `http.STATUS_CODES`, plus the request id. The api gets JSON (`{ error, requestId }`). The bank and console get a
