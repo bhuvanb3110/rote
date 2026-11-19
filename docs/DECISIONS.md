@@ -2325,7 +2325,8 @@ build, the image and the evidence in lockstep.
     body to the api was logged verbatim: `SyntaxError: Unexpected token 'p', "p=fake-cred-P7" is not valid JSON`.
   - A longer malformed body was not logged, because V8 quotes only the first 10 characters.
 - **Express 5.3.0** (held by D61 for this reason) logs the *whole* error object. body-parser puts the raw body on
-  its parse errors (`err.body`), so every malformed body would be logged.
+  its parse errors (`err.body`), so every malformed body is logged. Measured after item 3's bump: the 120-character
+  malformed JSON that 5.2.1 did not log is logged in full by 5.3.0's default handler.
 - **Not seen before:** the suite runs under `NODE_ENV=test`, where the default handler logs nothing.
 - CLAUDE.md: credentials and full PII never land in logs.
 
