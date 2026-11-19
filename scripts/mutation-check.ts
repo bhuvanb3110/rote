@@ -106,6 +106,12 @@ export const MUTANTS: Mutant[] = [
     what: "Step 10b (D58): verify-phase deaths use a separate low cap again (3 dead verify phases escalate, below the one crash budget: the day2-exit seed 1 failure)",
     tests: ["src/fleet/stateMachine.property.test.ts", "src/fleet/stateMachine.test.ts"],
   },
+  {
+    id: "13",
+    patch: "13-error-handler-logs-message.patch",
+    what: "Step 12b (D62): the redacting error handler logs `err.message` (body-parser's strict-mode message quotes the request body)",
+    tests: ["src/http/errorHandler.test.ts"],
+  },
 ];
 
 function argValue(name: string): string | undefined {

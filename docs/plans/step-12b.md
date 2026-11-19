@@ -25,7 +25,8 @@ fixes two test-runner bugs; this repo uses the `playwright` library, not `@playw
 decision (2026-11-19): wait for 1.65.1.** Items 1–3, 5 and 6 are done now. Then the branch is pushed as a backup,
 with no PR. Item 4 runs on **2026-11-21 or later**. D61's `--before=<today − 7 days>` is a date, so on 2026-11-20
 it would be `2026-11-13` (midnight), which still excludes 1.65.1. On 2026-11-21 it is `--before=2026-11-14`, which
-resolves 1.65.1 and nothing newer (1.66 is still alpha). The PR opens after item 4.
+resolves 1.65.1 and nothing newer (1.66 is still alpha). The PR opens after item 4. *(Superseded by the part 1
+review: item 4 is Step 12c, and this PR opens without it.)*
 
 ## 1. Local `.env` (not committed)
 
@@ -93,7 +94,11 @@ goes to `evidence/step-12b/item-3-lockdiff.txt`.
 
 Risk: low.
 
-## 4. `playwright` 1.65.1 (on or after 2026-11-21)
+## 4. `playwright` 1.65.1 (on or after 2026-11-21): moved to Step 12c
+
+**Moved by the part 1 review** (below). Step 12c (`docs/plans/step-12c.md`, written when it starts) does exactly
+this section, on or after 2026-11-21 and before Step 13c. It has its own branch and PR. Kept here as 12c's
+starting point.
 
 Changed together:
 - `npm install playwright@1.65.1 --before=<today − 7 days>`, with the floor moved to `^1.65.1`;
@@ -193,8 +198,8 @@ image don't load it (Compose passes the environment).
 - **D62** (the error handler). **A D61 amendment:** what a reviewer-named version inside the cooling-off does (it
   waits, the rest proceeds), and the held list now.
 - **REPO_NOTES** "Fleet Step 12b".
-- **After item 4:** the PR `chore: held upgrades: redacting error handler, express 5.3, playwright 1.65` into
-  `main`, not merged, with its four required checks reported.
+- **The PR** into `main`, not merged, with its four required checks reported. Per the part 1 review, it is titled
+  `chore: redacting error handler, express 5.3` and opens without item 4.
 
 ## Built so far (2026-11-19)
 
@@ -209,7 +214,24 @@ image don't load it (Compose passes the environment).
 
 - **Item 5:** fast-check 4.10.3 is still held, until 2026-11-25. Nothing needs it.
 - **Item 6:** section 6 is the written plan for the majors. Nothing was bumped.
-- **Item 4 waits for 2026-11-21.** The branch is pushed as a backup, with no PR until then.
+- **Item 4 waits for 2026-11-21.** The branch is pushed as a backup, with no PR until then. *(Superseded by the
+  review below: item 4 is Step 12c, and the PR opens now.)*
 - **Off-plan:** in item 2, the route of an error inside a mounted router turned out to be router-relative
   (`/tenant-b/login` logged `/login`), because Express restores `baseUrl` before the app-level handler runs. The
   review asked for the mount; see "Part 1 review" below.
+
+## Part 1 review (2026-11-19): approved, with three changes
+
+1. **The route includes its mount, as a pattern.** Literally logging `req.baseUrl` would not meet the rule:
+   router 2.x makes it the *concrete* mount and resets it before the handler runs. So `mountRouter(parent, pattern,
+   router)` records each mount's pattern, and the handler walks the app's stack to the matched route (D62
+   amendment).
+   - The bank's tenants use it.
+   - Tests cover `/tenant-b/login`, `/login`, a parameterized mount (`/t/:tenant/member/:id/transfer`, with the
+     tenant and member id nowhere), a nested one, and an unregistered one.
+   - Commit `4be450f`, 741/741.
+2. **Mutant 13: the error handler logs `err.message`** (`scripts/mutations/13-error-handler-logs-message.patch`).
+   It is caught by 5 tests in `src/http/errorHandler.test.ts`. Step 13's planned mutants are renumbered 14–16
+   (`step-13.md`).
+3. **Item 4 (Playwright 1.65.1) becomes Step 12c,** on or after 2026-11-21 and before 13c. This step's PR opens
+   now, titled "chore: redacting error handler, express 5.3".

@@ -227,7 +227,7 @@ Added panels:
 | `src/worker/trace.db.test.ts` | crash after Submit across two worker processes: every exported span carries the job's `trace_id`, parented under `root_span_id`; the dead attempt appears as `job.attempt.recovered` (`synthesized=true`); the second worker's `commit.verify` says `already_done` |
 | `src/worker/metricsPort.db.test.ts` | the metrics port already taken → the worker logs one warning and completes jobs; `/metrics` parses as the Prometheus text format and has every metric in section 5 |
 | replay `observe` tests (`src/replay/fleet.test.ts`) | absent = today's behaviour (the existing suite); a throwing `observe` changes nothing in the `ReplayResult` or the evidence; strategy and `irreversible` are reported per step |
-| **mutation check** (D54), new mutants | (13) the OTel wrapper rethrows an exporter error; (14) the worker `await`s `forceFlush` after `commit.intent`; (15) span attributes copy `params`. Each must turn the tests above red (target 15/15) |
+| **mutation check** (D54), new mutants | (14) the OTel wrapper rethrows an exporter error; (15) the worker `await`s `forceFlush` after `commit.intent`; (16) span attributes copy `params`. Each must turn the tests above red (target 16/16; 13 is Step 12b's error-handler mutant) |
 | **crash matrix** | a new flag `--telemetry dead` points every worker at a closed port. **23/23** at 5/2 with it, plus the usual run. Added to CI's crash-matrix job as a second invocation |
 | **chaos** (13c) | one standard seed with the stack up, and the **same seed with Jaeger and Prometheus stopped** (`docker compose stop jaeger prometheus` before the run, plus a mid-run stop in a third run). Every run: oracle PASS, 0 DUPLICATE, 0 LOST. Chaos interleaving isn't deterministic (D33), so the runs are compared by verdict and by the final-state distribution, not row for row |
 
@@ -252,8 +252,8 @@ checks each page's text for the fake credentials before saving, and refuses to s
 
 | Step | Contents | Exit |
 | --- | --- | --- |
-| **13a: telemetry core** | the deps (section 3); `src/telemetry/` (interface, no-op, OTel impl, config, allowlist); metrics (section 5) exported from workers and API; `InMemoryCounters` forwarded; `screenshot_retries_total`; the replay `observe` option; the tests in section 7 rows 1, 2, 5 and 6; mutants 13 and 15; D-entries | `npm test` ×3, typecheck, mutation-check, the matrix 23/23 (telemetry off, the default); `npm audit` 0 |
-| **13b: traces** | migration 0009 (if approved); every span in section 4; `job.attempt.recovered`; the equivalence test and the trace test (section 7 rows 3 and 4); mutant 14; the matrix `--telemetry dead` flag in CI | the matrix 23/23 twice (off, dead); equivalence green ×3 |
+| **13a: telemetry core** | the deps (section 3); `src/telemetry/` (interface, no-op, OTel impl, config, allowlist); metrics (section 5) exported from workers and API; `InMemoryCounters` forwarded; `screenshot_retries_total`; the replay `observe` option; the tests in section 7 rows 1, 2, 5 and 6; mutants 14 and 16; D-entries | `npm test` ×3, typecheck, mutation-check, the matrix 23/23 (telemetry off, the default); `npm audit` 0 |
+| **13b: traces** | migration 0009 (if approved); every span in section 4; `job.attempt.recovered`; the equivalence test and the trace test (section 7 rows 3 and 4); mutant 15; the matrix `--telemetry dead` flag in CI | the matrix 23/23 twice (off, dead); equivalence green ×3 |
 | **13c: the stack** | Jaeger, Prometheus, Grafana in Compose (section 6); provisioning and dashboard JSON; the API's DB gauges; the memory measurement; the chaos runs with the stack up and down; the two screenshots; README "Fleet (Day 3)" and the evidence index | Day-3 exit: both screenshots committed, the chaos verdicts PASS, peak memory recorded |
 
 Each sub-step ends with the usual handoff report and saves its plan as `docs/plans/step-13a.md` etc. before
@@ -286,3 +286,9 @@ The plan is approved. The answers to section 10:
 4. **Every metric gets the `rote_` prefix.** The README maps each one to the brief's name.
 5. **If memory is tight: a Compose profile for the observability stack**, not fewer workers.
 6. **Playwright 1.65 lands before 13c**, in Step 12b (`docs/plans/step-12b.md`).
+
+**Update (the Step 12b part 1 review, 2026-11-19).**
+- **Playwright 1.65.1 moves to its own small Step 12c,** on or after 2026-11-21 (D61's cooling-off) and before 13c.
+  Step 12b's PR goes ahead without it.
+- **Step 12b took mutant 13** (the error handler logs `err.message`). This plan's mutants are renumbered 14–16;
+  the target is 16/16.

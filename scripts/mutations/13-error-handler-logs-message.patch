@@ -1,0 +1,13 @@
+diff --git a/src/http/errorHandler.ts b/src/http/errorHandler.ts
+index 0a26732..cc55c1d 100644
+--- a/src/http/errorHandler.ts
++++ b/src/http/errorHandler.ts
+@@ -166,7 +166,7 @@ export function redactingErrorHandler(options: RedactingErrorHandlerOptions): Er
+   return (err: unknown, req, res, _next) => {
+     const summary = summarize(err, req, res);
+     try {
+-      log(summary);
++      log({ ...summary, message: err instanceof Error ? err.message : String(err) } as ErrorSummary);
+     } catch {
+       // A failing log sink must not stop the response (and must not be logged with the error either).
+     }
