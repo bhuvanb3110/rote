@@ -205,3 +205,34 @@ All on the final commit, with the fleet down for the test runs. Never the suite 
 `evidence/step-12/README.md` indexes it all. Then the D-entry (D61), the REPO_NOTES section, the push, and the
 PR `chore: dependency upgrades (npm audit)` into `main`, not merged. Then `docs/plans/step-13.md` (Day 3,
 observability; plan only).
+
+## Built (2026-11-19)
+
+| Commit | What |
+| --- | --- |
+| `5b3fc7e` | this plan and the before-state (`audit-before.*`, `outdated-before.txt`, `npm-ls-before.txt`) |
+| `20129a1` | group 1: vitest 4.1.12, vite 8.3.8, source-map-js 1.2.2 (dev); 723/723 |
+| `836d798` | group 2: proxy-addr 2.0.8, body-parser 2.4.0, qs 6.17.1 (runtime, express unchanged); 723/723 |
+| `b1f2825` | group 3: zod 4.6.7 (runtime); `npm audit` 0; 723/723 |
+| `28d21b7` | group 4: tsx 4.23.15, @types/node 26.6.6 (dev); 723/723 |
+| `4401c7d` | group 5: commander 15.1.0, pino 10.4.0 (runtime); 723/723 |
+| `25ca3d0` | not planned: `.gitattributes` keeps `scripts/mutations/*.patch` LF (D54 amendment); 723/723 |
+| `299113c` | the proof (section 5), `evidence/step-12/README.md` |
+| (docs) | D61, the D54 amendment, REPO_NOTES "Fleet Step 12", this section, `docs/plans/step-13.md` |
+
+Every group went as planned. The stop rule never fired, and the 7-day cutoff picked exactly the versions in
+section 3. Two things were not in the plan:
+1. **The first mutation check failed, 11/12.** Mutant 03 was a `STALE PATCH`: the CRLF working-tree copy of a
+   patch with a bare empty context line (D54 amendment). The upgrades did not cause it. It was fixed in
+   `25ca3d0`, the re-run is 12/12, and the failed run is kept.
+2. **This machine's `.env` has no worker credentials.** The chaos run used `.env.example`'s fake values
+   from the process environment, and `.env` was not changed.
+
+Results (section 5):
+- `npm ci` clean;
+- `npm test` ×3: 723/723 each;
+- typecheck: exit 0;
+- the matrix: 23/23;
+- mutants: 12/12;
+- chaos seed 412432443: PASS, 0 DUPLICATE, 0 LOST;
+- `npm audit`: **0**.

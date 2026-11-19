@@ -99,6 +99,40 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
+## Fleet Step 12: dependency upgrades, npm audit 8 → 0 (2026-11-19)
+
+Branch `chore/deps-2026-11`. The plan and every result: `docs/plans/step-12.md`, `evidence/step-12/README.md`.
+
+- **How dependencies change in this repo now (D61):**
+  - Name every package: `npm install <pkg>@<v>` for a direct one, `npm update <pkg…>` for a transitive.
+    **Never a bare `npm update`**: `^1.62.1` lets it move Playwright (its "Wanted" was 1.65.1).
+  - Never `npm audit fix`.
+  - Add `--before=<today − 7 days>` to every command, so nothing published in the last week is resolved.
+  - One commit per group, each after a full `npm test`, with its lockfile diff
+    (`evidence/step-12/group-N-lockdiff.txt`).
+- **What moved:**
+  - **Runtime:** zod 4.4.3 → 4.6.7 (floor `^4.6.7`); body-parser 2.4.0, proxy-addr 2.0.8 and qs 6.17.1 under
+    an unchanged express 5.2.1; commander 15.1.0; pino 10.4.0.
+  - **Dev:** vitest 4.1.12 with vite 8.3.8 and source-map-js 1.2.2; tsx 4.23.15; @types/node 26.6.6.
+- **Held, each for its own reviewed step (plan section 4):**
+  - **Playwright 1.65.1.** It is in range, but it moves the browser build, the `Dockerfile`'s
+    `PLAYWRIGHT_VERSION` and the worker's startup check together.
+  - **Express 5.3.0.** Its default error handler logs the full error object. The repo has no error handler
+    of its own, and a body-parser error carries the raw request body. Add a redacting handler first.
+  - **@anthropic-ai/sdk 1.x and dotenv 18** (majors).
+  - **fast-check 4.10.3**, published inside the cooling-off.
+- **`scripts/mutations/*.patch` are LF in every checkout now** (`.gitattributes`, D54 amendment). With
+  `core.autocrlf=true`, patch 03's bare empty context line read as a corrupt patch, and the first mutation
+  check was 11/12 (`STALE PATCH`). A patch that `git status` shows as unchanged can still be CRLF on disk:
+  check with `git ls-files --eol scripts/mutations/`.
+- **This machine's `.env` has no `ROTE_CRED_*`** (it predates Step 6). `docker compose up` then starts workers
+  that refuse to run, which is correct. For chaos, set the fake values from `.env.example` in the shell, or
+  add them to `.env`. Step 12 did the former and left `.env` alone.
+- **`npm ci` from an empty `node_modules` works**, and the lockfile is not rewritten. The image installs from
+  the lockfile (`npm ci --omit=dev`); `evidence/step-12/image-versions.txt` is `npm ls` inside the containers.
+- **The suite:** unchanged at 66 files and 723 tests. Per-group runs took 190–198 s, and the final three took
+  221, 210 and 212 s.
+
 ## Fleet Step 11: the Day-2 exit, closed; the PR to `main` (2026-11-19)
 
 No code changes. Every commit of the step is evidence or docs.
