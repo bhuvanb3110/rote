@@ -1,0 +1,133 @@
+
+> rote@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.12 C:/Users/hp/Downloads/rote
+
+[coverage] property tests, 4000 sequences: 47 paths reached
+  business_outcome->business_outcome             54
+  business_outcome->needs_human                  12
+  committing->succeeded                          2617
+  committing->verifying                          1932
+  decision:already_done                          327
+  decision:deferred                              720
+  decision:duplicate_suspected                   158
+  decision:escalated:ambiguous                   4
+  decision:escalated:verify_unavailable          74
+  decision:exhausted                             416
+  decision:not_committed_final                   32
+  decision:reconcile_deferred                    9
+  decision:reconciled                            987
+  decision:resubmitted                           810
+  decision:unrecorded_commit_suspected           97
+  failed->failed                                 433
+  failed->needs_human                            85
+  final:business_outcome/business_outcome        156
+  final:failed/crash_limit                       10
+  final:failed/failure                           112
+  final:failed/not_committed_attempts_exhausted  334
+  final:needs_human/ambiguous                    4
+  final:needs_human/crash_limit                  269
+  final:needs_human/duplicate_suspected          158
+  final:needs_human/unrecorded_commit_suspected  97
+  final:needs_human/verify_unavailable           74
+  final:succeeded/already_done                   327
+  final:succeeded/success                        2459
+  lookups:[0,1]                                  25
+  phase:crashed                                  1536
+  phase:reconcile-crashed                        7
+  queued->running                                5844
+  rows:0                                         782
+  rows:1                                         3039
+  rows:2                                         179
+  running->business_outcome                      136
+  running->committing                            4549
+  running->failed                                125
+  running->queued                                1034
+  succeeded->needs_human                         158
+  succeeded->succeeded                           772
+  verifying->business_outcome                    32
+  verifying->failed                              416
+  verifying->needs_human                         347
+  verifying->queued                              810
+  verifying->succeeded                           327
+  verifying->verifying                           2709
+  NOT reached (watched): reconcile:abandoned
+[coverage] property 12 (D59), 2000 sequences: 9 paths reached
+  reconcile:abandoned              403
+  reconcile:abandoned-while-wrong  35
+  reconcile:decided-after-deaths   407
+  reconcilerDeaths:0               1190
+  reconcilerDeaths:1               185
+  reconcilerDeaths:2               298
+  reconcilerDeaths:3               194
+  reconcilerDeaths:4               100
+  reconcilerDeaths:5               33
+  every watched path was reached
+[coverage] model vs real, 200 + 100 + 160 sequences (the three families): 57 paths reached
+  R1:abandoned                                       9
+  R1:claimed                                         82
+  R1:claimed:business_outcome                        14
+  R1:claimed:failed                                  34
+  R1:claimed:succeeded                               34
+  R1:none                                            102
+  R2:duplicate_suspected:fenced                      5
+  R2:duplicate_suspected:illegal_transition          5
+  R2:duplicate_suspected:recorded                    2
+  R2:reconcile_deferred:fenced                       4
+  R2:reconcile_deferred:illegal_transition           7
+  R2:reconcile_deferred:recorded                     10
+  R2:reconcile_unreadable:fenced                     8
+  R2:reconcile_unreadable:illegal_transition         6
+  R2:reconcile_unreadable:recorded                   7
+  R2:reconciled:fenced                               6
+  R2:reconciled:illegal_transition                   2
+  R2:reconciled:recorded                             5
+  R2:unrecorded_commit_suspected:fenced              3
+  R2:unrecorded_commit_suspected:illegal_transition  3
+  R2:unrecorded_commit_suspected:recorded            2
+  R2:wrong_state:fenced                              7
+  R2:wrong_state:illegal_transition                  15
+  T5:fenced                                          49
+  T5:illegal_transition                              67
+  T5:recorded                                        251
+  T7:already_done:fenced                             9
+  T7:already_done:illegal_transition                 20
+  T7:already_done:recorded                           4
+  T7:escalated:fenced                                9
+  T7:escalated:illegal_transition                    16
+  T7:escalated:recorded                              9
+  T7:exhausted:fenced                                9
+  T7:exhausted:illegal_transition                    14
+  T7:exhausted:recorded                              42
+  T7:not_committed_final:fenced                      4
+  T7:not_committed_final:illegal_transition          22
+  T7:not_committed_final:recorded                    7
+  T7:resubmitted:check_violation                     4
+  T7:resubmitted:fenced                              6
+  T7:resubmitted:illegal_transition                  13
+  T7:resubmitted:recorded                            124
+  T8:fenced                                          26
+  T8:illegal_transition                              76
+  T8:recorded                                        33
+  batchClaim:claimed                                 20
+  batchClaim:refused                                 25
+  dequeue:held_back_by_not_before                    1
+  dequeue:lease_beyond_max_attempts                  3
+  recover:T6.1                                       8
+  recover:T6.2                                       3
+  recover:T6.4                                       7
+  recover:T6.5                                       2
+  recover:T6.6                                       3
+  recover:T6.7                                       5
+  reverify:moved                                     7
+  reverify:refused                                   482
+  every watched path was reached
+
+ Test Files  66 passed (66)
+      Tests  723 passed (723)
+   Start at  11:02:41
+   Duration  190.37s (transform 5.89s, setup 0ms, import 42.39s, tests 535.29s, environment 29ms)
+
+exit=0 wall_seconds=191.4
