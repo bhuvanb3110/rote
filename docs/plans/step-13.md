@@ -271,3 +271,18 @@ building.
    the screenshot run?
 6. `fast-check`, Express 5.3.0 and Playwright 1.65 are held from Step 12. **Should Playwright 1.65 land before
    13c**, so the screenshots are taken on the browser build that ships?
+
+## Reviewer decisions (2026-11-19)
+
+The plan is approved. The answers to section 10:
+
+1. **Migration 0009 (`jobs.root_span_id`): yes.** The API's `job.enqueue` span is the trace root. Rows from
+   before 0009 fall back to the synthetic parent.
+2. **The DB gauges come from the API: yes, on their own small, dedicated connection pool** with a short
+   `statement_timeout`. A slow metrics query must never delay or fail a real API request, and a test proves it.
+   For example: a gauge query held open by a lock while API requests run, and each request still answers within
+   its usual time.
+3. **`commit.intent.idempotency_key` is a SHA-256 prefix** of the client's value. `memo_key` stays raw.
+4. **Every metric gets the `rote_` prefix.** The README maps each one to the brief's name.
+5. **If memory is tight: a Compose profile for the observability stack**, not fewer workers.
+6. **Playwright 1.65 lands before 13c**, in Step 12b (`docs/plans/step-12b.md`).
