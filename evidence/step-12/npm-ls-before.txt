@@ -1,0 +1,354 @@
+rote@0.1.0 C:\Users\hp\Downloads\rote
++-- @anthropic-ai/sdk@0.116.0
+| +-- json-schema-to-ts@3.1.1
+| | +-- @babel/runtime@7.29.7
+| | `-- ts-algebra@2.0.0
+| +-- standardwebhooks@1.0.0
+| | +-- @stablelib/base64@1.0.1
+| | `-- fast-sha256@1.3.0
+| `-- zod@4.4.3 deduped
++-- @types/express@5.0.6
+| +-- @types/body-parser@1.19.6
+| | +-- @types/connect@3.4.38
+| | | `-- @types/node@26.2.0 deduped
+| | `-- @types/node@26.2.0 deduped
+| +-- @types/express-serve-static-core@5.1.3
+| | +-- @types/node@26.2.0 deduped
+| | +-- @types/qs@6.15.1
+| | +-- @types/range-parser@1.2.7
+| | `-- @types/send@1.2.1
+| |   `-- @types/node@26.2.0 deduped
+| `-- @types/serve-static@2.2.0
+|   +-- @types/http-errors@2.0.5
+|   `-- @types/node@26.2.0 deduped
++-- @types/node@26.2.0
+| `-- undici-types@8.3.0
++-- @types/pg@8.23.1
+| +-- @types/node@26.2.0 deduped
+| +-- pg-protocol@1.16.1
+| `-- pg-types@2.2.0
+|   +-- pg-int8@1.0.1
+|   +-- postgres-array@2.0.0
+|   +-- postgres-bytea@1.0.1
+|   +-- postgres-date@1.0.7
+|   `-- postgres-interval@1.2.0
+|     `-- xtend@4.0.2
++-- commander@15.0.0
++-- dotenv@17.4.2
++-- express@5.2.1
+| +-- accepts@2.0.0
+| | +-- mime-types@3.0.2 deduped
+| | `-- negotiator@1.0.0
+| +-- body-parser@2.3.0
+| | +-- bytes@3.1.2
+| | +-- content-type@2.0.0
+| | +-- debug@4.4.3 deduped
+| | +-- http-errors@2.0.1 deduped
+| | +-- iconv-lite@0.7.3
+| | | `-- safer-buffer@2.1.2
+| | +-- on-finished@2.4.1 deduped
+| | +-- qs@6.16.0 deduped
+| | +-- raw-body@3.0.2
+| | | +-- bytes@3.1.2 deduped
+| | | +-- http-errors@2.0.1 deduped
+| | | +-- iconv-lite@0.7.3 deduped
+| | | `-- unpipe@1.0.0
+| | `-- type-is@2.1.0 deduped
+| +-- content-disposition@1.1.0
+| +-- content-type@1.0.5
+| +-- cookie-signature@1.2.2
+| +-- cookie@0.7.2
+| +-- debug@4.4.3
+| | `-- ms@2.1.3
+| +-- depd@2.0.0
+| +-- encodeurl@2.0.0
+| +-- escape-html@1.0.3
+| +-- etag@1.8.1
+| +-- finalhandler@2.1.1
+| | +-- debug@4.4.3 deduped
+| | +-- encodeurl@2.0.0 deduped
+| | +-- escape-html@1.0.3 deduped
+| | +-- on-finished@2.4.1 deduped
+| | +-- parseurl@1.3.3 deduped
+| | `-- statuses@2.0.2 deduped
+| +-- fresh@2.0.0
+| +-- http-errors@2.0.1
+| | +-- depd@2.0.0 deduped
+| | +-- inherits@2.0.4
+| | +-- setprototypeof@1.2.0
+| | +-- statuses@2.0.2 deduped
+| | `-- toidentifier@1.0.1
+| +-- merge-descriptors@2.0.0
+| +-- mime-types@3.0.2
+| | `-- mime-db@1.54.0
+| +-- on-finished@2.4.1
+| | `-- ee-first@1.1.1
+| +-- once@1.4.0
+| | `-- wrappy@1.0.2
+| +-- parseurl@1.3.3
+| +-- proxy-addr@2.0.7
+| | +-- forwarded@0.2.0
+| | `-- ipaddr.js@1.9.1
+| +-- qs@6.16.0
+| | +-- es-define-property@1.0.1
+| | `-- side-channel@1.1.1
+| |   +-- es-errors@1.3.0
+| |   +-- object-inspect@1.13.4
+| |   +-- side-channel-list@1.0.1
+| |   | +-- es-errors@1.3.0 deduped
+| |   | `-- object-inspect@1.13.4 deduped
+| |   +-- side-channel-map@1.0.1
+| |   | +-- call-bound@1.0.4
+| |   | | +-- call-bind-apply-helpers@1.0.2
+| |   | | | +-- es-errors@1.3.0 deduped
+| |   | | | `-- function-bind@1.1.2 deduped
+| |   | | `-- get-intrinsic@1.3.0 deduped
+| |   | +-- es-errors@1.3.0 deduped
+| |   | +-- get-intrinsic@1.3.0
+| |   | | +-- call-bind-apply-helpers@1.0.2 deduped
+| |   | | +-- es-define-property@1.0.1 deduped
+| |   | | +-- es-errors@1.3.0 deduped
+| |   | | +-- es-object-atoms@1.1.2
+| |   | | | `-- es-errors@1.3.0 deduped
+| |   | | +-- function-bind@1.1.2
+| |   | | +-- get-proto@1.0.1
+| |   | | | +-- dunder-proto@1.0.1
+| |   | | | | +-- call-bind-apply-helpers@1.0.2 deduped
+| |   | | | | +-- es-errors@1.3.0 deduped
+| |   | | | | `-- gopd@1.2.0 deduped
+| |   | | | `-- es-object-atoms@1.1.2 deduped
+| |   | | +-- gopd@1.2.0
+| |   | | +-- has-symbols@1.1.0
+| |   | | +-- hasown@2.0.4
+| |   | | | `-- function-bind@1.1.2 deduped
+| |   | | `-- math-intrinsics@1.1.0
+| |   | `-- object-inspect@1.13.4 deduped
+| |   `-- side-channel-weakmap@1.0.2
+| |     +-- call-bound@1.0.4 deduped
+| |     +-- es-errors@1.3.0 deduped
+| |     +-- get-intrinsic@1.3.0 deduped
+| |     +-- object-inspect@1.13.4 deduped
+| |     `-- side-channel-map@1.0.1 deduped
+| +-- range-parser@1.3.0
+| +-- router@2.2.0
+| | +-- debug@4.4.3 deduped
+| | +-- depd@2.0.0 deduped
+| | +-- is-promise@4.0.0
+| | +-- parseurl@1.3.3 deduped
+| | `-- path-to-regexp@8.4.2
+| +-- send@1.2.1
+| | +-- debug@4.4.3 deduped
+| | +-- encodeurl@2.0.0 deduped
+| | +-- escape-html@1.0.3 deduped
+| | +-- etag@1.8.1 deduped
+| | +-- fresh@2.0.0 deduped
+| | +-- http-errors@2.0.1 deduped
+| | +-- mime-types@3.0.2 deduped
+| | +-- ms@2.1.3 deduped
+| | +-- on-finished@2.4.1 deduped
+| | +-- range-parser@1.3.0 deduped
+| | `-- statuses@2.0.2 deduped
+| +-- serve-static@2.2.1
+| | +-- encodeurl@2.0.0 deduped
+| | +-- escape-html@1.0.3 deduped
+| | +-- parseurl@1.3.3 deduped
+| | `-- send@1.2.1 deduped
+| +-- statuses@2.0.2
+| +-- type-is@2.1.0
+| | +-- content-type@2.0.0
+| | +-- media-typer@1.1.1
+| | `-- mime-types@3.0.2 deduped
+| `-- vary@1.1.2
++-- fast-check@4.10.2
+| `-- pure-rand@8.4.2
++-- pg@8.23.1
+| +-- pg-cloudflare@1.4.1
+| +-- pg-connection-string@2.14.1
+| +-- UNMET OPTIONAL DEPENDENCY pg-native@>=3.0.1
+| +-- pg-pool@3.14.0
+| | `-- pg@8.23.1 deduped
+| +-- pg-protocol@1.16.1 deduped
+| +-- pg-types@2.2.0 deduped
+| `-- pgpass@1.0.5
+|   `-- split2@4.2.0
++-- pino@10.3.1
+| +-- @pinojs/redact@0.4.0
+| +-- atomic-sleep@1.0.0
+| +-- on-exit-leak-free@2.1.2
+| +-- pino-abstract-transport@3.0.0
+| | `-- split2@4.2.0 deduped
+| +-- pino-std-serializers@7.1.0
+| +-- process-warning@5.1.0
+| +-- quick-format-unescaped@4.0.4
+| +-- real-require@0.2.0
+| +-- safe-stable-stringify@2.5.0
+| +-- sonic-boom@4.2.1
+| | `-- atomic-sleep@1.0.0 deduped
+| `-- thread-stream@4.2.0
+|   `-- real-require@1.0.0
++-- playwright@1.62.1
+| +-- UNMET OPTIONAL DEPENDENCY fsevents@2.3.2
+| `-- playwright-core@1.62.1
++-- tsx@4.23.12
+| +-- esbuild@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/aix-ppc64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/android-arm@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/android-arm64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/android-x64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/darwin-arm64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/darwin-x64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/freebsd-arm64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/freebsd-x64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/linux-arm@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/linux-arm64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/linux-ia32@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/linux-loong64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/linux-mips64el@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/linux-ppc64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/linux-riscv64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/linux-s390x@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/linux-x64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/netbsd-arm64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/netbsd-x64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/openbsd-arm64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/openbsd-x64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/openharmony-arm64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/sunos-x64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/win32-arm64@0.28.2
+| | +-- UNMET OPTIONAL DEPENDENCY @esbuild/win32-ia32@0.28.2
+| | `-- @esbuild/win32-x64@0.28.2
+| `-- UNMET OPTIONAL DEPENDENCY fsevents@~2.3.3
++-- typescript@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-aix-ppc64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-darwin-arm64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-darwin-x64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-freebsd-arm64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-freebsd-x64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-linux-arm@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-linux-arm64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-linux-loong64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-linux-mips64el@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-linux-ppc64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-linux-riscv64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-linux-s390x@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-linux-x64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-netbsd-arm64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-netbsd-x64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-openbsd-arm64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-openbsd-x64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-sunos-x64@7.0.2
+| +-- UNMET OPTIONAL DEPENDENCY @typescript/typescript-win32-arm64@7.0.2
+| `-- @typescript/typescript-win32-x64@7.0.2
++-- vitest@4.1.10
+| +-- UNMET OPTIONAL DEPENDENCY @edge-runtime/vm@*
+| +-- UNMET OPTIONAL DEPENDENCY @opentelemetry/api@^1.9.0
+| +-- @types/node@26.2.0 deduped
+| +-- UNMET OPTIONAL DEPENDENCY @vitest/browser-playwright@4.1.10
+| +-- UNMET OPTIONAL DEPENDENCY @vitest/browser-preview@4.1.10
+| +-- UNMET OPTIONAL DEPENDENCY @vitest/browser-webdriverio@4.1.10
+| +-- UNMET OPTIONAL DEPENDENCY @vitest/coverage-istanbul@4.1.10
+| +-- UNMET OPTIONAL DEPENDENCY @vitest/coverage-v8@4.1.10
+| +-- @vitest/expect@4.1.10
+| | +-- @standard-schema/spec@1.1.0
+| | +-- @types/chai@5.2.3
+| | | +-- @types/deep-eql@4.0.2
+| | | `-- assertion-error@2.0.1
+| | +-- @vitest/spy@4.1.10 deduped
+| | +-- @vitest/utils@4.1.10 deduped
+| | +-- chai@6.2.2
+| | `-- tinyrainbow@3.1.1 deduped
+| +-- @vitest/mocker@4.1.10
+| | +-- @vitest/spy@4.1.10 deduped
+| | +-- estree-walker@3.0.3
+| | | `-- @types/estree@1.0.9
+| | +-- magic-string@0.30.21 deduped
+| | +-- UNMET OPTIONAL DEPENDENCY msw@^2.4.9
+| | `-- vite@8.2.1 deduped
+| +-- @vitest/pretty-format@4.1.10
+| | `-- tinyrainbow@3.1.1 deduped
+| +-- @vitest/runner@4.1.10
+| | +-- @vitest/utils@4.1.10 deduped
+| | `-- pathe@2.0.3 deduped
+| +-- @vitest/snapshot@4.1.10
+| | +-- @vitest/pretty-format@4.1.10 deduped
+| | +-- @vitest/utils@4.1.10 deduped
+| | +-- magic-string@0.30.21 deduped
+| | `-- pathe@2.0.3 deduped
+| +-- @vitest/spy@4.1.10
+| +-- UNMET OPTIONAL DEPENDENCY @vitest/ui@4.1.10
+| +-- @vitest/utils@4.1.10
+| | +-- @vitest/pretty-format@4.1.10 deduped
+| | +-- convert-source-map@2.0.0
+| | `-- tinyrainbow@3.1.1 deduped
+| +-- es-module-lexer@2.3.1
+| +-- expect-type@1.4.0
+| +-- UNMET OPTIONAL DEPENDENCY happy-dom@*
+| +-- UNMET OPTIONAL DEPENDENCY jsdom@*
+| +-- magic-string@0.30.21
+| | `-- @jridgewell/sourcemap-codec@1.5.5
+| +-- obug@2.1.4
+| +-- pathe@2.0.3
+| +-- picomatch@4.0.5
+| +-- std-env@4.2.0
+| +-- tinybench@2.9.0
+| +-- tinyexec@1.3.0
+| +-- tinyglobby@0.2.17
+| | +-- fdir@6.5.0
+| | | `-- picomatch@4.0.5 deduped
+| | `-- picomatch@4.0.5 deduped
+| +-- tinyrainbow@3.1.1
+| +-- vite@8.2.1
+| | +-- @types/node@26.2.0 deduped
+| | +-- UNMET OPTIONAL DEPENDENCY @vitejs/devtools@^0.4.0
+| | +-- esbuild@0.28.2 deduped
+| | +-- UNMET OPTIONAL DEPENDENCY fsevents@~2.3.3
+| | +-- UNMET OPTIONAL DEPENDENCY jiti@>=1.21.0
+| | +-- UNMET OPTIONAL DEPENDENCY less@^4.0.0
+| | +-- lightningcss@1.33.0
+| | | +-- detect-libc@2.1.2
+| | | +-- UNMET OPTIONAL DEPENDENCY lightningcss-android-arm64@1.33.0
+| | | +-- UNMET OPTIONAL DEPENDENCY lightningcss-darwin-arm64@1.33.0
+| | | +-- UNMET OPTIONAL DEPENDENCY lightningcss-darwin-x64@1.33.0
+| | | +-- UNMET OPTIONAL DEPENDENCY lightningcss-freebsd-x64@1.33.0
+| | | +-- UNMET OPTIONAL DEPENDENCY lightningcss-linux-arm-gnueabihf@1.33.0
+| | | +-- UNMET OPTIONAL DEPENDENCY lightningcss-linux-arm64-gnu@1.33.0
+| | | +-- UNMET OPTIONAL DEPENDENCY lightningcss-linux-arm64-musl@1.33.0
+| | | +-- UNMET OPTIONAL DEPENDENCY lightningcss-linux-x64-gnu@1.33.0
+| | | +-- UNMET OPTIONAL DEPENDENCY lightningcss-linux-x64-musl@1.33.0
+| | | +-- UNMET OPTIONAL DEPENDENCY lightningcss-win32-arm64-msvc@1.33.0
+| | | `-- lightningcss-win32-x64-msvc@1.33.0
+| | +-- picomatch@4.0.5 deduped
+| | +-- postcss@8.5.26
+| | | +-- nanoid@3.3.18
+| | | +-- picocolors@1.1.1
+| | | `-- source-map-js@1.2.1
+| | +-- rolldown@1.2.4
+| | | +-- @oxc-project/types@0.144.0
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-android-arm64@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-darwin-arm64@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-darwin-x64@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-freebsd-x64@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-linux-arm-gnueabihf@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-linux-arm64-gnu@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-linux-arm64-musl@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-linux-ppc64-gnu@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-linux-s390x-gnu@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-linux-x64-gnu@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-linux-x64-musl@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-openharmony-arm64@1.2.4
+| | | +-- UNMET OPTIONAL DEPENDENCY @rolldown/binding-win32-arm64-msvc@1.2.4
+| | | +-- @rolldown/binding-win32-x64-msvc@1.2.4
+| | | `-- @rolldown/pluginutils@1.0.1
+| | +-- UNMET OPTIONAL DEPENDENCY sass-embedded@^1.70.0
+| | +-- UNMET OPTIONAL DEPENDENCY sass@^1.70.0
+| | +-- UNMET OPTIONAL DEPENDENCY stylus@>=0.54.8
+| | +-- UNMET OPTIONAL DEPENDENCY sugarss@^5.0.0
+| | +-- UNMET OPTIONAL DEPENDENCY terser@^5.16.0
+| | +-- tinyglobby@0.2.17 deduped
+| | +-- tsx@4.23.12 deduped
+| | `-- UNMET OPTIONAL DEPENDENCY yaml@^2.4.2
+| `-- why-is-node-running@2.3.0
+|   +-- siginfo@2.0.0
+|   `-- stackback@0.0.2
+`-- zod@4.4.3
+

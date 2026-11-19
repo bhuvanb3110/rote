@@ -1,0 +1,35 @@
+$ git rev-parse --short HEAD 
+4401c7d
+$ node --version 
+v25.9.0
+$ npm --version 
+11.0.0
+$ npm ci 
+
+added 168 packages, and audited 169 packages in 5s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm-ci-exit=0 
+$ npx playwright --version 
+Version 1.62.1
+$ npm ls --depth=0 
+rote@0.1.0 C:\Users\hp\Downloads\rote
++-- @anthropic-ai/sdk@0.116.0
++-- @types/express@5.0.6
++-- @types/node@26.6.6
++-- @types/pg@8.23.1
++-- commander@15.1.0
++-- dotenv@17.4.2
++-- express@5.2.1
++-- fast-check@4.10.2
++-- pg@8.23.1
++-- pino@10.4.0
++-- playwright@1.62.1
++-- tsx@4.23.15
++-- typescript@7.0.2
++-- vitest@4.1.12
+`-- zod@4.6.7
+

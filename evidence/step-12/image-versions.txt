@@ -1,0 +1,53 @@
+$ docker compose images 
+CONTAINER           REPOSITORY          TAG                 PLATFORM            IMAGE ID            SIZE                CREATED
+rote-api-1          rote-fleet          local               linux/amd64         7445b9c138ca        3.58GB              32 seconds ago
+rote-bank-1         rote-fleet          local               linux/amd64         7445b9c138ca        3.58GB              32 seconds ago
+rote-postgres-1     postgres            17                  linux/amd64         ff87138949ad        640MB               2 weeks ago
+rote-worker-1       rote-fleet          local               linux/amd64         7445b9c138ca        3.58GB              32 seconds ago
+rote-worker-2       rote-fleet          local               linux/amd64         7445b9c138ca        3.58GB              32 seconds ago
+rote-worker-3       rote-fleet          local               linux/amd64         7445b9c138ca        3.58GB              32 seconds ago
+rote-worker-4       rote-fleet          local               linux/amd64         7445b9c138ca        3.58GB              32 seconds ago
+ 
+$ docker compose exec -T api npm ls --omit=dev zod express body-parser proxy-addr qs pino commander playwright --all 
+rote@0.1.0 /app
+├─┬ @anthropic-ai/sdk@0.116.0
+│ └── zod@4.6.7 deduped
+├── commander@15.1.0
+├─┬ express@5.2.1
+│ ├─┬ body-parser@2.4.0
+│ │ └── qs@6.17.1 deduped
+│ ├── proxy-addr@2.0.8
+│ └── qs@6.17.1
+├── pino@10.4.0
+├── playwright@1.62.1
+└── zod@4.6.7
+
+ 
+$ docker compose exec -T worker npm ls --omit=dev zod playwright 
+service "worker" is not running
+ 
+$ docker compose exec -T worker sh -c 'echo PLAYWRIGHT_VERSION=' 
+service "worker" is not running
+ 
+$ docker image inspect rote-fleet:local --format {{.Id}} {{.Created}} {{.Size}} 
+sha256:7445b9c138caa9242e893be4bb00d968047fff297d45f74f2da5a3fca6ebf9a2 2026-11-19T16:44:46.253845909Z 3579714574
+ 
+$ docker compose ps -a [after recreating the workers with the .env.example fake credentials in the environment] 
+rote-api-1 running
+rote-bank-1 running
+rote-postgres-1 running
+rote-worker-1 running
+rote-worker-2 running
+rote-worker-3 running
+rote-worker-4 running
+ 
+$ docker compose exec -T worker npm ls --omit=dev zod playwright pino 
+rote@0.1.0 /app
+├─┬ @anthropic-ai/sdk@0.116.0
+│ └── zod@4.6.7 deduped
+├── pino@10.4.0
+├── playwright@1.62.1
+└── zod@4.6.7
+
+$ docker compose exec -T worker printenv PLAYWRIGHT_VERSION 
+1.62.1

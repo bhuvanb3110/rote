@@ -1810,6 +1810,18 @@ design argument says is caught; the check proves it is, on every push.
 
 **Date.** 2026-11-14
 
+**Amendment (2026-11-19, Step 12): the patches stay LF in every checkout.** Step 12's first mutation check on
+Windows was RESULT: FAIL, 11/12. Mutant 03 was a `STALE PATCH` ("corrupt patch at line 12"), not a surviving
+mutant. With `core.autocrlf=true` every patch is CRLF on disk, and patch 03's line 12 is a bare empty context
+line. `git apply` accepts that only as `\n`; `\r\n` reads as corrupt. CI (LF) never saw it. `.gitattributes`
+now has `scripts/mutations/*.patch text eol=lf`, as `*.sql` already did. The re-run is 12/12
+(`evidence/step-12/mutation-check/`; the failed run is in `evidence/step-12/mutation-check-run1-stale-03/`).
+Alternatives considered:
+- regenerate patch 03 without the bare line, which fixes one file and leaves the trap for the next
+  regenerated patch;
+- `git apply --ignore-whitespace` in the script, which loosens the check that makes a moved mutant fail
+  loudly.
+
 ## D55: The reconcile pass covers every terminal job a verify once read [0, 0] on: 1 row expected for `succeeded`, 0 for `failed` / `business_outcome`; `unrecorded_commit_suspected` (amends D50, D51)
 
 (Step 10b; the reviewer decisions on 10a, decision 2, 2026-11-14.)
@@ -2239,3 +2251,63 @@ folder with a seed from another commit (`seeds.json` not extended, no tally or r
 trusting the operator to pick a fresh folder, and the randomized tests now say what they actually exercised.
 
 **Date.** 2026-11-18
+
+## D61: Dependency upgrades: named packages only, a 7-day cooling-off (`--before`), one commit per group, and Playwright held by its own rule
+
+(Step 12; `docs/plans/step-12.md`; the reviewer's Step 12 instruction, 2026-11-19.)
+
+**Context.** `npm audit` on `main` (`0fa700f`) reported 8 findings: 1 critical, 4 high, 3 moderate.
+- Runtime: `proxy-addr`, `body-parser`, `qs` (all under Express 5.2.1) and `zod`.
+- Dev: `vitest`, `@vitest/mocker`, `vite`, `source-map-js`.
+
+CLAUDE.md forbids `npm audit fix` and gives upgrades their own reviewed step. Every fixed version turned out to
+be inside the range its parent already declares, so no major bump was needed. Two facts shaped how the
+upgrades were made:
+- `npm outdated` showed Playwright's "Wanted" as 1.65.1 (`^1.62.1` allows it), so a plain `npm update`
+  would have changed the browser build and the worker image's base tag.
+- `source-map-js` 1.2.3 and 1.2.4 were published the day before and the day of the step. zod's 4.6.6 release
+  note reports malicious commits pushed with a stolen credential (reverted, never published).
+
+**Decision.**
+- **Named packages only.** Every change is `npm install <pkg>@<version>` (a direct dependency, raising its
+  floor) or `npm update <transitive…>` (a transitive one, lockfile only). Never a bare `npm update`, never
+  `npm audit fix` with or without `--force`.
+- **A 7-day cooling-off.** Every resolution runs with `--before=<today − 7 days>`, so npm never picks a
+  version published in the last week. It is applied per command; nothing is written to `.npmrc`. If a fix
+  only exists in a younger version, the finding is listed as open with its date, and the reviewer decides.
+- **Groups, one commit each, each after a full `npm test`** and a typecheck: dev first, then runtime; audit
+  fixes before the in-range refresh. Each commit's lockfile diff (`group-N-lockdiff.txt`: every package path,
+  old → new, dev or runtime) and its test log go in `evidence/step-12/`.
+- **A direct dependency's floor moves to the fixed version** (`zod ^4.6.7`, `vitest ^4.1.12`), so a fresh
+  resolve cannot land on a vulnerable version. Transitives are fixed in the lockfile only; their parents'
+  ranges already allow the fix.
+- **Held for a reviewed step of their own:**
+  - **Playwright, in any direction.** It pins the base image (`Dockerfile` `ARG PLAYWRIGHT_VERSION`, D28),
+    the worker's startup check and CI's browser.
+  - **Any major on runtime code.**
+  - **A minor that changes logging or error output on a redaction path.** Express 5.3.0's default error
+    handler logs the full error object, and a body-parser error carries the raw body. 5.2.1's ranges already
+    take every fix.
+- **The proof** is on the final commit: `npm ci` from an empty `node_modules`, `npm test` ×3, typecheck, the
+  crash matrix at 5/2, the mutation check, one standard chaos run on the rebuilt image, and `npm audit` after.
+
+**Alternatives considered.**
+- **`npm audit fix`** (no `--force`): it would fix the same 8, but it resolves each fix to the newest
+  version in range. Here that is `source-map-js` 1.2.4, published that day. It gives no per-group commits
+  either, and CLAUDE.md forbids it anyway. (Not run, so this is npm's documented behaviour, not a measured
+  result.)
+- **`overrides` in `package.json`** to pin transitives: permanent and easy to forget, and not needed when the
+  parents' ranges already allow the fix.
+- **Dependabot or Renovate**: a bot with write access to PRs. Noted in D35's amendment; still its own
+  decision. A bot's minimum-release-age setting would carry the same cooling-off.
+- **An audit-only PR** (groups 1–3): smaller. Groups 4–5 (the in-range refresh) are two separate commits, so
+  the reviewer can drop them.
+- **A longer cooling-off** (14–30 days): safer, but fast-moving security fixes would wait longer. 7 days
+  covered every fix here.
+
+**Why.** An upgrade is a change to code nobody in this repo wrote. Naming each package keeps the change to
+what was decided. The cooling-off keeps a just-published (possibly compromised) version out. One commit per
+group with its own green suite means a regression points at one group, and holding Playwright keeps the browser
+build, the image and the evidence in lockstep.
+
+**Date.** 2026-11-19
