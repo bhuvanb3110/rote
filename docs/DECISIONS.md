@@ -2312,6 +2312,24 @@ build, the image and the evidence in lockstep.
 
 **Date.** 2026-11-19
 
+**Amendment (Step 12b, 2026-11-19): the held items, and a version that a reviewer names inside the cooling-off.**
+- **Express 5.3.0 landed** (`c38de78`), after D62's redacting error handler (`8085e5f`), as the held list required.
+  Both of its new direct dependencies resolved under `--before=2026-11-12`.
+- **A version the reviewer names, still inside the cooling-off, waits.** The rule is not bent for it. The reviewer
+  asked for Playwright 1.65.1, published 2026-11-13 21:15 UTC.
+  - `--before=2026-11-12` resolves 1.65.0, which would mean running the full browser proof twice (Chromium 158, then
+    159).
+  - The reviewer chose to wait. Everything else in the step proceeds, the branch is pushed as a backup, and the PR
+    opens after the waiting item.
+- **`--before` is a date, so "7 days" means `today − 7` at midnight.** 1.65.1 becomes resolvable on 2026-11-21
+  (`--before=2026-11-14`), not at 2026-11-20 21:15 UTC. Use the date form unchanged; an hour-precise timestamp would
+  just be a second rule.
+- **Held now:**
+  - Playwright 1.65.1, until 2026-11-21 (Step 12b item 4);
+  - fast-check 4.10.3, published 2026-11-18, until 2026-11-25;
+  - `@anthropic-ai/sdk` 1.x and dotenv 18 (majors). `docs/plans/step-12b.md` section 6 records what each changes
+    and how discovery is affected, as the plan for their own step.
+
 ## D62: Every Express app ends with one redacting error handler: it logs an allowlisted summary and answers a generic error, so Express's default handler never sees an error
 
 (Step 12b item 2; `docs/plans/step-12b.md`; the reviewer's Step 12b instruction, 2026-11-19.)

@@ -1,0 +1,5 @@
+Built bank (dist/mock-app/index.js, NODE_ENV=production), express 5.3.0, commit c38de78. Script: npm run build, then node evidence/step-12b/smoke-built-bank.mjs: a too-deeply nested login form + Authorization header carrying fake-cred-smoke.
+status 400; x-request-id d800369f-7bf9-4cc3-af67-6ce464cdc95b
+response: <body><h1>400 Bad Request</h1><p>Request id: d800369f-7bf9-4cc3-af67-6ce464cdc95b</p></body>
+bank stderr: {"level":"error","time":"2026-11-19T23:11:55.834Z","msg":"http: request failed","name":"BadRequestError","status":400,"method":"POST","route":"(no route)","requestId":"d800369f-7bf9-4cc3-af67-6ce464cdc95b","code":"querystring.parse.rangeError"}
+credential in response: false; in bank stdout/stderr: false

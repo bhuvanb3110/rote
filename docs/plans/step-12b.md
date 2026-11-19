@@ -196,3 +196,21 @@ image don't load it (Compose passes the environment).
 - **REPO_NOTES** "Fleet Step 12b".
 - **After item 4:** the PR `chore: held upgrades: redacting error handler, express 5.3, playwright 1.65` into
   `main`, not merged, with its four required checks reported.
+
+## Built so far (2026-11-19)
+
+| Commit | What |
+| --- | --- |
+| `74f3905` | `step-13.md`: the reviewer's decisions on its section 10 |
+| `4d0cef9` | this plan; `audit-before.txt`, `outdated-before.txt` |
+| (none) | item 1: `.env` gained the six fake `ROTE_CRED_*` keys (not committed; git-ignored) |
+| `8085e5f` | item 2: `src/http/errorHandler.ts` in all three apps, 14 tests, D62; 737/737 |
+| `c38de78` | item 3: express 5.3.0; 737/737; the built bank's smoke check |
+| (docs) | the D61 amendment, REPO_NOTES "Fleet Step 12b" (in progress), `evidence/step-12b/README.md`, this section |
+
+- **Item 5:** fast-check 4.10.3 is still held, until 2026-11-25. Nothing needs it.
+- **Item 6:** section 6 is the written plan for the majors. Nothing was bumped.
+- **Item 4 waits for 2026-11-21.** The branch is pushed as a backup, with no PR until then.
+- **Off-plan:** in item 2, the route of an error inside a mounted router turned out to be router-relative
+  (`/tenant-b/login` logs `/login`), because Express restores `baseUrl` before the app-level handler runs. That is
+  documented, not worked around.
