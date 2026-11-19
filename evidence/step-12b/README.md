@@ -1,8 +1,8 @@
 # Step 12b evidence: the held upgrades
 
 The plan is `docs/plans/step-12b.md`; the decisions are D61 (amendment) and D62. Branch `chore/deps-held-2026-11`.
-**In progress:** items 1–3, 5 and 6 are done (2026-11-19). Item 4, Playwright 1.65.1, runs from 2026-11-21 under
-D61's cooling-off, and its proof is added to this folder then.
+Items 1–3, 5 and 6 are done (2026-11-19), plus the part 1 review's two changes: the route pattern with its mount,
+and mutant 13. Item 4, Playwright 1.65.1, became Step 12c (on or after 2026-11-21), with its own evidence folder.
 
 | File | What | Result |
 | --- | --- | --- |
@@ -12,6 +12,9 @@ D61's cooling-off, and its proof is added to this folder then.
 | `item-3-npm-test.txt`, `item-3-typecheck.txt` | full `npm test` and typecheck on Express 5.3.0 (`c38de78`) | **67 files, 737/737**, 236.4 s; typecheck exit 0 |
 | `item-3-built-bank-smoke.txt`, `smoke-built-bank.mjs` | the *built* bank (`dist/mock-app/index.js`, what the image runs), `NODE_ENV=production`: a too-deeply nested login form and an `Authorization` header, each carrying a fake credential | 400 with a generic page; one stderr summary (`code: querystring.parse.rangeError`, `route: (no route)`); the credential in neither the response nor the bank's output |
 | `audit-after-items-1-3.txt`, `outdated-after-items-1-3.txt` | after items 1–3 | 0 vulnerabilities; 4 outdated (sdk, dotenv, fast-check, playwright: all held) |
+| `review-1-npm-test.txt` | full `npm test` at the part 1 review's route-pattern commit (`4be450f`) | **67 files, 741/741**, 231.5 s |
+| `review-2-npm-test.txt` | full `npm test` at the mutant-13 commit (`53a9275`) | **67 files, 741/741**, 238.8 s |
+| `mutation-check/`, `mutation-check-stdout.txt` | `npm run mutation-check -- --out evidence/step-12b/mutation-check` on `53a9275` | **13/13 caught**, `RESULT: PASS`; mutant 13 caught by 5 tests |
 
 Not committed: item 1 (`.env` is git-ignored). Six `ROTE_CRED_*` keys were appended; the two existing lines were
 left as they were.

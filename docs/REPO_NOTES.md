@@ -99,11 +99,12 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
-## Fleet Step 12b: a redacting error handler, Express 5.3, Playwright 1.65.1 (2026-11-19, in progress)
+## Fleet Step 12b: a redacting error handler, Express 5.3 (2026-11-19)
 
 Branch `chore/deps-held-2026-11`. The plan: `docs/plans/step-12b.md`. The evidence: `evidence/step-12b/README.md`.
-**Items 1–3, 5 and 6 are done. Item 4 (Playwright 1.65.1) runs from 2026-11-21, D61's cooling-off.** This
-section is completed then.
+- **Playwright 1.65.1 is Step 12c**, on or after 2026-11-21 (D61's cooling-off) and before Step 13c.
+- **The mutation check has 13 mutants.** 13 is "the error handler logs `err.message`" (13/13 on Windows).
+  Step 13's planned mutants are 14–16.
 
 - **Every Express app ends with `redactingErrorHandler`** (`src/http/errorHandler.ts`, D62). That covers the api,
   the mock bank and the operator console.
