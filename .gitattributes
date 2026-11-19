@@ -1,3 +1,6 @@
 # Migrations are checksummed by the runner (src/queue/migrate.ts). The runner also normalizes
 # CRLF -> LF before hashing, but keep them LF in every checkout so the files on disk agree too.
 *.sql text eol=lf
+# The mutation check's patches (D54) must be LF on disk: `git apply` reads a bare empty context line as
+# "\n" only, so a CRLF checkout (core.autocrlf=true on Windows) turns it into a corrupt patch (Step 12).
+scripts/mutations/*.patch text eol=lf
