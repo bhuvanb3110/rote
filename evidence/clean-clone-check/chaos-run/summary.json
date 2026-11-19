@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "completed": true,
+  "seed": 757102590,
+  "family": "standard",
+  "jobs": 100,
+  "workers": 4,
+  "durationMs": 150000,
+  "pauseMs": 45000,
+  "drainTimeoutMs": 600000,
+  "commit": "9d38bb2",
+  "startedAt": "2026-11-19T14:39:20.106Z",
+  "wallMs": 165688,
+  "workMs": 151212,
+  "drainMs": 3769,
+  "drainTimedOut": false,
+  "kills": 16,
+  "restarts": 16,
+  "actionErrors": 0,
+  "pause": {
+    "replica": 1,
+    "fromMs": 40928,
+    "toMs": 85928
+  },
+  "bank": null,
+  "bankControlsApplied": 0,
+  "oracle": {
+    "pass": true,
+    "counts": {
+      "ok": 100,
+      "DUPLICATE": 0,
+      "MISSING_COMMIT": 0,
+      "UNRECORDED_COMMIT": 0,
+      "MISMATCH": 0,
+      "LOST": 0,
+      "PENDING": 0,
+      "ORPHAN": 0
+    },
+    "ledgerRows": 100
+  },
+  "finals": {
+    "succeeded/success": 100
+  },
+  "needsHuman": [],
+  "failed": [],
+  "notSettled": 0,
+  "recoveries": {
+    "requeuedAfterCrash": 11,
+    "requeuedAfterFailure": 0,
+    "failedByRecovery": 0,
+    "claimedToVerify": 0,
+    "reclaimedVerify": 0,
+    "resumedVerify": 0,
+    "escalatedByRecovery": 0,
+    "ownVerify": 0,
+    "already_done": 0,
+    "resubmitted": 0,
+    "exhausted": 0,
+    "not_committed_final": 0,
+    "deferred": 0,
+    "escalated": 0,
+    "reconciled": 0,
+    "duplicate_suspected": 0,
+    "unrecorded_commit_suspected": 0,
+    "reconcile_unreadable": 0,
+    "reconcile_deferred": 0
+  },
+  "crashBudget": {
+    "jobsWithCrashes": 9,
+    "totalCrashes": 11,
+    "maxCrashesOnOneJob": 2,
+    "jobsLeasedPastMaxAttempts": 0,
+    "crashLimit": 0
+  },
+  "escalatedByCrashCapAttributed": [],
+  "reconcileAbandoned": [],
+  "workerProtections": {
+    "heartbeatLeaseLost": 1,
+    "fencedCommitIntent": 0,
+    "completionFencedOut": 0,
+    "runAbortedOnLostLease": 1,
+    "verifyPhaseAborted": 0,
+    "verifyDecisionFencedOut": 0,
+    "reconcileDecisionFencedOut": 0,
+    "duplicatesDetected": 0,
+    "unrecordedCommitsDetected": 0,
+    "reconcileAbandoned": 0
+  },
+  "leaks": [],
+  "oom": [],
+  "problems": [],
+  "pass": true
+}

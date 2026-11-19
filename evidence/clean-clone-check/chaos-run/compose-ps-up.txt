@@ -1,0 +1,8 @@
+NAME              IMAGE                                                                     COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+rote-api-1        sha256:db8c225547e2ea7de84ea5a722c117a69ccc138853bca5c0da7bf4c713675a53   "node dist/src/cli/i…"   api        54 seconds ago   Up 36 seconds (healthy)   127.0.0.1:8080->8080/tcp
+rote-bank-1       sha256:db8c225547e2ea7de84ea5a722c117a69ccc138853bca5c0da7bf4c713675a53   "node dist/mock-app/…"   bank       54 seconds ago   Up 43 seconds (healthy)   127.0.0.1:4100->4100/tcp
+rote-postgres-1   postgres:17                                                               "docker-entrypoint.s…"   postgres   8 seconds ago    Up 6 seconds (healthy)    127.0.0.1:55432->5432/tcp
+rote-worker-1     sha256:db8c225547e2ea7de84ea5a722c117a69ccc138853bca5c0da7bf4c713675a53   "node dist/src/worke…"   worker     54 seconds ago   Up 36 seconds (healthy)   
+rote-worker-2     sha256:db8c225547e2ea7de84ea5a722c117a69ccc138853bca5c0da7bf4c713675a53   "node dist/src/worke…"   worker     54 seconds ago   Up 36 seconds (healthy)   
+rote-worker-3     sha256:db8c225547e2ea7de84ea5a722c117a69ccc138853bca5c0da7bf4c713675a53   "node dist/src/worke…"   worker     54 seconds ago   Up 36 seconds (healthy)   
+rote-worker-4     sha256:db8c225547e2ea7de84ea5a722c117a69ccc138853bca5c0da7bf4c713675a53   "node dist/src/worke…"   worker     54 seconds ago   Up 35 seconds (healthy)   
