@@ -99,6 +99,38 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
+## Fleet Step 11: the Day-2 exit, closed; the PR to `main` (2026-11-19)
+
+No code changes. Every commit of the step is evidence or docs.
+- **The 20-seed batch** (`evidence/chaos/day2-exit-final/`) is committed exactly as the runner wrote it, plus a
+  README.
+  - The run: on `9d38bb2`, 02:48–07:24 UTC, 4 h 36 min, about 14 min per seed, not interrupted.
+  - **RESULT: PASS WITH 1 ESCALATION BY CRASH CAP (ATTRIBUTED)**: 10,000 jobs, 1,582 kills, 0 DUPLICATE,
+    0 LOST, 9,999 succeeded.
+  - The escalation: 1 `needs_human` / `crash_limit` in seed 20 (job `9e1d23f4-…`, 0 ledger rows). Its worker
+    died 0.6 s after the intent, then four verifiers in a row were killed before a lookup. Every death is a
+    scheduled kill, during a burst of 16 kills in 135 s while worker 4 was paused.
+  - The batch's exit code is 3 for that seed, not 0. `tally.json`'s `result` is
+    `PASS_WITH_ATTRIBUTED_ESCALATIONS`. Treat it as a pass that a person must look at, never as a plain pass.
+  - **Before committing a batch, check it.** `evidence/step-11/check-day2-exit-final.mjs <dir> <commit>` is
+    read-only. It compares every tally cell with its `summary.json` and recounts the verdicts from the raw
+    `jobs.json` and `ledger.json`. It is not a test and not wired to npm: a one-off check, kept with its output.
+- **`core.autocrlf=true` on this machine.** Committing a runner's output byte for byte needs files with no CR.
+  The chaos runner writes LF, so nothing is converted. Check with `grep -l $'\r'` before `git add` (and ignore
+  the "LF will be replaced by CRLF" warnings, which are about future checkouts).
+- **`evidence/mutation-check/ci-linux/`** is CI run 44425004620's whole `mutation-check-report` artifact (12/12),
+  not just `report.md` and `check.txt`. Replace it the same way (`gh run download <run> -n mutation-check-report`)
+  when the mutants change. GitHub deletes the artifact after 90 days.
+- **The clean-clone check** (`evidence/clean-clone-check/`) passed with the README as written. Two things worth
+  knowing:
+  - `docker-compose.yml`'s `name: rote` makes a clone in any folder the same Compose project, with the same
+    containers and volumes. So stop this repo's stack before running one from a clone.
+  - `npx playwright install chromium` is not needed for chaos (the browsers are in the worker image), only
+    for the tests.
+- **`main` is protected** (step-10 "Built: Step 10b"): `test`, `docker`, `crash-matrix` and
+  `mutation-check` are required, `strict`, `enforce_admins`, PR only. `fleet/day-1` already contains `main`'s
+  head (`1e323f3`), so the PR needs no update to merge.
+
 ## Fleet Step 10b: reconcile every terminal job, chaos at scale, one crash budget (2026-11-17/18)
 
 - **Eight migrations now** (tests that list them name all eight): `0005_reconcile_terminal.sql` (D55: the

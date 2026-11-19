@@ -407,7 +407,8 @@ this window. It is **made loud** instead: the reconcile pass finds the second ro
 
 | Judge | Evidence | Result |
 | --- | --- | --- |
-| Chaos at scale: 500 jobs, 4 workers, kills every 5–15 s, a 45 s pause (standard family), 2 seeds | [`chaos/day2-exit/`](evidence/chaos/day2-exit/README.md) (before D58) and [`…-after-d58/`](evidence/chaos/day2-exit-after-d58/README.md) | **FAIL before D58** (1 of 2): one job went to `needs_human` after its worker and all 3 of its verifiers were killed. **PASS after**, on the same 2 seeds: 1000/1000 ok, 0 duplicates, 0 lost, 0 `needs_human`; 3 dead verifiers re-claimed and decided. The 20-seed batch (the same first 2 seeds, one commit) goes to [`chaos/day2-exit-final/`](evidence/chaos/day2-exit-final/README.md) |
+| **The Day-2 exit.** Chaos at scale: 20 seeds × 500 jobs, 4 workers, kills every 5–15 s, a 45 s pause (standard family), all on one commit | [`chaos/day2-exit-final/`](evidence/chaos/day2-exit-final/README.md) ([`tally.md`](evidence/chaos/day2-exit-final/tally.md); checked before commit: [`step-11/`](evidence/step-11/day2-exit-final-check.txt)) | **20/20 seeds passed: 10,000 jobs, 1,582 kills, 0 duplicates, 0 lost**, 9,999 succeeded. 1 job ended `needs_human` / `crash_limit` with **0 ledger rows**: its worker died 0.6 s after the intent, then 4 verifiers in a row were killed by the schedule before a lookup. Every death is attributed, so this is a pass with 1 escalation, not a plain pass. 548 crash requeues used no attempt; 99 jobs verified after a death past the intent (89 `already_done`, 9 resubmitted and reconciled `[1]`, 1 escalated) |
+| The same standard family on 2 seeds, before and after D58 | [`chaos/day2-exit/`](evidence/chaos/day2-exit/README.md) and [`…-after-d58/`](evidence/chaos/day2-exit-after-d58/README.md) | **FAIL before D58** (1 of 2): one job went to `needs_human` after its worker and all 3 of its verifiers were killed. **PASS after**, on the same 2 seeds: 1000/1000 ok, 0 duplicates, 0 lost, 0 `needs_human` |
 | The bank down 30 s and slow 60 s, no kills | [`chaos/bank-fault-only-seed-2130356189-after-d57/`](evidence/chaos/bank-fault-only-seed-2130356189-after-d57/) | **PASS**: 100/100 succeeded, 0 failed, 0 duplicates, 0 lost; 101 attempts requeued with the backoff |
 | The bank down and slow, plus 16 kills and the pause | [`chaos/bank-fault-kills-seed-41379566/`](evidence/chaos/bank-fault-kills-seed-41379566/README.md) (before) and [`…-after-d57/`](evidence/chaos/bank-fault-kills-seed-41379566-after-d57/) | **FAIL before D57**: 2 jobs failed, their attempts used up by kills. **PASS after**, on the same seed: 100/100 succeeded, 0 failed, 0 duplicates, 0 lost; 3 jobs ran a 4th time because their crashes used no attempt |
 | Crash-point matrix, production timing (lease 30 s, heartbeat 10 s): a kill at each of 16 transfer boundaries + 7 two-fault recovery scenarios | [`crash-matrix/step-10-production-30-10/`](evidence/crash-matrix/step-10-production-30-10/README.md) | **PASS, 23/23**, 1 ledger row in every scenario: the pre-intent points requeued without using an attempt; `before-submit` resubmitted `[0, 0]` and reconciled `[1]`; the post-click points `already_done`; every killed verifier re-claimed and decided |
@@ -415,7 +416,8 @@ this window. It is **made loud** instead: the reconcile pass finds the second ro
 | A crash right before / after Submit, in `npm test` and CI (real SIGKILL on Linux) | `src/worker/crashSubmit.db.test.ts`; the CI `crash-matrix` job | exactly 1 ledger row each: resubmitted on attempt 2 / `already_done` on attempt 1 |
 | The zombie window | [`zombie-window-limit/`](evidence/zombie-window-limit/) | **PASS**: the duplicate happens (2 rows) and is flagged `needs_human` / `duplicate_suspected` |
 | The history lagging past the settle period; a 30 s outage during verifies | [`step-10/verify-scenarios/`](evidence/step-10/verify-scenarios/) | **PASS**: the lag's `[0, 0]` duplicates are flagged by the reconcile pass; every deferred verify decided after the outage |
-| Planted bugs | [`mutation-check/`](evidence/mutation-check/report.md) | **12/12** caught on the final code, each by its named tests; in CI on every push |
+| Planted bugs | [`mutation-check/`](evidence/mutation-check/report.md) and its CI copy [`ci-linux/`](evidence/mutation-check/ci-linux/README.md) | **12/12** caught on the final code, each by its named tests, on Windows and in CI (run 44425004620); in CI on every push |
+| This README, from a fresh clone | [`clean-clone-check/`](evidence/clean-clone-check/README.md) | **PASS**: `npm ci`, `docker compose up -d --build`, then `npm run chaos -- --seed 757102590`: 100/100 succeeded, 0 duplicates, 0 lost |
 
 The full before / after, step by step, is in the [evidence index](evidence/README.md).
 
@@ -451,6 +453,11 @@ The full before / after, step by step, is in the [evidence index](evidence/READM
 - **The zombie window is detected, not closed** (above). The reconcile pass has its own limit: a zombie
   frozen longer than the reconcile delay that also beats its heartbeat on waking clicks after the pass read the
   history; the end-of-day batch is what finds that one (D51).
+- **Bad luck alone can reach the crash cap.** Under chaos-level kill rates, 1 job in the 10,000 of the 20-seed
+  batch went to `needs_human` / `crash_limit`: five scheduled kills in a row hit it (its worker right after the
+  intent, then four verifiers). It had no ledger row, so the transfer had not happened, but a person had to be
+  asked. The cap (5, D58) is what stops a real poison job from looping, so the fleet cannot tell the two apart.
+  `rote jobs reverify` hands such a job back to verify.
 - **An abandoned reconcile is settled, not confirmed.** If 5 reconcilers die on one job, no automatic check
   re-reads it again; only the end-of-day batch can still find a late duplicate on it (`reconcile: "abandoned"`
   says so, D59).
