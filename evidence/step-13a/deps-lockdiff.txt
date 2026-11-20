@@ -1,0 +1,16 @@
+Step 13a dependency group (D61): npm install <7 named packages> --before=2026-11-12, on 2026-11-19.
+Cutoff: 2026-11-12T00:00Z. Every version below was published before it.
+
+node_modules/@opentelemetry/api: (absent) -> 1.10.0 (runtime) published 2026-10-20T18:23:17.360Z
+node_modules/@opentelemetry/core: (absent) -> 3.1.1 (runtime) published 2026-11-09T17:02:40.770Z
+node_modules/@opentelemetry/exporter-prometheus: (absent) -> 0.301.1 (runtime) published 2026-11-09T17:00:07.684Z
+node_modules/@opentelemetry/exporter-trace-otlp-http: (absent) -> 0.301.1 (runtime) published 2026-11-09T16:59:53.953Z
+node_modules/@opentelemetry/otlp-exporter-base: (absent) -> 0.301.1 (runtime) published 2026-11-09T17:00:47.520Z
+node_modules/@opentelemetry/otlp-transformer: (absent) -> 0.301.1 (runtime) published 2026-11-09T17:00:29.615Z
+node_modules/@opentelemetry/resources: (absent) -> 3.1.1 (runtime) published 2026-11-09T16:58:45.816Z
+node_modules/@opentelemetry/sdk-logs: (absent) -> 3.1.1 (runtime) published 2026-11-09T17:00:44.518Z
+node_modules/@opentelemetry/sdk-metrics: (absent) -> 3.1.1 (runtime) published 2026-11-09T17:02:06.378Z
+node_modules/@opentelemetry/sdk-trace: (absent) -> 3.1.1 (runtime) published 2026-11-09T16:59:26.912Z
+node_modules/@opentelemetry/semantic-conventions: (absent) -> 1.45.0 (runtime) published 2026-11-06T17:37:38.087Z
+
+11 package path(s) changed.
