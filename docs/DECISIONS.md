@@ -2446,3 +2446,223 @@ would leak and check the bytes that actually go out.
   - Each asserts the route is exactly `/(unknown route)`, and that no tenant, member id, year, memo or path segment is
     in the summaries, the logs or the response bodies. On the old code the first two log
     `(route not in the app's stack)/member/:id/transfer` and fail.
+
+**Amendment to D61 (Step 13a, 2026-11-19): two findings while resolving the OpenTelemetry packages.**
+- **`npm view <pkg> version --before=<date>` ignores `--before`.** It printed the `latest` dist-tag (0.301.2 for both
+  exporters, published 2026-11-12 17:10, inside the cooling-off). Only `npm install … --before` applies the rule. So
+  a version is chosen from the package's `time` field, installed with `--before`, and the lockfile diff records each
+  path's publish time (`evidence/step-13a/deps-lockdiff.txt`).
+- **A planned package can be renamed upstream.** step-13.md named `@opentelemetry/sdk-trace-base`. In the 3.x SDK it
+  is `@opentelemetry/sdk-trace`; `sdk-trace-base` stops at 2.12.x and requires `@opentelemetry/api <1.10.0`. The step
+  reports such a change instead of mixing SDK lines.
+
+## D63: The telemetry core: one seam, wired by hand, and every call fire-and-forget with a bounded export
+
+(Step 13a; `docs/plans/step-13a.md`, step-13.md section 2; the reviewer's 13a instruction, 2026-11-19.)
+
+**Context.** Day 3 adds metrics and traces to code that holds leases and writes fenced transitions. The reviewer's
+rule outranks the deliverables: telemetry must never change behaviour. A collector that is down, slow or absent must
+leave jobs, timings and results as they are.
+
+**Decision.**
+- **One seam.** `src/telemetry/` holds a small `Telemetry` interface (`count`, `observe`, `adjust`, `startSpan`,
+  `metricsHandler`, `registerGauges`, `flush`, `shutdown`) and `NO_TELEMETRY`, the default everywhere. `otel.ts` is
+  the only file that imports `@opentelemetry/*`. `createTelemetry` returns the no-op when nothing is configured.
+- **Wired by hand, nothing global.**
+  - A `TracerProvider` with explicit contexts and a `MeterProvider` with the Prometheus reader (`preventServerStart`).
+  - No `sdk-node`, no auto-instrumentation, no global provider, context manager or diag logger.
+  - The resource is built from explicit attributes: `service.name`, and the worker id as `service.instance.id`.
+- **Every public method is guarded.** Its body is in try/catch. An error is swallowed, counted in
+  `rote_telemetry_errors_total{kind}`, and logged as one `telemetry: degraded` warning at most every 60 s. The warning
+  carries the error's class and code, never its message.
+- **The span pipeline has a bound we can count:**
+  - `GuardProcessor` counts spans between `onEnd` and their export's end. At 2048 it drops and counts
+    `span_dropped`; the batch processor would drop silently.
+  - `BatchSpanProcessor`: 500 ms delay, batch 512.
+  - `SafeExporter`: a synchronous throw becomes a failed result, an exporter that never answers is given up at 2 s,
+    and every failure counts `span_export`.
+  - Then the OTLP/HTTP exporter, with a 2 s timeout.
+- **flush and shutdown race a timer of `capMs`** and never reject. An exporter error that surfaces through
+  `forceFlush` is caught there and counted as `flush`. The worker's one flush at exit is
+  min(2 s, what is left of `ROTE_SHUTDOWN_GRACE_MS` since the signal) (`telemetryShutdownCapMs`), never added to it.
+- **Off unless configured:**
+  - `OTEL_EXPORTER_OTLP_ENDPOINT` turns on traces;
+  - `ROTE_METRICS_PORT` turns on the worker's metrics and listener (`ROTE_METRICS_HOST` defaults to 127.0.0.1);
+  - `--metrics` turns on the API's.
+  - A bad value is a warning, and that part stays off. Building the telemetry opens no socket.
+  - A metrics port that can't be bound is one warning (`startMetricsServer` resolves `null`), and the worker runs on.
+- **Redaction.** Span attributes pass a per-span allowlist (`names.ts`): known keys only, and values that are
+  numbers, booleans or plain identifiers. Event names must be identifiers. Label values that are not plain
+  identifiers are exported as `other`.
+- **13a's one span is `capability.step`.** Its parent is a synthetic remote parent. The span id is derived from
+  `jobs.trace_id` (`syntheticRootSpanId`), so every worker picks the same one. That is reviewer decision 1's fallback
+  for rows without `root_span_id`; 13b adds 0009 and the real root.
+
+**Tests.**
+- `telemetry.test.ts` (16): one contract for the no-op and OTel.
+  - With an exporter that throws, one that hangs and one that rejects after 10 s, the calls' p99 is under 5 ms and
+    the slowest under 100 ms. flush/shutdown resolve within their cap and never reject.
+  - The guard drops at its bound and counts it; a hung export is released at the timeout; the warning is
+    rate-limited and carries no message.
+  - Configuration and the exit cap.
+- `redaction.test.ts` (4): every attribute path a caller could use, params and credentials spread in.
+- `metricsPort.db.test.ts` (2): a taken port gives one warning and the job completes. A free one serves Prometheus
+  text with every worker metric.
+
+**Alternatives considered.**
+- **`@opentelemetry/sdk-node`:** it pulls the gRPC/proto exporters for three signals, `instrumentation`,
+  `configuration`, B3 and Zipkin, and reads a wide set of `OTEL_*` variables at start.
+- **Auto-instrumentation of `pg`/`http`/Express/Playwright:** patched drivers change timing and error paths exactly
+  where leases and fences live (step-13.md rule 7).
+- **Trusting the batch processor's own bound:** it drops without telling anyone. Counting needs our own bound.
+- **Awaiting telemetry in the job path:** that is a behaviour change by definition.
+- **Logging the error message in the degraded warning:** exporter errors can carry URLs and payload fragments, so
+  class and code are enough to act on.
+
+**Why.** Telemetry is the one feature whose failures must be invisible to the system it watches. Every path that
+could make a call slow, throw, or keep the process alive ends inside `otel.ts`, where it is counted instead.
+
+**Date.** 2026-11-19
+
+## D64: Metrics: `rote_` names, counted where the state changes, and the API's DB gauges on a dedicated pool
+
+(Step 13a; step-13.md section 5; reviewer decisions 2 and 4, 2026-11-19.)
+
+**Decision.**
+- **Names.** Every metric has the `rote_` prefix. The README maps each one to the brief's name, and `names.ts`
+  holds the list (HELP text, labels, the brief's name).
+- **Counted once, where the write commits** (`src/worker/telemetryEvents.ts`):
+  - `jobs_completed_total{outcome}` and `job_duration_seconds` (`created_at` → now) at T4's terminal write, at a T7
+    that ends the job, and at T6.2 / T6.6, which are terminal writes too.
+  - `job_retries_total` at T4's requeue and T6.1.
+  - `recoveries_total{result}` from the verify decision, as the brief's three: `already_done`, `resubmitted`,
+    `escalated`. T6.6 counts as `escalated`.
+  - `worker_crashes_total{kind}` by the worker that recovered the job: `before_intent` (from `running`), `committing`,
+    `verifier`, and `reconciler` (a reconcile claim that closed a dead phase).
+  - `browser_contexts_in_use` around each replay run, whether a job or a lookup.
+  - `screenshot_retries_total` from replay's per-run total (D8 promised it).
+- **The existing counters are forwarded.** `forwardingMetrics(InMemoryCounters, telemetry)` forwards every `inc()`,
+  so call sites are unchanged and the in-memory totals still feed the log lines.
+- **Closed label sets are seeded at 0**, so a series exists before its first event. `jobs_completed_total` (open set)
+  appears with its first job.
+- **Small additive data changes:**
+  - `CLAIM_EXPIRED_SQL` also selects `created_at` (`VerifyClaim.job.created_at`, `RecoveredJob.createdAt`, both
+    optional);
+  - reconcile claims carry `deadReconciler`;
+  - `CreatePoolOptions.statementTimeoutMillis`.
+- **The API's gauges** (`apiGauges.ts`, reviewer decision 2):
+  - `rote_queue_depth{tenant}` (every tenant, 0 included), `rote_breaker_state{capability}` and
+    `rote_jobs_crashes_sum`.
+  - They are read on every scrape from a dedicated pool (`max` 1, `statement_timeout` 1000 ms, connect timeout
+    1000 ms), with a 4 s cap on the whole read.
+  - Each query stands alone. One that fails keeps its gauge at the last value and counts `gauge_query`. The API's
+    request pool is never touched.
+  - Served at `GET /metrics` with `catalog serve --queue --metrics`.
+
+**Tests.**
+- `apiMetrics.db.test.ts` (3):
+  - The gauge values, and a drained tenant reading 0.
+  - **With `breakers` locked** (ACCESS EXCLUSIVE in an open transaction), a scrape takes the statement timeout and
+    keeps the stale value, counted once. Meanwhile `/healthz`, `GET /jobs/:id` and an async enqueue each answer
+    within their baseline + 250 ms.
+  - Without the option, there is no `/metrics`.
+- The equivalence test checks the counts after its scenarios: success 2, business outcome 1, resubmitted 1, deferred
+  1, contexts 0.
+
+**Alternatives considered.**
+- **Counting in the state machine or the SQL:** the SQL is fenced and mirrored by the model (D39). Metrics belong
+  where the worker learns that a write committed.
+- **A separate exporter process for the DB gauges:** one more container on an 8 GB laptop. The reviewer chose the
+  API.
+- **Gauges from the API's own pool:** a slow scrape would queue behind requests, or requests behind it.
+- **Gauge rows only for tenants with queued jobs:** a drained tenant would keep its last value until the series went
+  stale.
+
+**Why.** The numbers should mean what they say and cost the job path nothing: one in-memory increment after a commit
+it already waited for.
+
+**Date.** 2026-11-19
+
+## D65: Replay's `observe`: an additive, synchronous, never-awaited view of a run
+
+(Step 13a; step-13.md section 4, "one additive option, not a reuse of `onStep`".)
+
+**Decision.**
+- `ReplayOptions.observe?: (event: ReplayObservation) => void`, passed through `invokeCapability`.
+- **The events:**
+  - `step_start` (index, id, irreversible);
+  - `step_end`, which adds the strategy that resolved the step's own target, that step's screenshot retries, and how
+    it ended: `completed`, `exited`, `threw` or `superseded`;
+  - `run_end`, once and last, with the run's total retries.
+- **The strategy is read right after `act()`.** Recognizers and checkpoints locate too, so "the last provenance entry
+  at the step's end" would be theirs. A first version did that and reported `visual` for the Submit step.
+- **It is called synchronously, inside try/catch.** A returned promise's rejection gets a no-op handler, so a
+  careless async observer cannot cause an unhandled rejection. It is never awaited, and nothing reads anything back.
+- **Absent, no code path changes.** The worker passes it only when telemetry is on: `stepObserver` for a job's run,
+  and a retries-only observer for lookups.
+- **Events carry no param, value, URL or page text.**
+
+**Tests** (`fleet.test.ts`, 3):
+- a full transfer's events in order, `irreversible` only on step-11, `roleName` for Submit, and no param value in any
+  event;
+- a business outcome ends its last step `exited`;
+- a throwing observer and a rejecting async one give the same status, outputs and evidence kinds as a run without
+  one, 1 row each, and no unhandled rejection.
+
+**Alternatives considered.**
+- **Reuse `onStep`:** it is awaited and may throw on purpose (D34's fault worker). Making every worker pass one would
+  put an awaited hook into every step.
+- **Read telemetry off `WebSurface` after the run:** per-step timing and strategies would be lost, and a run that
+  throws would report nothing.
+
+**Why.** Extend replay, never fork it (CLAUDE.md). The option is shaped so it cannot stop or delay a run.
+
+**Date.** 2026-11-19
+
+## D66: The equivalence test, in two halves; the crash matrix's `--telemetry dead`; Compose turns telemetry on
+
+(Step 13a; step-13.md section 7 row 3; the reviewer's 13a instruction pulled the equivalence test and the matrix flag
+forward from 13b.)
+
+**Decision.**
+- **Four modes:**
+  - off;
+  - in-memory;
+  - a **closed port** (every export refused);
+  - a **black hole** (a server that accepts and never answers, so every export hangs to its timeout).
+- **The in-process half** (`src/worker/telemetry.db.test.ts`):
+  - Scenarios: success, business outcome, a lost lease, a deferred verify. The real `OtelTelemetry` is built per
+    mode with `/metrics` served.
+  - The same end state is compared: jobs, attempts, verifications and ledger rows, with timestamps, ids, tokens and
+    worker names normalized away. Each scenario must run within 1.5 × off + 3 s.
+  - The in-memory mode's spans are the full-transfer redaction check (section 7 row 2).
+- **The worker-process half** (`src/worker/crashSubmit.db.test.ts`, the file that owns :4100): crash before and after
+  Submit, the four modes **one after another**, one schema each, configured only through the environment. They were
+  run at once first; four worker processes launching Chromium together overloaded the laptop
+  (`evidence/step-13a/flakes.md`).
+  - The child's in-memory mode is an OTLP receiver in the test that answers 200, since an in-memory exporter cannot
+    cross a process boundary. It receives the clean worker's `capability.step` spans.
+  - The closed mode also points `ROTE_METRICS_PORT` at a port the test holds: each worker logs exactly one warning.
+  - Every mode keeps the original assertions, and the modes must match. Each drain must finish within 1.5 × off's
+    + 5 s.
+- **`npm run crash-matrix -- --telemetry dead`** gives every worker in the matrix `OTEL_EXPORTER_OTLP_ENDPOINT` to a
+  closed port and `ROTE_METRICS_PORT=0`. Its second invocation in CI stays 13b's (step-13.md section 9).
+- **Compose turns telemetry on now:**
+  - workers: `ROTE_METRICS_PORT=9464` on 0.0.0.0, `OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318`;
+  - the API: `--metrics`.
+  - Until 13c adds Jaeger, the endpoint does not resolve. The chaos run proves that state.
+
+**Alternatives considered.**
+- **All six scenarios in child processes:** that needs :4100 for each, so they could not overlap with
+  `crashSubmit.db.test.ts`, and the file would take minutes.
+- **A test-only env switch for an in-memory exporter in a child:** a code path that exists only for tests.
+- **The crash modes at once** (tried first): equal conditions for the four, but four Chromium-launching workers on
+  top of the suite's three browser files made the first full run take 425 s, and two unrelated teardowns timed out.
+  One after another costs wall time; the drain-time bound absorbs the load differences.
+- **Compare wall time exactly:** chaos and Chromium timings vary by seconds. The bound catches a hang (a 2 s export
+  timeout in the job path would show), not noise.
+
+**Why.** "Never changes behaviour" is a claim about outcomes and timing, so it is tested on outcomes and timing,
+with collectors that fail in the two ways real ones do: refused at once, and silent forever.
+
+**Date.** 2026-11-19
