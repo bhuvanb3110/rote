@@ -43,12 +43,14 @@ import type { WorkerMetrics } from "./metrics.js";
 import { claimReconcile, type ReconcileClaim } from "./reconcile.js";
 import { INSERT_PHASE_SQL, readVerifyCycle } from "./verifySql.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
+import { NO_TELEMETRY, type Telemetry } from "../telemetry/index.js";
+import { recordReconcileClaim, recordRecovery } from "./telemetryEvents.js";
 
 export const DEFAULT_RECOVER_PER_ITERATION = 10;
 
 /** T6.0: one expired lease, oldest first (served by the partial index jobs_lease_expiry). */
 export const CLAIM_EXPIRED_SQL = `
-SELECT id, state, attempt, max_attempts, crashes, max_crashes, lease_crashes, fencing_token, lease_owner, commit_intent_at, tenant_id, params, memo_key
+SELECT id, state, attempt, max_attempts, crashes, max_crashes, lease_crashes, fencing_token, lease_owner, commit_intent_at, tenant_id, params, memo_key, created_at
 FROM jobs
 WHERE state IN ('running', 'committing', 'verifying') AND lease_expires_at < now()
 ORDER BY lease_expires_at, id
@@ -102,7 +104,10 @@ WHERE job_id = $1 AND fencing_token = $2 AND ended_at IS NULL`;
 /** The job a recovery claimed to verify: what the verify phase needs. */
 export interface VerifyClaim {
   /** lease_crashes: what verify's own-attempt count needs (D57); crashes: the budget, for the logs (D58). */
-  job: Pick<JobRow, "id" | "tenant_id" | "params" | "memo_key" | "attempt" | "max_attempts" | "crashes" | "lease_crashes">;
+  job: Pick<JobRow, "id" | "tenant_id" | "params" | "memo_key" | "attempt" | "max_attempts" | "crashes" | "lease_crashes"> & {
+    /** For telemetry's job_duration_seconds at the verify's terminal write (Step 13a); absent in older callers. */
+    created_at?: Date;
+  };
   /** This phase's token (the new one). */
   fencingToken: number;
   /** How the phase began. */
@@ -127,6 +132,8 @@ export interface RecoveredJob {
   fencingToken: number;
   /** A verifying job's cycle as recovery read it (dead phases, deferrals...). */
   verifyCycle?: VerifyCycle;
+  /** jobs.created_at: telemetry's job_duration_seconds when this recovery is a terminal write (T6.2, T6.6). */
+  createdAt?: Date;
   /** T6.4/T6.5/T6.7: this worker now holds the job to verify it. */
   claim?: VerifyClaim;
 }
@@ -157,6 +164,7 @@ export async function recoverOne(pool: Pool, options: RecoverOptions): Promise<R
       tenant_id: string;
       params: Record<string, unknown>;
       memo_key: string;
+      created_at: Date;
     }>(CLAIM_EXPIRED_SQL);
     const row = claimed.rows[0];
     if (!row) return null;
@@ -210,7 +218,7 @@ export async function recoverOne(pool: Pool, options: RecoverOptions): Promise<R
       const priorStatus = action.reason === "lease_expired_in_committing" ? null : cycle.priorStatus;
       await client.query(INSERT_PHASE_SQL, [row.id, token, options.workerId, action.reason, priorStatus]);
       claim = {
-        job: { id: row.id, tenant_id: row.tenant_id, params: row.params, memo_key: row.memo_key, attempt: row.attempt, max_attempts: row.max_attempts, crashes, lease_crashes: leaseCrashes },
+        job: { id: row.id, tenant_id: row.tenant_id, params: row.params, memo_key: row.memo_key, attempt: row.attempt, max_attempts: row.max_attempts, crashes, lease_crashes: leaseCrashes, created_at: row.created_at },
         fencingToken: token,
         label: action.label,
         priorStatus,
@@ -231,6 +239,7 @@ export async function recoverOne(pool: Pool, options: RecoverOptions): Promise<R
       fencingToken: token,
       verifyCycle: row.state === "verifying" ? cycle : undefined,
       claim,
+      createdAt: row.created_at,
     };
   });
 }
@@ -275,7 +284,10 @@ export function createRecoverySweep(options: {
   reconcileDueSeconds?: number;
   /** reconcile_abandoned_total (R3, D59). */
   metrics?: WorkerMetrics;
+  /** Day 3 (Step 13a): crashes, retries and terminal recoveries counted (telemetryEvents.ts). Default: none. */
+  telemetry?: Telemetry;
 }): () => Promise<VerifyClaim | ReconcileClaim | null> {
+  const telemetry = options.telemetry ?? NO_TELEMETRY;
   return async () => {
     try {
       const { claim } = await recoverExpired(options.pool, {
@@ -301,12 +313,20 @@ export function createRecoverySweep(options: {
             },
             r.claim ? "worker: recovered an expired lease and claimed the job to verify it" : "worker: recovered an expired lease",
           );
+          recordRecovery(telemetry, r);
           options.onRecovered?.(r);
         },
       });
       if (claim || !options.reconcile) return claim;
       // A due job at the reconcile cap is abandoned on the way, logged and counted (R3, D59).
-      const due = await claimReconcile(options.pool, { workerId: options.workerId, leaseSeconds: options.leaseSeconds, log: options.log, metrics: options.metrics });
+      const due = await claimReconcile(options.pool, {
+        workerId: options.workerId,
+        leaseSeconds: options.leaseSeconds,
+        log: options.log,
+        metrics: options.metrics,
+        onAbandoned: (a) => recordReconcileClaim(telemetry, a),
+      });
+      if (due) recordReconcileClaim(telemetry, due);
       if (due) options.log?.info({ workerId: options.workerId, jobId: due.job.id, fencingToken: due.fencingToken }, "worker: a terminal job a verify once read [0, 0] on is due; reconciling it (R1)");
       return due;
     } catch (err) {

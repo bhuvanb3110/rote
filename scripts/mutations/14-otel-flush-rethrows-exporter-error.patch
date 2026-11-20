@@ -1,0 +1,13 @@
+diff --git a/src/telemetry/otel.ts b/src/telemetry/otel.ts
+index 1a6fc23..0c2b551 100644
+--- a/src/telemetry/otel.ts
++++ b/src/telemetry/otel.ts
+@@ -443,7 +443,7 @@ export class OtelTelemetry implements Telemetry {
+     } catch (err) {
+       // An exporter or query error surfaced here (a forceFlush whose export failed, a gauge query): swallowed (rule 2).
+       this.degraded(kind, err);
+-      return undefined;
++      throw err;
+     } finally {
+       clearTimeout(timer);
+     }

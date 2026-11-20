@@ -1,0 +1,6 @@
+{"level":30,"time":1795139312561,"service":"worker","workerId":"fault-after-step-04","port":65275,"host":"127.0.0.1","msg":"telemetry: serving /metrics"}
+{"level":40,"time":1795139312801,"service":"worker","workerId":"fault-after-step-04","faultPoint":"after-step-04","msg":"worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)"}
+{"level":30,"time":1795139312801,"service":"worker","workerId":"fault-after-step-04","playwrightVersion":"1.62.1","leaseSeconds":5,"heartbeatSeconds":2,"shutdownGraceMs":10000,"settleMs":5000,"defer":{"budgetSeconds":600,"backoffBaseSeconds":5,"backoffCapSeconds":60},"reconcileDueSeconds":15,"evidenceBaseDir":"C:\\Users\\hp\\Downloads\\rote\\evidence\\step-13a\\crash-matrix-telemetry-dead\\after-step-04\\worker-evidence","db":"postgres://rote:***@127.0.0.1:55432/rote_test?options=-c+search_path%3Dt_crash_after_step_04_66905a00","tenants":["tenant-a","tenant-b","tenant-c"],"msg":"worker: ready"}
+{"level":30,"time":1795139312802,"service":"worker","workerId":"fault-after-step-04","leaseSeconds":5,"msg":"worker: started"}
+{"level":30,"time":1795139312875,"service":"worker","workerId":"fault-after-step-04","jobId":"bbe59ce7-23c8-43aa-912f-745e98c12324","tenant":"tenant-a","capability":"transfer","attempt":1,"msg":"worker: job leased"}
+ROTE_FAULT firing at after-step-04 (pid 21572)

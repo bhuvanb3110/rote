@@ -112,6 +112,19 @@ export const MUTANTS: Mutant[] = [
     what: "Step 12b (D62): the redacting error handler logs `err.message` (body-parser's strict-mode message quotes the request body)",
     tests: ["src/http/errorHandler.test.ts"],
   },
+  {
+    id: "14",
+    patch: "14-otel-flush-rethrows-exporter-error.patch",
+    what: "Step 13a (D63): the OTel wrapper rethrows an exporter error from flush/shutdown (a worker would exit 1 over telemetry at shutdown)",
+    tests: ["src/telemetry/telemetry.test.ts"],
+  },
+  // 15 is Step 13b's (the worker awaits forceFlush after commit.intent), once commit.intent exists.
+  {
+    id: "16",
+    patch: "16-span-attributes-not-allowlisted.patch",
+    what: "Step 13a (D63): span attributes copy whatever the caller passes (params included): the per-span allowlist is skipped",
+    tests: ["src/telemetry/redaction.test.ts"],
+  },
 ];
 
 function argValue(name: string): string | undefined {

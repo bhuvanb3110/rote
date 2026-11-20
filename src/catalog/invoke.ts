@@ -26,6 +26,7 @@ export interface InvokeCapabilityOptions {
   browser?: ReplayOptions["browser"];
   onIrreversible?: ReplayOptions["onIrreversible"];
   onStep?: ReplayOptions["onStep"];
+  observe?: ReplayOptions["observe"];
   signal?: ReplayOptions["signal"];
   evidenceBaseDir?: ReplayOptions["evidenceBaseDir"];
   statusDir?: ReplayOptions["statusDir"];
@@ -65,6 +66,7 @@ export async function invokeCapability(options: InvokeCapabilityOptions): Promis
     browser: options.browser,
     onIrreversible: options.onIrreversible,
     onStep: options.onStep,
+    observe: options.observe,
     signal: options.signal,
     evidenceBaseDir: options.evidenceBaseDir,
     statusDir: options.statusDir,

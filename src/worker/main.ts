@@ -30,6 +30,11 @@
 //   PLAYWRIGHT_VERSION       [unset]  baked into the image; must equal the installed playwright
 //   ROTE_FAULT / ROTE_FAULT_ENABLE   [unset]  TEST-ONLY crash point (fault.ts, D34); refused unless both
 //   ROTE_FAULT_STALL_MS      [unset]  TEST-ONLY: the stall of ROTE_FAULT=stall-after-intent (D52); needs it, refused otherwise
+//   Day 3 telemetry (src/telemetry/config.ts; OFF unless configured, and never a reason to stop):
+//   OTEL_EXPORTER_OTLP_ENDPOINT [unset]  e.g. http://jaeger:4318: spans to <endpoint>/v1/traces (OTLP/HTTP)
+//   OTEL_SERVICE_NAME        [rote-worker]
+//   ROTE_METRICS_PORT        [unset]  serve /metrics here (Compose: 9464); a port that can't be bound is one warning
+//   ROTE_METRICS_HOST        [127.0.0.1]  (Compose: 0.0.0.0)
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -49,6 +54,7 @@ import { createFaultInjector, parseFaultConfig, parseStallMs } from "./fault.js"
 import { DEFAULT_HEARTBEAT_SECONDS, DEFAULT_LEASE_SECONDS, validateLeaseTiming } from "./heartbeat.js";
 import { runJob } from "./runJob.js";
 import { InMemoryCounters } from "./metrics.js";
+import { createTelemetry, forwardingMetrics, startMetricsServer, telemetrySettingsFromEnv, telemetryShutdownCapMs } from "../telemetry/index.js";
 import { DEFAULT_VERIFY_SETTLE_MS, runVerifyPhase, type VerifyContext } from "./verify.js";
 import { runReconcilePhase } from "./reconcile.js";
 import { DEFAULT_DEFER_CONFIG, DEFAULT_RECONCILE_MARGIN_SECONDS, reconcileDueSeconds, type DeferConfig } from "../fleet/stateMachine.js";
@@ -101,9 +107,26 @@ async function main(): Promise<void> {
   const healthFile = process.env.ROTE_HEALTH_FILE;
   const dbUrl = databaseUrlFromEnv();
 
+  // Telemetry (Day 3): built before anything else can fail, so even a startup failure is a normal exit. Nothing
+  // here touches the network; the metrics port is bound in the background (one warning if it can't be).
+  const { settings: telemetrySettings, warnings: telemetryWarnings } = telemetrySettingsFromEnv(process.env, { serviceName: "rote-worker", instanceId: workerId });
+  for (const warning of telemetryWarnings) log.warn({ workerId }, `telemetry: ${warning}`);
+  const telemetry = createTelemetry(telemetrySettings, { log });
+  const metricsHandler = telemetry.metricsHandler();
+  if (metricsHandler && telemetrySettings.listen) {
+    void startMetricsServer(metricsHandler, telemetrySettings.listen, {
+      log,
+      onError: () => telemetry.count("rote_telemetry_errors_total", { kind: "metrics_port" }),
+    }).then((server) => {
+      if (server) log.info({ workerId, port: server.port, host: telemetrySettings.listen!.host }, "telemetry: serving /metrics");
+    });
+  }
+
   let worker: Worker | null = null;
+  let stopRequestedAt: number | null = null;
   const early = new AbortController();
   const onSignal = (signal: string) => {
+    stopRequestedAt ??= Date.now();
     log.info({ workerId, signal }, "worker: signal received");
     if (worker) worker.stop();
     else early.abort();
@@ -166,8 +189,8 @@ async function main(): Promise<void> {
   );
 
   // In-process counters (illegal_transitions_total, verify_decisions_total, reconcile_decisions_total,
-  // duplicates_detected_total); Day 3 exports them (D41, D50).
-  const metrics = new InMemoryCounters();
+  // duplicates_detected_total); Day 3 forwards every inc() to telemetry too (rote_*), call sites unchanged.
+  const metrics = forwardingMetrics(new InMemoryCounters(), telemetry);
   const verifyCtx: VerifyContext = {
     pool,
     workerId,
@@ -183,6 +206,7 @@ async function main(): Promise<void> {
     log,
     metrics,
     redact,
+    telemetry,
   };
   worker = new Worker({
     pool,
@@ -195,8 +219,9 @@ async function main(): Promise<void> {
     log,
     fault,
     metrics,
+    telemetry,
     reconcileDueSeconds: reconcileDue,
-    runJob: (job, options) => runJob({ credentials, evidenceBaseDir, fault }, job, options),
+    runJob: (job, options) => runJob({ credentials, evidenceBaseDir, fault, telemetry }, job, options),
     // Step 9: a job that may have committed is verified in the bank's history (T5/T6.4-T6.7 -> T7/T8).
     verify: (claim, controller, hardSignal) => runVerifyPhase(verifyCtx, claim, controller, hardSignal),
     // Step 10: a terminal job a verify once read [0, 0] on is re-read once it is due (R1 -> lookup -> R2,
@@ -205,7 +230,7 @@ async function main(): Promise<void> {
     // Seam 4: every loop iteration recovers up to 10 expired leases before it dequeues (T6, D38); a
     // claim to verify (T6.4/T6.5/T6.7) is the iteration's work; otherwise at most one due reconcile is
     // (R1, D50). T6.2 marks a resubmitted job it fails for the reconcile pass (D55).
-    beforeDequeue: createRecoverySweep({ pool, workerId, leaseSeconds, log, fault, reconcile: true, reconcileDueSeconds: reconcileDue, metrics }),
+    beforeDequeue: createRecoverySweep({ pool, workerId, leaseSeconds, log, fault, reconcile: true, reconcileDueSeconds: reconcileDue, metrics, telemetry }),
     onTick: healthFile
       ? () => {
           writeFile(healthFile, new Date().toISOString()).catch(() => undefined);
@@ -220,6 +245,9 @@ async function main(): Promise<void> {
     await (browser as Browser | null)?.close().catch(() => undefined);
     await pool.end().catch(() => undefined);
     await forwarder?.close();
+    // Rule 6: one flush, capped at 2 s and taken from INSIDE the shutdown grace, never added to it. It never
+    // rejects; a flush that times out is dropped (counted, one warning).
+    await telemetry.shutdown(telemetryShutdownCapMs(stopRequestedAt, shutdownGraceMs));
   }
 }
 

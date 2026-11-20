@@ -5,6 +5,7 @@
 //   npm run crash-matrix -- [--points after-submit,before-submit>verify-after-count] [--drain-timeout 90s]
 //                           [--lease-seconds 30] [--heartbeat-seconds 10] [--expect step-10]
 //                           [--reconcile-margin-seconds 5] [--tenant tenant-a] [--out <dir>]
+//                           [--telemetry off|dead]
 //
 // Per scenario, isolated: a fresh Postgres test schema (rote_test database), a fresh in-process mock bank
 // on :4100 with an empty ledger, ONE transfer job, then
@@ -34,6 +35,10 @@
 // SETTLED, and the reconcile pass judged too: a resubmitted job (first fault before-submit) is reconciled with 1
 // match; no other job has a reconcile due. The workers' reconcile margin is --reconcile-margin-seconds (default 5,
 // so the reconcile is due lease + settle + 5 s after the success, inside the drain).
+// Step 13a (D66): --telemetry dead turns telemetry ON in every worker and points it at a collector that is not
+// there: OTEL_EXPORTER_OTLP_ENDPOINT = a closed port on 127.0.0.1 (every export refused), and ROTE_METRICS_PORT=0
+// (a /metrics listener on a free port). Telemetry must never change behaviour, so every scenario must end exactly
+// as with --telemetry off (the default, which sets neither).
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resetLedger } from "../mock-app/data.js";
@@ -45,6 +50,7 @@ import { createTestSchema } from "../src/queue/testDb.js";
 import { EXPECTATION_PHASES, scenariosFor, judgePoint, type CrashScenario, type ExpectationPhase } from "../src/chaos/crashExpected.js";
 import { argValue, parseDuration } from "./lib/compose.js";
 import { BANK, closeBank, listenBank, runFaultWorker, startWorker, TERMINAL, within, workerEnv } from "../src/testing/workerProcess.js";
+import { closedPort } from "../src/testing/collectors.js";
 
 const DRAIN_TIMEOUT_MS = argValue("drain-timeout") ? parseDuration(argValue("drain-timeout")!) : 90_000;
 const LEASE_SECONDS = Number(argValue("lease-seconds") ?? 30);
@@ -52,6 +58,8 @@ const HEARTBEAT_SECONDS = Number(argValue("heartbeat-seconds") ?? 10);
 const TENANT = argValue("tenant") ?? "tenant-a";
 const PHASE = (argValue("expect") ?? "step-10") as ExpectationPhase;
 const RECONCILE_MARGIN_SECONDS = Number(argValue("reconcile-margin-seconds") ?? 5);
+const TELEMETRY = argValue("telemetry") ?? "off";
+if (TELEMETRY !== "off" && TELEMETRY !== "dead") throw new Error(`--telemetry must be off or dead (got ${TELEMETRY})`);
 if (!(EXPECTATION_PHASES as readonly string[]).includes(PHASE)) throw new Error(`--expect must be one of ${EXPECTATION_PHASES.join(", ")}`);
 const ALL = scenariosFor(PHASE);
 const scenarios: CrashScenario[] = argValue("points")
@@ -86,6 +94,12 @@ interface Row {
 /** Runs a fault worker to its death at `point`; returns whether it fired there and how it exited. */
 const faultWorker = (base: Record<string, string>, point: string, logFile: string) => runFaultWorker(base, point, logFile, FAULT_WORKER_TIMEOUT_MS);
 
+/** --telemetry dead: on, to a collector that is not there (a closed port), with /metrics on a free port. */
+async function telemetryEnv(): Promise<Record<string, string>> {
+  if (TELEMETRY === "off") return { OTEL_EXPORTER_OTLP_ENDPOINT: "", ROTE_METRICS_PORT: "" };
+  return { OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${await closedPort()}`, ROTE_METRICS_PORT: "0", ROTE_METRICS_HOST: "127.0.0.1" };
+}
+
 async function runScenario(scenario: CrashScenario): Promise<{ row: Row; text: string }> {
   const dir = path.join(OUT, scenario.name.replace(">", "__"));
   await mkdir(dir, { recursive: true });
@@ -105,6 +119,7 @@ async function runScenario(scenario: CrashScenario): Promise<{ row: Row; text: s
       ROTE_HEARTBEAT_SECONDS: String(HEARTBEAT_SECONDS),
       ROTE_RECONCILE_MARGIN_SECONDS: String(RECONCILE_MARGIN_SECONDS),
       ROTE_EVIDENCE_DIR: path.resolve(dir, "worker-evidence"),
+      ...(await telemetryEnv()),
     });
 
     // 1-2. The first fault worker kills itself at its point.
@@ -188,6 +203,7 @@ async function main(): Promise<void> {
     `scenarios: ${scenarios.map((s) => s.name).join(", ")}`,
     `expectations: ${PHASE} (src/chaos/crashExpected.ts)`,
     `tenant: ${TENANT}; lease: ${LEASE_SECONDS} s; heartbeat: ${HEARTBEAT_SECONDS} s; verify settle: the worker default (5 s); reconcile margin: ${RECONCILE_MARGIN_SECONDS} s; drain ${PHASE === "step-10" ? "until settled" : "until terminal"}, timeout per scenario: ${DRAIN_TIMEOUT_MS} ms; workers: child processes (node --import tsx src/worker/main.ts)`,
+    `telemetry: ${TELEMETRY === "dead" ? "ON, pointed at a dead collector (OTLP to a closed 127.0.0.1 port; /metrics on a free port)" : "off (no OTEL_EXPORTER_OTLP_ENDPOINT, no ROTE_METRICS_PORT)"}`,
     "",
   ];
   console.log(header.join("\n"));

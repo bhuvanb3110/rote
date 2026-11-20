@@ -38,6 +38,8 @@ import type { VerifyClaim } from "./recover.js";
 import type { ReconcileClaim, ReconcilePhaseOutcome } from "./reconcile.js";
 import type { VerifyPhaseOutcome } from "./verify.js";
 import { completeIntoVerify } from "./verifySql.js";
+import { NO_TELEMETRY, type Telemetry } from "../telemetry/index.js";
+import { recordRequeue, recordTerminal } from "./telemetryEvents.js";
 
 export interface WorkerLogger {
   info(obj: Record<string, unknown>, msg: string): void;
@@ -114,6 +116,11 @@ export interface WorkerOptions {
   reconcileDueSeconds?: number;
   /** Counters (illegal_transitions_total, ...); Day 3 exports them. Default: not counted. */
   metrics?: WorkerMetrics;
+  /**
+   * Day 3 (Step 13a): T4's terminal writes and requeues are counted (jobs_completed_total, job_duration_seconds,
+   * job_retries_total). Only ever called, never awaited, never read back. Default: none.
+   */
+  telemetry?: Telemetry;
   /**
    * Seconds a requeue after a failed attempt waits before the job may be dequeued again (T4's
    * not_before; Step 10, D49). Called with the job's own attempt that failed (ownAttempts, D57).
@@ -342,6 +349,11 @@ export class Worker {
         ...(requeueAfterSeconds === null ? {} : { retryInSeconds: requeueAfterSeconds }),
         ms: Date.now() - started,
       };
+      if (recorded === true) {
+        const telemetry = this.options.telemetry ?? NO_TELEMETRY;
+        if (outcome.state === "queued") recordRequeue(telemetry);
+        else recordTerminal(telemetry, outcome.outcome, outcome.state, job.created_at);
+      }
       if (recorded === true) this.log.info(fields, requeueAfterSeconds === null ? "worker: job recorded" : `worker: requeued; retry in ${requeueAfterSeconds} s (backoff)`);
       else if (completion && !completion.recorded && completion.reason === "illegal_transition") {
         // A bug, not a lost lease (D41): the token is unchanged, so the state guard refused this
@@ -397,7 +409,7 @@ export class Worker {
     if (this.current?.graceTimer) clearTimeout(this.current.graceTimer);
     this.current = null;
     await this.verifyPhase({
-      job: { id: job.id, tenant_id: job.tenant_id, params: job.params, memo_key: job.memo_key, attempt: job.attempt, max_attempts: job.max_attempts, crashes: job.crashes, lease_crashes: job.lease_crashes },
+      job: { id: job.id, tenant_id: job.tenant_id, params: job.params, memo_key: job.memo_key, attempt: job.attempt, max_attempts: job.max_attempts, crashes: job.crashes, lease_crashes: job.lease_crashes, created_at: job.created_at },
       fencingToken: moved.fencingToken,
       label: "T5",
       priorStatus: outcome.priorStatus ?? null,

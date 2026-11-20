@@ -50,6 +50,11 @@ export interface CreatePoolOptions {
   searchPath?: string;
   /** Errors on IDLE pooled clients (e.g. Postgres restarted). Without a listener `pg` would crash the process. */
   onIdleError?: (err: Error) => void;
+  /**
+   * The session's statement_timeout: Postgres cancels any statement on this pool that runs longer. Unset: none
+   * (every pool before Step 13a). The API's metrics pool sets it (reviewer decision 2).
+   */
+  statementTimeoutMillis?: number;
 }
 
 export type Pool = pg.Pool;
@@ -63,6 +68,7 @@ export function createPool(options: CreatePoolOptions = {}): pg.Pool {
     connectionTimeoutMillis: options.connectionTimeoutMillis ?? 5000,
     types: typeOverrides(),
     ...(options.searchPath ? { options: `-c search_path=${quoteIdent(options.searchPath)}` } : {}),
+    ...(options.statementTimeoutMillis !== undefined ? { statement_timeout: options.statementTimeoutMillis } : {}),
   });
   pool.on("error", options.onIdleError ?? (() => undefined));
   return pool;

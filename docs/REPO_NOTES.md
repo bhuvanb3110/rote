@@ -99,6 +99,41 @@ Recorded as found; each names its planned fix or the step that owns it.
    empty and poll again. Correctness is unaffected (the cap is never exceeded); the cost is one poll
    interval. The Day-3 load test measures whether it matters.
 
+## Fleet Step 13a: the telemetry core (2026-11-19)
+
+Branch `feat/day3-13a`. The plan: `docs/plans/step-13a.md`. The decisions: D63–D66, plus amendments to D61 and D62.
+The evidence: `evidence/step-13a/README.md`.
+- **All telemetry is in `src/telemetry/`.** It is the only code that imports `@opentelemetry/*` (`otel.ts`). Every
+  other file uses `Telemetry` / `NO_TELEMETRY` from `src/telemetry/index.ts`. **Adding a metric or span:** add it to
+  `names.ts` first. A span attribute not on that span's allowlist is silently dropped, so add the key there too.
+- **Off unless configured.**
+  - Workers: `OTEL_EXPORTER_OTLP_ENDPOINT` (traces) and `ROTE_METRICS_PORT` / `ROTE_METRICS_HOST` (metrics).
+  - The API: `catalog serve --queue --metrics`.
+  - `npm test`, the matrix (unless `--telemetry dead`) and child workers run with it off. **Compose turns it on**,
+    and its endpoint `http://jaeger:4318` does not resolve until 13c. That is expected: one rate-limited
+    `telemetry: degraded` warning, nothing else.
+- **Optional `telemetry` on:** `Worker`, `runJob`'s context, `VerifyContext` and `createRecoverySweep`. In tests,
+  `env.newWorker({ telemetry })` wires it everywhere the way `main.ts` does, including `forwardingMetrics`.
+- **Replay's `observe`** (D65) is additive and never awaited. Use it for telemetry. Use `onStep` (D34) only for
+  something that must be able to stop a run.
+- **The DB reads that changed:**
+  - `CLAIM_EXPIRED_SQL` also selects `created_at`;
+  - reconcile claims carry `deadReconciler`;
+  - `createPool({ statementTimeoutMillis })` exists (the API's metrics pool uses it).
+- **The mutation check has 15 mutants:** 01–14 and 16. 14 is "the flush rethrows an exporter error"; 16 is "the span
+  allowlist is skipped". 15 is 13b's.
+- **The equivalence test is two files.**
+  - `src/worker/telemetry.db.test.ts`: in process, in the slow project.
+  - `src/worker/crashSubmit.db.test.ts`: worker processes on :4100, the four modes one after another.
+  - **Do not run the crash modes at once:** four Chromium-launching workers overloaded this laptop
+    (`evidence/step-13a/flakes.md`).
+- **The suite:** 72 files, 780 tests, 311–348 s in the final three runs (Step 12b: 219–236 s). The two equivalence
+  files account for most of the growth.
+- **The proof** (`evidence/step-13a/README.md`): the matrix 23/23 with `--telemetry dead`, the mutation check 15/15,
+  and chaos seed 412432443 PASS with Compose's telemetry on. The image grew by 22.4 MB.
+- **New dependencies** (D61, `--before=2026-11-12`): 7 named OpenTelemetry packages, 11 lockfile paths.
+  `npm view <pkg> version --before=…` **ignores `--before`**, so check the `time` field.
+
 ## Fleet Step 12b: a redacting error handler, Express 5.3 (2026-11-19)
 
 Branch `chore/deps-held-2026-11`. The plan: `docs/plans/step-12b.md`. The evidence: `evidence/step-12b/README.md`.

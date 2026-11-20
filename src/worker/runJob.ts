@@ -21,6 +21,7 @@ import type { TenantCredentials } from "./credentials.js";
 import type { RunEnd } from "../fleet/stateMachine.js";
 import { NO_FAULT, type FaultInjector } from "./fault.js";
 import { FencingError } from "./leaseErrors.js";
+import { NO_TELEMETRY, stepObserver, type Telemetry } from "../telemetry/index.js";
 
 export interface RunJobContext {
   credentials: TenantCredentials;
@@ -32,6 +33,11 @@ export interface RunJobContext {
   statusDir?: string;
   /** Test-only crash points inside the run (fault.ts, D34). Default: none. */
   fault?: FaultInjector;
+  /**
+   * Day 3 (Step 13a): a capability.step span per step and the run's screenshot retries, through replay's
+   * `observe`, passed ONLY when telemetry is on. Default: none, and replay runs exactly as before.
+   */
+  telemetry?: Telemetry;
 }
 
 /** The job cannot run as given; never retried. */
@@ -145,6 +151,9 @@ export async function runJob(ctx: RunJobContext, job: JobRow, options: RunJobOpt
   };
   // Only a fault-injecting worker passes onStep at all: a normal worker's replay is unchanged.
   const onStep = fault.point ? { after: async (step: Step) => fault.at(`after-${step.id}`) } : undefined;
+  const telemetry = ctx.telemetry ?? NO_TELEMETRY;
+  const observe = telemetry.enabled.traces || telemetry.enabled.metrics ? stepObserver(telemetry, job.trace_id) : undefined;
+  telemetry.adjust("rote_browser_contexts_in_use", 1);
   try {
     const result = await invokeCapability({
       id: prepared.capability.id,
@@ -159,10 +168,13 @@ export async function runJob(ctx: RunJobContext, job: JobRow, options: RunJobOpt
       approveRisky: true,
       onIrreversible,
       onStep,
+      observe,
       headless: true,
     });
     return { end: { kind: "result", result }, irreversibleStarted };
   } catch (error) {
     return { end: { kind: "thrown", error, aborted: options.signal.aborted }, irreversibleStarted };
+  } finally {
+    telemetry.adjust("rote_browser_contexts_in_use", -1);
   }
 }

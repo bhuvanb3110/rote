@@ -9,14 +9,14 @@
 //    (Measured on Express 5.2.1: body-parser's strict-mode JSON error copies a short non-JSON body into its
 //    message, and the default handler logs the stack. Express 5.3.0 logs the whole error object, `body` too.)
 import { createServer, type Server } from "node:http";
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import bankApp from "../../mock-app/app.js";
 import { createCatalogApp } from "../catalog/http.js";
 import { createOperatorConsole } from "../escalation/console.js";
 import { EscalationController } from "../escalation/controller.js";
 import { listenOnSafePort } from "../testing/listen.js";
-import { mountRouter, redactingErrorHandler, requestId, type ErrorSummary } from "./errorHandler.js";
+import { mountRouter, redactingErrorHandler, requestId, summarize, UNKNOWN_ROUTE, type ErrorSummary } from "./errorHandler.js";
 
 const CRED = "fake-cred-12b";
 /** Short and not JSON: body-parser's strict-mode error quotes all of it (the measured 5.2.1 leak). */
@@ -283,6 +283,84 @@ describe("route patterns through mounts: the pattern, never concrete values", ()
     await post(base, `/legacy/${TENANT}/member/${MEMBER}/transfer`, "text/plain", "x");
     expect(summaries).toEqual([expect.objectContaining({ route: "/(unregistered mount)/member/:id/transfer" })]);
     expect(JSON.stringify(summaries)).not.toMatch(new RegExp(`${TENANT}|${MEMBER}`));
+  });
+
+  // The reviewer's condition for reading router internals (D62 notes): if they are not where routeOf expects
+  // them, it FAILS CLOSED to a fixed placeholder, never the concrete URL and not even a partial pattern.
+  describe("fails closed when Express's internals are not where it expects them", () => {
+    /** Every Layer in the app's tree that holds a Route: the field an upgrade could rename. */
+    function routeLayers(stack: unknown, out: Record<string, unknown>[] = []): Record<string, unknown>[] {
+      for (const layer of stack as Record<string, unknown>[]) {
+        if (layer.route) out.push(layer);
+        const sub = (layer.handle as { stack?: unknown } | undefined)?.stack;
+        if (Array.isArray(sub)) routeLayers(sub, out);
+      }
+      return out;
+    }
+
+    async function sendAll(base: string): Promise<{ sent: Sent[] }> {
+      const sent: Sent[] = [];
+      sent.push(await post(base, `/t/${TENANT}/member/${MEMBER}/transfer`, "text/plain", "x"));
+      sent.push(await post(base, `/t/${TENANT}/archive/2026/history/rent-${MEMBER}`, "text/plain", "x"));
+      sent.push(await post(base, `/legacy/${TENANT}/member/${MEMBER}/transfer`, "text/plain", "x"));
+      return { sent };
+    }
+
+    function expectPlaceholderOnly(summaries: ErrorSummary[], sent: Sent[]): void {
+      expect(UNKNOWN_ROUTE).toBe("/(unknown route)");
+      expect(summaries.map((s) => s.route)).toEqual([UNKNOWN_ROUTE, UNKNOWN_ROUTE, UNKNOWN_ROUTE]);
+      // Headers left out here: their Date line carries the year. expectNoCredential checks them below.
+      const everything = JSON.stringify(summaries) + sent.map((s) => s.logged + s.body).join("");
+      expect(everything).not.toMatch(new RegExp(`${TENANT}|${MEMBER}|2026|rent-|/member/|/transfer|/history`));
+      for (const s of sent) {
+        expect(s.status).toBe(500);
+        expectNoCredential(s, summaries);
+      }
+    }
+
+    it("Layer.route renamed (the Route is in no Layer the walk reads): the placeholder, no ids", async () => {
+      const summaries: ErrorSummary[] = [];
+      const app = mountedApp(summaries);
+      // Rename the field on every route Layer, as an upgrade might. Dispatch still works: router 2.x reaches a
+      // route Layer's handler without it, and Route#dispatch still sets req.route.
+      for (const layer of routeLayers((app as unknown as { router: { stack: unknown } }).router.stack)) {
+        layer.movedRoute = layer.route;
+        delete layer.route;
+      }
+      const { sent } = await sendAll(await serve(app));
+      expectPlaceholderOnly(summaries, sent);
+    });
+
+    it("app.router missing (as the handler sees req.app): the placeholder, no ids", async () => {
+      const summaries: ErrorSummary[] = [];
+      const app = express();
+      app.set("env", "development");
+      app.use(requestId());
+      app.use((req, _res, next) => {
+        (req as unknown as { app: unknown }).app = {}; // an app object with no `router`
+        next();
+      });
+      app.use(mountedApp(summaries)); // the routes and the handler, as a sub-app sees them
+      const { sent } = await sendAll(await serve(app));
+      expectPlaceholderOnly(summaries, sent);
+    });
+
+    it("req.route.path not a string, or app.router.stack not an array: the placeholder", () => {
+      const res = { locals: { requestId: "r" } } as unknown as Response;
+      const route = { path: `/member/${MEMBER}` };
+      const cases: { route: unknown; app: unknown }[] = [
+        { route: { path: [`/member/${MEMBER}`] }, app: { router: { stack: [{ route: { path: [] } }] } } },
+        { route, app: { router: { stack: { length: 1, 0: { route } } } } },
+        { route, app: { router: {} } },
+        { route, app: undefined },
+      ];
+      for (const c of cases) {
+        const req = { method: "POST", route: c.route, app: c.app } as unknown as Request;
+        const summary = summarize(new Error(TENANT), req, res);
+        expect(summary.route).toBe(UNKNOWN_ROUTE);
+        expect(JSON.stringify(summary)).not.toMatch(new RegExp(`${TENANT}|${MEMBER}`));
+      }
+    });
   });
 });
 

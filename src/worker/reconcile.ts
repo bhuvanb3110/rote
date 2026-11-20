@@ -134,6 +134,8 @@ export interface ReconcileClaim {
   fencingToken: number;
   /** The job's own result.outputs.confirmationRef, for the record. */
   confirmationRef: string | null;
+  /** This claim closed a dead reconciler's phase (reconcile_crashes + 1): telemetry's worker_crashes_total{kind="reconciler"}. */
+  deadReconciler?: boolean;
 }
 
 /** R3 (D59): the workers' pass gave up on this job's reconcile at the cap; it stays in `state`. */
@@ -147,6 +149,8 @@ export interface ReconcileAbandoned {
   reconcileCrashes: number;
   maxCrashes: number;
   error: string;
+  /** As ReconcileClaim's: this claim closed a dead reconciler's phase. */
+  deadReconciler?: boolean;
 }
 
 type ClaimRow = {
@@ -187,6 +191,7 @@ async function leaseFor(client: Queryable, row: ClaimRow, workerId: string, leas
       reconcileCrashes: action.reconcileCrashes,
       maxCrashes: row.max_crashes,
       error: action.error,
+      deadReconciler: open > 0,
     };
   }
   const updated = await client.query<{ fencing_token: number }>(RECONCILE_LEASE_SQL, [row.id, row.fencing_token, workerId, leaseSeconds, action.reconcileCrashes]);
@@ -199,6 +204,7 @@ async function leaseFor(client: Queryable, row: ClaimRow, workerId: string, leas
     state,
     fencingToken: token,
     confirmationRef: confirmationRefOf(row.result),
+    deadReconciler: open > 0,
   };
 }
 

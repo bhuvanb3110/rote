@@ -1,5 +1,6 @@
 # Fleet services (docs/FLEET_BRIEF.md). Step 5: Postgres. Step 6: the mock bank, the API and N
-# workers (one image, see Dockerfile). Day 3 adds Jaeger, Prometheus and Grafana.
+# workers (one image, see Dockerfile). Day 3: telemetry is on from Step 13a (workers' /metrics, the API's
+# /metrics, spans to jaeger:4318); Step 13c adds the Jaeger, Prometheus and Grafana services.
 #
 #   docker compose up -d postgres            # just the database (what `npm test` needs)
 #   docker compose up -d --build             # everything; ROTE_WORKERS (default 4) workers
@@ -62,9 +63,11 @@ services:
 
   api:
     image: rote-fleet:local
-    command: ["node", "dist/src/cli/index.js", "catalog", "serve", "--port", "8080", "--queue"]
+    # --metrics (Day 3, D64): GET /metrics on :8080, the DB gauges on their own 1-connection pool (1 s timeout).
+    command: ["node", "dist/src/cli/index.js", "catalog", "serve", "--port", "8080", "--queue", "--metrics"]
     environment:
       ROTE_DATABASE_URL: postgres://rote:${ROTE_PG_PASSWORD:-rote_dev_only}@postgres:5432/rote
+      OTEL_SERVICE_NAME: rote-api
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -105,6 +108,13 @@ services:
       ROTE_HEARTBEAT_SECONDS: "10"
       ROTE_SHUTDOWN_GRACE_MS: "30000"
       ROTE_HEALTH_FILE: /tmp/rote-worker-alive
+      # Day 3 telemetry (D63, D66): on. /metrics on :9464 for Prometheus (compose network only, no host port), and
+      # spans to Jaeger's OTLP/HTTP port. Until Step 13c adds the jaeger service this name does not resolve: the
+      # "collector absent" case, which by design changes nothing (one rate-limited "telemetry: degraded" warning).
+      ROTE_METRICS_PORT: "9464"
+      ROTE_METRICS_HOST: 0.0.0.0
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: rote-worker
     volumes:
       - worker-evidence:/evidence
     depends_on:

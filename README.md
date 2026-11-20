@@ -416,7 +416,7 @@ this window. It is **made loud** instead: the reconcile pass finds the second ro
 | A crash right before / after Submit, in `npm test` and CI (real SIGKILL on Linux) | `src/worker/crashSubmit.db.test.ts`; the CI `crash-matrix` job | exactly 1 ledger row each: resubmitted on attempt 2 / `already_done` on attempt 1 |
 | The zombie window | [`zombie-window-limit/`](evidence/zombie-window-limit/) | **PASS**: the duplicate happens (2 rows) and is flagged `needs_human` / `duplicate_suspected` |
 | The history lagging past the settle period; a 30 s outage during verifies | [`step-10/verify-scenarios/`](evidence/step-10/verify-scenarios/) | **PASS**: the lag's `[0, 0]` duplicates are flagged by the reconcile pass; every deferred verify decided after the outage |
-| Planted bugs | [`mutation-check/`](evidence/mutation-check/report.md) and its CI copy [`ci-linux/`](evidence/mutation-check/ci-linux/README.md); since Step 12b, [`step-12b/mutation-check/`](evidence/step-12b/mutation-check/report.md) | **12/12** caught on the Day-2 code, each by its named tests, on Windows and in CI (run 44425004620). Step 12b added mutant 13 (the error handler logs `err.message`): **13/13** on Windows. In CI on every push |
+| Planted bugs | [`mutation-check/`](evidence/mutation-check/report.md) and its CI copy [`ci-linux/`](evidence/mutation-check/ci-linux/README.md); since Step 12b, [`step-12b/mutation-check/`](evidence/step-12b/mutation-check/report.md) | **12/12** caught on the Day-2 code, each by its named tests, on Windows and in CI (run 44425004620). Step 12b added mutant 13 (the error handler logs `err.message`): **13/13** on Windows. Step 13a added 14 and 16 (telemetry, [`step-13a/mutation-check/`](evidence/step-13a/mutation-check/report.md)): **15/15**. In CI on every push |
 | This README, from a fresh clone | [`clean-clone-check/`](evidence/clean-clone-check/README.md) | **PASS**: `npm ci`, `docker compose up -d --build`, then `npm run chaos -- --seed 757102590`: 100/100 succeeded, 0 duplicates, 0 lost |
 
 The full before / after, step by step, is in the [evidence index](evidence/README.md).
@@ -469,6 +469,56 @@ The full before / after, step by step, is in the [evidence index](evidence/READM
   scope). Multi-machine stays design-only (REPORT.md).
 - **Longer bank outages** than the backoff schedule (about 32 s) can still fail jobs; that is Day 4's
   circuit breaker.
+
+## Fleet (Day 3, part 1): telemetry that never changes behaviour
+
+Step 13a adds the telemetry core: metrics, the OpenTelemetry wiring and one span. The plan is
+`docs/plans/step-13a.md` (and `step-13.md`), the decisions are D63–D66, and the evidence is in
+[`evidence/step-13a/`](evidence/step-13a/README.md). Traces across workers (13b) and Jaeger, Prometheus and Grafana
+in Compose (13c) are still to come.
+
+**The rule above all others: telemetry never changes behaviour.** With the collector down, hanging or absent, jobs,
+timings and results are the same. The equivalence test proves it. It runs the same scenarios with telemetry off,
+to an in-memory exporter, to a closed port, and to a server that accepts and never answers. The scenarios are
+success, business outcome, a lost lease, a deferred verify, and a crash before and after Submit in worker
+processes. The end states must be identical, and each run's time must be within 1.5 × the off run's + 3 s (+ 5 s
+for the worker-process crashes, `crashSubmit.db.test.ts`).
+- **One seam:** `src/telemetry/` is the only code that imports `@opentelemetry/*`. It is wired by hand, with no
+  auto-instrumentation and nothing global.
+- **Calls never wait and never throw.** An exporter that throws, hangs, or rejects after 10 s costs one rate-limited
+  `telemetry: degraded` warning and a count in `rote_telemetry_errors_total`.
+- **Spans are exported in batches from a bounded queue** (2048), which drops when full and counts the drop.
+- **Metrics are pulled,** so a Prometheus that is down changes nothing.
+- **Off unless configured.**
+- **The flush at exit** is capped at 2 s, inside the shutdown grace.
+
+| Setting | Where | What it does |
+| --- | --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | worker, API | Spans go to `<endpoint>/v1/traces` (OTLP/HTTP). Compose: `http://jaeger:4318`, which does not resolve until 13c adds Jaeger. That is the "collector absent" case, and it costs nothing |
+| `ROTE_METRICS_PORT`, `ROTE_METRICS_HOST` | worker | `/metrics`. Compose: 9464 on 0.0.0.0. A port that can't be bound is one warning, and the worker runs on |
+| `catalog serve --queue --metrics` | API | `/metrics` on the API's port, with the DB gauges on their own 1-connection pool (`statement_timeout` 1 s) |
+| `OTEL_SERVICE_NAME` | both | `rote-worker` / `rote-api`. The worker id is `service.instance.id` |
+
+**Metric names.** Every metric has the `rote_` prefix (reviewer decision 4). The brief's names map as follows:
+
+| Exported | The brief's name | Type | From |
+| --- | --- | --- | --- |
+| `rote_jobs_completed_total{outcome}` | `jobs_completed_total` | counter | worker: T4, T7, T6.2, T6.6 |
+| `rote_job_duration_seconds` | `job_duration_seconds` | histogram | worker: `created_at` → the terminal write |
+| `rote_job_retries_total` | `job_retries_total` | counter | worker: T4's requeue, T6.1 |
+| `rote_recoveries_total{result}` | `recoveries_total` | counter | worker: `already_done`, `resubmitted`, `escalated` |
+| `rote_queue_depth{tenant}` | `queue_depth` | gauge | API, per scrape |
+| `rote_workers_alive` | `workers_alive` | recording rule | Prometheus, `sum(up{job="worker"})` (13c) |
+| `rote_browser_contexts_in_use` | `browser_contexts_in_use` | gauge | worker |
+| `rote_breaker_state{capability}` | `breaker_state` | gauge | API, from `breakers`; always closed until Day 4 |
+| `rote_worker_crashes_total{kind}` | (added) | counter | worker that recovered the job: `before_intent`, `committing`, `verifier`, `reconciler` |
+| `rote_jobs_crashes_sum` | (added) | gauge | API: the crash budget in use |
+| `rote_screenshot_retries_total` | (added) | counter | worker (D8) |
+| `rote_duplicates_detected_total`, `rote_illegal_transitions_total`, `rote_reconcile_abandoned_total`, `rote_unrecorded_commits_detected_total`, `rote_verify_decisions_total{decision}`, `rote_reconcile_decisions_total{decision}` | (added) | counter | worker (the existing in-process counters, forwarded) |
+| `rote_telemetry_errors_total{kind}` | (added) | counter | both |
+
+**The numbers on a dashboard are for watching. Evidence comes from the oracle and the database.** A killed
+worker's counters die with it, and what happened between its last scrape and its death is not counted.
 
 ## Saved demonstration runs
 

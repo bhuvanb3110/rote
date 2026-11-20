@@ -1,0 +1,6 @@
+{"level":30,"time":1795139349977,"service":"worker","workerId":"fault-after-step-08","port":26319,"host":"127.0.0.1","msg":"telemetry: serving /metrics"}
+{"level":40,"time":1795139350200,"service":"worker","workerId":"fault-after-step-08","faultPoint":"after-step-08","msg":"worker: FAULT INJECTION ENABLED: this worker SIGKILLs itself at the point (test-only)"}
+{"level":30,"time":1795139350200,"service":"worker","workerId":"fault-after-step-08","playwrightVersion":"1.62.1","leaseSeconds":5,"heartbeatSeconds":2,"shutdownGraceMs":10000,"settleMs":5000,"defer":{"budgetSeconds":600,"backoffBaseSeconds":5,"backoffCapSeconds":60},"reconcileDueSeconds":15,"evidenceBaseDir":"C:\\Users\\hp\\Downloads\\rote\\evidence\\step-13a\\crash-matrix-telemetry-dead\\after-step-08\\worker-evidence","db":"postgres://rote:***@127.0.0.1:55432/rote_test?options=-c+search_path%3Dt_crash_after_step_08_67486b1b","tenants":["tenant-a","tenant-b","tenant-c"],"msg":"worker: ready"}
+{"level":30,"time":1795139350201,"service":"worker","workerId":"fault-after-step-08","leaseSeconds":5,"msg":"worker: started"}
+{"level":30,"time":1795139350246,"service":"worker","workerId":"fault-after-step-08","jobId":"994f2ad2-e363-463a-aa1c-15670f5e6333","tenant":"tenant-a","capability":"transfer","attempt":1,"msg":"worker: job leased"}
+ROTE_FAULT firing at after-step-08 (pid 11748)

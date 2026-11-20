@@ -82,6 +82,12 @@ function statusOf(err: unknown): number {
 // router stack to the Layer whose Route is `req.route`, adding the patterns of the mounts on the way. This reads
 // router 2.x's Layer fields (`route`, `handle`, `slash`) and Express 5's `app.router`; the tests cover a static,
 // a parameterized, an unregistered and a path-less mount, so an upgrade that moves them turns them red.
+//
+// It FAILS CLOSED (the reviewer's condition for reading internals, D62 notes): whenever the walk cannot prove the
+// whole pattern -- `app.router.stack` is not an array, the Route is not found under any Layer's `route`, or
+// `req.route.path` is not a string -- the route is the fixed `UNKNOWN_ROUTE`, with nothing appended. Never the
+// concrete URL, and not even the router-relative pattern, since an upgrade that moved the fields may have
+// changed what they hold.
 
 interface RouterLayer {
   route?: unknown;
@@ -91,7 +97,8 @@ interface RouterLayer {
 
 const mountPatterns = new WeakMap<object, string>();
 const UNREGISTERED_MOUNT = "/(unregistered mount)";
-const ROUTE_NOT_FOUND = "(route not in the app's stack)";
+/** The route when Express's internals are not where `routeOf` expects them: a fixed string, nothing appended. */
+export const UNKNOWN_ROUTE = "/(unknown route)";
 
 /**
  * `parent.use(pattern, router)`, and remember `pattern` for that mount, so an error inside the router logs
@@ -122,11 +129,14 @@ function findRoute(stack: unknown, target: object, prefix: string, depth: number
 }
 
 function routeOf(req: Request): string {
-  const route = (req as Request & { route?: { path?: unknown } }).route;
-  if (!route || typeof route.path !== "string") return NO_ROUTE;
+  const route = (req as Request & { route?: unknown }).route;
+  if (route === undefined || route === null) return NO_ROUTE; // an error before routing, or in a router-level middleware
+  // From here a Route was matched, so anything unexpected means the internals moved: fail closed.
+  if (typeof route !== "object" || typeof (route as { path?: unknown }).path !== "string") return UNKNOWN_ROUTE;
   const appStack = (req.app as unknown as { router?: { stack?: unknown } } | undefined)?.router?.stack;
+  if (!Array.isArray(appStack)) return UNKNOWN_ROUTE;
   const prefix = findRoute(appStack, route, "", 0);
-  return prefix === undefined ? `${ROUTE_NOT_FOUND}${route.path}` : `${prefix}${route.path}`;
+  return prefix === undefined ? UNKNOWN_ROUTE : `${prefix}${(route as { path: string }).path}`;
 }
 
 /** The summary of one failed request. Exported for the tests; nothing else reads the error. */

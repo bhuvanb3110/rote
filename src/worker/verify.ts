@@ -58,8 +58,18 @@ import type { VerifyClaim } from "./recover.js";
 import { buildJobParams } from "./runJob.js";
 import { deferVerify, markPhaseFencedOut, readVerifyCycle, writeVerifyResult } from "./verifySql.js";
 import type { FencedOutReason } from "./complete.js";
+import { NO_TELEMETRY, type Telemetry } from "../telemetry/index.js";
+import type { ReplayObservation } from "../replay/index.js";
+import { recordVerifyDecision } from "./telemetryEvents.js";
 
 export const LOOKUP_CAPABILITY_ID = "transfer-history-lookup";
+
+/** A lookup run's observer: its screenshot retries only (step-13a; the lookup's spans are 13b's). */
+function lookupObserver(telemetry: Telemetry): (event: ReplayObservation) => void {
+  return (event) => {
+    if (event.kind === "run_end" && event.screenshotRetries > 0) telemetry.count("rote_screenshot_retries_total", undefined, event.screenshotRetries);
+  };
+}
 export const DEFAULT_VERIFY_SETTLE_MS = 5000;
 
 /** The lookup's steps that are crash points (the 1.2.0 step ids). */
@@ -83,6 +93,8 @@ export interface VerifyContext {
   log?: WorkerLogger;
   metrics?: WorkerMetrics;
   redact?: Redactor;
+  /** Day 3 (Step 13a): verify decisions, terminal writes, the lookups' contexts and screenshot retries. Default: none. */
+  telemetry?: Telemetry;
   /**
    * Test seam: replaces the browser lookup (invokeCapability of transfer-history-lookup) with a function
    * returning what it would have. Never set by the entrypoint.
@@ -148,6 +160,11 @@ export function createLookup(
           }
         : undefined;
     let reading: LookupReading;
+    const telemetry = ctx.telemetry ?? NO_TELEMETRY;
+    // Telemetry only when it is on (rule 9): absent, replay runs exactly as before. Step 13a counts the lookup's
+    // screenshot retries; its spans (verify.lookup) are 13b's.
+    const observe = telemetry.enabled.metrics ? lookupObserver(telemetry) : undefined;
+    telemetry.adjust("rote_browser_contexts_in_use", 1);
     try {
       const result = await invokeCapability({
         id: LOOKUP_CAPABILITY_ID,
@@ -160,12 +177,15 @@ export function createLookup(
         overridesDir: ctx.overridesDir,
         statusDir: ctx.statusDir,
         onStep,
+        observe,
         headless: true,
       });
       reading = classifyLookup({ kind: "result", result });
     } catch (error) {
       if (controller.signal.aborted) throw controller.signal.reason;
       reading = classifyLookup({ kind: "thrown", error });
+    } finally {
+      telemetry.adjust("rote_browser_contexts_in_use", -1);
     }
     controller.signal.throwIfAborted();
     return reading.kind === "count" ? reading : { ...reading, detail: redact(reading.detail) };
@@ -294,6 +314,7 @@ export async function runVerifyPhase(
     }
     if (decision.decision === "resubmitted") fault.at("verify-after-requeue"); // T7 (queued) committed
     metrics.inc("verify_decisions_total", { decision: decision.decision });
+    recordVerifyDecision(ctx.telemetry ?? NO_TELEMETRY, decision, job.created_at);
     const fields = { ...log, decision: decision.decision, to: decision.to, lookups: write.lookups, ms: Date.now() - started };
     if (decision.decision === "escalated") ctx.log?.warn({ ...fields, outcome: decision.outcome, error: decision.error }, "verify: escalated to a human");
     else ctx.log?.info(fields, decision.decision === "deferred" ? `verify: deferred ${decision.backoffSeconds} s (bank unavailable)` : "verify: decided");

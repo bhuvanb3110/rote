@@ -1,0 +1,67 @@
+# the API's /metrics at 2026-11-20T02:19:07.1587949Z, all 12 jobs terminal
+# HELP target_info Target metadata
+# TYPE target_info gauge
+target_info{service_name="rote-api"} 1
+# HELP rote_job_retries_total Requeues a worker performed: T4 after a failed attempt, and T6.1 after a dead worker's lease.
+# TYPE rote_job_retries_total counter
+rote_job_retries_total 0
+# HELP rote_recoveries_total Verify decisions after a possible commit, as the brief's three results (already_done, resubmitted, escalated); T6.6 counts as escalated.
+# TYPE rote_recoveries_total counter
+rote_recoveries_total{result="already_done"} 0
+rote_recoveries_total{result="resubmitted"} 0
+rote_recoveries_total{result="escalated"} 0
+# HELP rote_worker_crashes_total Worker deaths, counted by the worker that recovered the job: before_intent, committing, verifier, reconciler.
+# TYPE rote_worker_crashes_total counter
+rote_worker_crashes_total{kind="before_intent"} 0
+rote_worker_crashes_total{kind="committing"} 0
+rote_worker_crashes_total{kind="verifier"} 0
+rote_worker_crashes_total{kind="reconciler"} 0
+# HELP rote_screenshot_retries_total Screenshot captures retried inside WebSurface.perceive (D8).
+# TYPE rote_screenshot_retries_total counter
+rote_screenshot_retries_total 0
+# HELP rote_illegal_transitions_total Fenced writes the state guard refused with the token unchanged: a bug (D41).
+# TYPE rote_illegal_transitions_total counter
+rote_illegal_transitions_total 0
+# HELP rote_verify_decisions_total Finished verify phases, by decision (D43).
+# TYPE rote_verify_decisions_total counter
+rote_verify_decisions_total{decision="already_done"} 0
+rote_verify_decisions_total{decision="resubmitted"} 0
+rote_verify_decisions_total{decision="exhausted"} 0
+rote_verify_decisions_total{decision="not_committed_final"} 0
+rote_verify_decisions_total{decision="escalated"} 0
+rote_verify_decisions_total{decision="deferred"} 0
+# HELP rote_reconcile_decisions_total Recorded reconcile runs, by decision (D50, D55).
+# TYPE rote_reconcile_decisions_total counter
+rote_reconcile_decisions_total{decision="reconciled"} 0
+rote_reconcile_decisions_total{decision="duplicate_suspected"} 0
+rote_reconcile_decisions_total{decision="unrecorded_commit_suspected"} 0
+rote_reconcile_decisions_total{decision="reconcile_unreadable"} 0
+rote_reconcile_decisions_total{decision="reconcile_deferred"} 0
+# HELP rote_duplicates_detected_total Reconciles that found 2+ transfers for one succeeded job (duplicate_suspected).
+# TYPE rote_duplicates_detected_total counter
+rote_duplicates_detected_total 0
+# HELP rote_unrecorded_commits_detected_total Reconciles that found 1+ transfers for a failed / business_outcome job (D55).
+# TYPE rote_unrecorded_commits_detected_total counter
+rote_unrecorded_commits_detected_total 0
+# HELP rote_reconcile_abandoned_total Reconciles the workers' pass abandoned at the reconcile crash cap (R3, D59).
+# TYPE rote_reconcile_abandoned_total counter
+rote_reconcile_abandoned_total 0
+# HELP rote_telemetry_errors_total Telemetry's own failures, swallowed: span_export, span_dropped, gauge_query, call, flush, metrics_port.
+# TYPE rote_telemetry_errors_total counter
+rote_telemetry_errors_total{kind="span_export"} 0
+rote_telemetry_errors_total{kind="span_dropped"} 0
+rote_telemetry_errors_total{kind="gauge_query"} 0
+rote_telemetry_errors_total{kind="call"} 0
+rote_telemetry_errors_total{kind="flush"} 0
+rote_telemetry_errors_total{kind="metrics_port"} 0
+# HELP rote_browser_contexts_in_use Browser contexts open for a job or a lookup in this worker (0 or 1: one at a time).
+# TYPE rote_browser_contexts_in_use gauge
+rote_browser_contexts_in_use 0
+# HELP rote_queue_depth Queued jobs per tenant.
+# TYPE rote_queue_depth gauge
+rote_queue_depth{tenant="tenant-a"} 0
+rote_queue_depth{tenant="tenant-b"} 0
+rote_queue_depth{tenant="tenant-c"} 0
+# HELP rote_jobs_crashes_sum Sum of jobs.crashes over non-terminal jobs: the crash budget in use.
+# TYPE rote_jobs_crashes_sum gauge
+rote_jobs_crashes_sum 0

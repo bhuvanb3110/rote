@@ -10,7 +10,8 @@ import { runReplay } from "../replay/index.js";
 import { commitUncertainWarning, deserializeCapability, type Capability, type ReplayResult } from "../artifact/index.js";
 import { EscalationController, createOperatorConsole } from "../escalation/index.js";
 import { resolveTenant, type TenantOverride } from "../tenant/index.js";
-import { createCatalogApp, findCapability, invokeCapability, listCapabilities, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
+import { createApiGaugePool, createCatalogApp, findCapability, invokeCapability, listCapabilities, registerApiGauges, DEFAULT_ARTIFACTS_DIR } from "../catalog/index.js";
+import { createTelemetry, telemetrySettingsFromEnv, type Telemetry } from "../telemetry/index.js";
 import { approvalKeyWithOverrides, approveCapability, readRunConfidence } from "../confidence/index.js";
 import { createPool, databaseUrlFromEnv, migrate, redactDatabaseUrl } from "../queue/index.js";
 import { collectAndCheck, DEFAULT_BANK_URL, oracleJson, readJobIdsFile } from "../oracle/index.js";
@@ -392,10 +393,19 @@ catalogCommand
     "--queue",
     "also serve the fleet's async mode (?mode=async, GET /jobs/:id, GET /healthz) on ROTE_DATABASE_URL; runs migrations at startup",
   )
-  .action(async (opts: { port: number; queue?: boolean }) => {
+  .option(
+    "--metrics",
+    "with --queue: serve GET /metrics (Prometheus text): the DB gauges on their own 1-connection pool with a 1 s statement_timeout (Day 3, reviewer decision 2)",
+  )
+  .action(async (opts: { port: number; queue?: boolean; metrics?: boolean }) => {
     let app;
     // A failed request is logged as its redacted summary only (D62).
     const logError = (summary: ErrorSummary) => logger.error(summary, "catalog: request failed");
+    if (opts.metrics && !opts.queue) {
+      logger.error({}, "catalog: --metrics needs --queue (its gauges read the job queue)");
+      process.exitCode = 1;
+      return;
+    }
     if (opts.queue) {
       const url = databaseUrlFromEnv();
       const pool = createPool({
@@ -410,7 +420,18 @@ catalogCommand
         await pool.end();
         return;
       }
-      app = createCatalogApp({ queue: { pool }, logError });
+      let metrics: { telemetry: Telemetry } | undefined;
+      if (opts.metrics) {
+        // Telemetry never stops the API (rule 5): a bad OTEL_* setting is a warning, and the gauge pool connects
+        // lazily, on the first scrape.
+        const { settings, warnings } = telemetrySettingsFromEnv(process.env, { serviceName: "rote-api", metrics: "on" });
+        for (const warning of warnings) logger.warn({}, `telemetry: ${warning}`);
+        const telemetry = createTelemetry(settings, { log: logger });
+        registerApiGauges(telemetry, createApiGaugePool(url, (err) => logger.warn({ err: err.message }, "catalog: idle metrics connection dropped")));
+        metrics = { telemetry };
+        logger.info({}, "catalog: serving /metrics (DB gauges on a dedicated pool)");
+      }
+      app = createCatalogApp({ queue: { pool }, logError, metrics });
       logger.info({ database: redactDatabaseUrl(url) }, "catalog: async mode enabled");
     } else {
       app = createCatalogApp({ logError });
