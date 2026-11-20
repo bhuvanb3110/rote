@@ -1,0 +1,12 @@
+diff --git a/src/telemetry/otel.ts b/src/telemetry/otel.ts
+index 1a6fc23..4d4aeca 100644
+--- a/src/telemetry/otel.ts
++++ b/src/telemetry/otel.ts
+@@ -118,7 +118,6 @@ export function allowedAttributes(name: SpanName, attributes: SpanAttributes | u
+   if (!attributes) return out;
+   const allowed: readonly string[] = SPAN_ATTRIBUTES[name] ?? [];
+   for (const key of Object.keys(attributes)) {
+-    if (!allowed.includes(key)) continue;
+     const value = attributes[key];
+     if (typeof value === "boolean") out[key] = value;
+     else if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
