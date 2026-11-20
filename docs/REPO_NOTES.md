@@ -127,7 +127,10 @@ The evidence: `evidence/step-13a/README.md`.
   - `src/worker/crashSubmit.db.test.ts`: worker processes on :4100, the four modes one after another.
   - **Do not run the crash modes at once:** four Chromium-launching workers overloaded this laptop
     (`evidence/step-13a/flakes.md`).
-- **The suite:** 72 files, 780 tests.
+- **The suite:** 72 files, 780 tests, 311–348 s in the final three runs (Step 12b: 219–236 s). The two equivalence
+  files account for most of the growth.
+- **The proof** (`evidence/step-13a/README.md`): the matrix 23/23 with `--telemetry dead`, the mutation check 15/15,
+  and chaos seed 412432443 PASS with Compose's telemetry on. The image grew by 22.4 MB.
 - **New dependencies** (D61, `--before=2026-11-12`): 7 named OpenTelemetry packages, 11 lockfile paths.
   `npm view <pkg> version --before=…` **ignores `--before`**, so check the `time` field.
 

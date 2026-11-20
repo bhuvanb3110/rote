@@ -1,0 +1,41 @@
+worker-2  | {"level":30,"time":1795140453932,"service":"worker","workerId":"92ec8d67ded1-7-6e61","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-4  | {"level":30,"time":1795140457366,"service":"worker","workerId":"46236f90cfb6-7-dd33","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-2  | {"level":30,"time":1795140479025,"service":"worker","workerId":"92ec8d67ded1-7-b99a","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-2  | {"level":40,"time":1795140483496,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-4  | {"level":40,"time":1795140473695,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-2  | {"level":30,"time":1795140541647,"service":"worker","workerId":"92ec8d67ded1-7-852f","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-2  | {"level":40,"time":1795140544815,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-2  | {"level":30,"time":1795140548567,"service":"worker","workerId":"92ec8d67ded1-7-0643","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-4  | {"level":30,"time":1795140514798,"service":"worker","workerId":"46236f90cfb6-8-8bbf","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-2  | {"level":40,"time":1795140551705,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-4  | {"level":30,"time":1795140521616,"service":"worker","workerId":"46236f90cfb6-7-e56a","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-4  | {"level":40,"time":1795140529900,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-2  | {"level":30,"time":1795140590905,"service":"worker","workerId":"92ec8d67ded1-7-c2ea","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-2  | {"level":40,"time":1795140594250,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-4  | {"level":30,"time":1795140555932,"service":"worker","workerId":"46236f90cfb6-7-9c2c","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-2  | {"level":30,"time":1795141129892,"service":"worker","workerId":"92ec8d67ded1-7-7afd","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-4  | {"level":30,"time":1795140563971,"service":"worker","workerId":"46236f90cfb6-7-1e81","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-2  | {"level":40,"time":1795141136138,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-4  | {"level":40,"time":1795140577379,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-4  | {"level":30,"time":1795141131072,"service":"worker","workerId":"46236f90cfb6-7-b38e","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-4  | {"level":40,"time":1795141136125,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-1  | {"level":30,"time":1795140453662,"service":"worker","workerId":"32a151816207-7-b5d5","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-1  | {"level":40,"time":1795140473735,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-1  | {"level":30,"time":1795140482223,"service":"worker","workerId":"32a151816207-7-2475","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-1  | {"level":40,"time":1795140486708,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-1  | {"level":30,"time":1795140500752,"service":"worker","workerId":"32a151816207-7-590b","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-3  | {"level":30,"time":1795140455216,"service":"worker","workerId":"4434ccf44517-7-f3f1","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-3  | {"level":40,"time":1795140473672,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-3  | {"level":30,"time":1795140488108,"service":"worker","workerId":"4434ccf44517-7-0a5e","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-3  | {"level":40,"time":1795140499430,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-3  | {"level":30,"time":1795140535049,"service":"worker","workerId":"4434ccf44517-7-9ec9","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-3  | {"level":30,"time":1795140611995,"service":"worker","workerId":"4434ccf44517-8-8285","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-3  | {"level":30,"time":1795141130353,"service":"worker","workerId":"4434ccf44517-7-2853","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-3  | {"level":40,"time":1795141136112,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-1  | {"level":40,"time":1795140509579,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-1  | {"level":40,"time":1795140571665,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":22,"errorsByKind":{"span_export":24},"msg":"telemetry: degraded"}
+worker-1  | {"level":30,"time":1795140577598,"service":"worker","workerId":"32a151816207-7-0e6e","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-1  | {"level":40,"time":1795140584206,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}
+worker-1  | {"level":30,"time":1795140604153,"service":"worker","workerId":"32a151816207-7-84bc","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-1  | {"level":30,"time":1795141129006,"service":"worker","workerId":"32a151816207-7-a1e6","port":9464,"host":"0.0.0.0","msg":"telemetry: serving /metrics"}
+worker-1  | {"level":40,"time":1795141136099,"service":"worker","kind":"span_export","error":"TelemetryTimeoutError","suppressedSinceLastWarning":0,"errorsByKind":{"span_export":1},"msg":"telemetry: degraded"}

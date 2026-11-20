@@ -1,0 +1,51 @@
+Step 13a: the fleet image before and after the OpenTelemetry dependencies (docker image inspect --format {{.Size}}).
+
+before  rote-fleet:before-13a  3579680917 bytes  built from 535284f (the fail-closed commit; the same dependencies as main)  id sha256:4719f9f3e2b2...
+after   rote-fleet:local       3602097655 bytes  built from 7444087 (HEAD)  id sha256:ab26a0f031a0...
+delta   +22416738 bytes (+21.4 MiB, +0.63 %)
+
+Inside the after image (npm ci --omit=dev), npm ls of the OpenTelemetry packages, their size on disk, and node:
+├── @opentelemetry/api@1.10.0
+├─┬ @opentelemetry/exporter-prometheus@0.301.1
+│ ├── @opentelemetry/api@1.10.0 deduped
+│ ├─┬ @opentelemetry/core@3.1.1
+│ │ ├── @opentelemetry/api@1.10.0 deduped
+│ │ └── @opentelemetry/semantic-conventions@1.45.0 deduped
+│ ├── @opentelemetry/resources@3.1.1 deduped
+│ ├── @opentelemetry/sdk-metrics@3.1.1 deduped
+│ └── @opentelemetry/semantic-conventions@1.45.0 deduped
+├─┬ @opentelemetry/exporter-trace-otlp-http@0.301.1
+│ ├── @opentelemetry/api@1.10.0 deduped
+│ ├─┬ @opentelemetry/otlp-exporter-base@0.301.1
+│ │ ├── @opentelemetry/api@1.10.0 deduped
+│ │ ├── @opentelemetry/core@3.1.1 deduped
+│ │ └── @opentelemetry/otlp-transformer@0.301.1 deduped
+│ ├─┬ @opentelemetry/otlp-transformer@0.301.1
+│ │ ├── @opentelemetry/api@1.10.0 deduped
+│ │ ├── @opentelemetry/core@3.1.1 deduped
+│ │ ├── @opentelemetry/resources@3.1.1 deduped
+│ │ ├─┬ @opentelemetry/sdk-logs@3.1.1
+│ │ │ ├── @opentelemetry/api@1.10.0 deduped
+│ │ │ ├── @opentelemetry/core@3.1.1 deduped
+│ │ │ ├── @opentelemetry/resources@3.1.1 deduped
+│ │ │ └── @opentelemetry/semantic-conventions@1.45.0 deduped
+│ │ ├── @opentelemetry/sdk-metrics@3.1.1 deduped
+│ │ └── @opentelemetry/sdk-trace@3.1.1 deduped
+│ └── @opentelemetry/sdk-trace@3.1.1 deduped
+├─┬ @opentelemetry/resources@3.1.1
+│ ├── @opentelemetry/api@1.10.0 deduped
+│ ├── @opentelemetry/core@3.1.1 deduped
+│ └── @opentelemetry/semantic-conventions@1.45.0 deduped
+├─┬ @opentelemetry/sdk-metrics@3.1.1
+│ ├── @opentelemetry/api@1.10.0 deduped
+│ ├── @opentelemetry/core@3.1.1 deduped
+│ └── @opentelemetry/resources@3.1.1 deduped
+├─┬ @opentelemetry/sdk-trace@3.1.1
+│ ├── @opentelemetry/api@1.10.0 deduped
+│ ├── @opentelemetry/core@3.1.1 deduped
+│ ├── @opentelemetry/resources@3.1.1 deduped
+│ └── @opentelemetry/semantic-conventions@1.45.0 deduped
+├── @opentelemetry/semantic-conventions@1.45.0
+
+20M	node_modules/@opentelemetry
+v24.18.1
