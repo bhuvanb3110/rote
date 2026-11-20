@@ -20,6 +20,7 @@ import path from "node:path";
 import { checkApproval } from "../confidence/index.js";
 import { DEFAULT_OVERRIDES_DIR, deserializeTenantOverride, type TenantOverride } from "../tenant/index.js";
 import {
+  createPool,
   CredentialsInParamsError,
   enqueue,
   IdempotencyKeyConflict,
@@ -34,6 +35,7 @@ import {
 import { isTransientDbError } from "../queue/index.js";
 import { jobSettled, reconcileStatus } from "../fleet/stateMachine.js";
 import { redactingErrorHandler, requestId, type ErrorSummaryLog } from "../http/errorHandler.js";
+import { createGaugeReader, GAUGE_CONNECT_TIMEOUT_MS, GAUGE_READ_CAP_MS, GAUGE_STATEMENT_TIMEOUT_MS, type Telemetry } from "../telemetry/index.js";
 import { DEFAULT_ARTIFACTS_DIR, findCapability, listCapabilities } from "./registry.js";
 import { invokeCapability } from "./invoke.js";
 
@@ -70,6 +72,31 @@ export interface CatalogAppOptions {
    * never the body, headers or the error's message.
    */
   logError?: ErrorSummaryLog;
+  /**
+   * Day 3 (Step 13a): serve GET /metrics (Prometheus text) from this telemetry. The DB gauges are registered on
+   * it by the caller, on their own pool (apiMetricsTelemetry). Absent: no /metrics, the app is unchanged.
+   */
+  metrics?: { telemetry: Telemetry };
+}
+
+/**
+ * The API's telemetry with its DB gauges (reviewer decision 2): read per scrape on `gaugePool`, a SMALL,
+ * DEDICATED pool (createApiGaugePool) with a short statement_timeout, so a slow metrics query never touches the
+ * API's own pool or delays a request.
+ */
+export function registerApiGauges(telemetry: Telemetry, gaugePool: Pool): void {
+  telemetry.registerGauges(createGaugeReader(gaugePool, telemetry), GAUGE_READ_CAP_MS);
+}
+
+/** The API's metrics pool: one connection, statement_timeout and connect timeout of 1 s. */
+export function createApiGaugePool(connectionString: string, onIdleError?: (err: Error) => void): Pool {
+  return createPool({
+    connectionString,
+    max: 1,
+    statementTimeoutMillis: GAUGE_STATEMENT_TIMEOUT_MS,
+    connectionTimeoutMillis: GAUGE_CONNECT_TIMEOUT_MS,
+    onIdleError,
+  });
 }
 
 const MAX_IDEMPOTENCY_KEY_LENGTH = 255;
@@ -315,6 +342,12 @@ export function createCatalogApp(options: CatalogAppOptions = {}): Express {
         databaseUnavailable(res);
       }
     });
+  }
+
+  const metricsHandler = options.metrics?.telemetry.metricsHandler();
+  if (metricsHandler) {
+    // Prometheus pulls (rule 4). The handler answers from memory plus the gauges' own pool; never the API's.
+    app.get("/metrics", (req, res) => metricsHandler(req, res));
   }
 
   // Last: every error that reaches Express (a malformed JSON body above all) is answered and logged

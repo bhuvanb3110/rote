@@ -17,7 +17,7 @@ import type { EscalationController } from "../escalation/index.js";
 import { evaluateCheckpoint } from "./checkpoint.js";
 import { describeCheckpoint, findBusinessOutcome, findRecoverableRule, isSessionTimeoutState } from "./recognize.js";
 import { resolveStepValue, validateParams } from "./params.js";
-import type { ReplayOptions } from "./types.js";
+import type { ObservedStepEnd, ReplayObservation, ReplayOptions } from "./types.js";
 
 /** Upper bound on waiting for the bank's answer to the irreversible click (IrreversibleHooks.after). */
 const IRREVERSIBLE_SETTLE_TIMEOUT_MS = 10_000;
@@ -161,6 +161,66 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   let hookFailure: { error: unknown } | null = null;
   let currentStepId = capability.steps[0]!.id;
 
+  // --- observe (telemetry; docs/plans/step-13a.md section 3) ------------------------------------------------
+  // Synchronous, inside try/catch, never awaited; a returned promise's rejection is swallowed too. Nothing below
+  // reads anything back from it, and without options.observe none of this does anything.
+  let openStep: {
+    step: Step;
+    index: number;
+    irreversible: boolean;
+    retriesAtStart: number;
+    provenanceAtStart: number;
+    /** The strategy that resolved the step's own target, read right after act() (later locates are recognizers'). */
+    locatorStrategy: string | null;
+  } | null = null;
+  let runEnded = false;
+  function emit(event: ReplayObservation): void {
+    if (!options.observe) return;
+    try {
+      const returned: unknown = options.observe(event);
+      if (returned && typeof (returned as { then?: unknown }).then === "function") {
+        (returned as Promise<unknown>).then(undefined, () => undefined);
+      }
+    } catch {
+      // Telemetry never changes a run.
+    }
+  }
+  function observeStepEnd(ended: ObservedStepEnd): void {
+    if (!options.observe || !openStep) return;
+    const open = openStep;
+    openStep = null;
+    try {
+      emit({
+        kind: "step_end",
+        stepIndex: open.index,
+        stepId: open.step.id,
+        irreversible: open.irreversible,
+        ended,
+        locatorStrategy: open.locatorStrategy,
+        screenshotRetries: surface.screenshotRetries - open.retriesAtStart,
+        at: Date.now(),
+      });
+    } catch {
+      // As emit.
+    }
+  }
+  function observeStepStart(step: Step, index: number, irreversible: boolean): void {
+    if (!options.observe) return;
+    if (openStep) observeStepEnd("superseded");
+    openStep = { step, index, irreversible, retriesAtStart: surface.screenshotRetries, provenanceAtStart: surface.provenance.length, locatorStrategy: null };
+    emit({ kind: "step_start", stepIndex: index, stepId: step.id, irreversible, at: Date.now() });
+  }
+  /** Right after the step's act(): the strategy that resolved its target, if act() located anything. */
+  function observeStepStrategy(strategy: string, provenanceLength: number): void {
+    if (openStep && provenanceLength > openStep.provenanceAtStart) openStep.locatorStrategy = strategy;
+  }
+  function observeRunEnd(stepEnded: ObservedStepEnd): void {
+    if (!options.observe || runEnded) return;
+    runEnded = true;
+    observeStepEnd(stepEnded);
+    emit({ kind: "run_end", screenshotRetries: surface.screenshotRetries, at: Date.now() });
+  }
+
   async function runHook(name: "before" | "after", step: Step): Promise<void> {
     if (!options.onIrreversible) return;
     try {
@@ -222,6 +282,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
   }
 
   async function finish(result: ReplayResult): Promise<ReplayResult> {
+    observeRunEnd("exited");
     // An aborted run never returns a result, whatever exit it was heading for.
     options.signal?.throwIfAborted();
     const marked: ReplayResult =
@@ -287,6 +348,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
         decision.risk === "risky"
           ? decision.reason
           : `the artifact marks step "${step.id}" risk: "risky" (the live gate classified it safe)`;
+      observeStepStart(step, stepIndex, irreversible);
 
       // An irreversible action is never auto-executed by default -- the artifact's own recorded
       // risk reflects what discovery observed, not a standing authorization to replay it
@@ -383,6 +445,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
             if (last) {
               stepConfidenceScores.push(stepConfidence(executable.target.strategies, last.strategy));
             }
+            if (last) observeStepStrategy(last.strategy, entries.length);
             if (last && topChoice && last.strategy !== topChoice) {
               await evidence.append({
                 turn: stepIndex,
@@ -578,6 +641,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
       }
 
       // The step completed normally (D34). Absent hook: a no-op.
+      observeStepEnd("completed");
       await runStepHook(step, stepIndex);
       options.signal?.throwIfAborted();
       stepIndex += 1;
@@ -603,6 +667,7 @@ export async function runReplay(options: ReplayOptions): Promise<ReplayResult> {
     }
     return await finish({ status: "success", outputs, evidenceRef });
   } catch (err) {
+    observeRunEnd("threw");
     // Abort first: whatever was in flight failed because the context was closed under it.
     if (options.signal?.aborted) {
       await closeSurface().catch(() => undefined);

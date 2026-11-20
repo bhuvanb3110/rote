@@ -40,6 +40,38 @@ export interface StepHooks {
   after(step: Step, index: number): Promise<void>;
 }
 
+/** How an observed step ended (ReplayObservation step_end). */
+export type ObservedStepEnd =
+  /** Its checkpoint passed (or it had none and its action raised no error): the main path. */
+  | "completed"
+  /** The run ended at this step (a result: business outcome, needs_human, failure, success after a hand-back). */
+  | "exited"
+  /** The run threw (or was aborted) during this step. */
+  | "threw"
+  /** The step started again (a human's "retry"), or the run moved on after a hand-back ("skip"). */
+  | "superseded";
+
+/**
+ * What replay tells an `observe` callback (docs/plans/step-13a.md section 3; step-13.md section 4). Telemetry
+ * only: nothing about the run's params, values, URLs or page text is ever in an event.
+ */
+export type ReplayObservation =
+  | { kind: "step_start"; stepIndex: number; stepId: string; irreversible: boolean; at: number }
+  | {
+      kind: "step_end";
+      stepIndex: number;
+      stepId: string;
+      irreversible: boolean;
+      ended: ObservedStepEnd;
+      /** The locator strategy that resolved this step's last target (roleName, textAnchor, ...), or null. */
+      locatorStrategy: string | null;
+      /** Screenshot captures retried during this step (WebSurface.screenshotRetries, D8). */
+      screenshotRetries: number;
+      at: number;
+    }
+  /** Once per run that launched a surface, last: the run's total screenshot retries. */
+  | { kind: "run_end"; screenshotRetries: number; at: number };
+
 export interface ReplayOptions {
   capability: Capability;
   params: Record<string, unknown>;
@@ -104,6 +136,13 @@ export interface ReplayOptions {
   onIrreversible?: IrreversibleHooks;
   /** Called after each normally completed step (StepHooks). Absent: no change at all. */
   onStep?: StepHooks;
+  /**
+   * Telemetry's view of the run (step-13.md section 4: "one additive option, not a reuse of onStep"). Called
+   * SYNCHRONOUSLY, inside try/catch, and NEVER awaited: an exception, or the rejection of a promise it returns,
+   * is swallowed, and changes nothing in the run, its result or its evidence. Absent: no change at all. Unlike
+   * onStep it cannot stop or delay a run, which is the point (D34's onStep may throw on purpose).
+   */
+  observe?: (event: ReplayObservation) => void;
   /**
    * Aborts the run (fleet: the heartbeat lost the lease). Already aborted at entry → rejects with
    * `signal.reason` before any evidence, browser or context is created. Aborted mid-run → replay

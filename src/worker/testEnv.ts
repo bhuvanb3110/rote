@@ -21,6 +21,8 @@ import { createRecoverySweep } from "./recover.js";
 import { runVerifyPhase, type VerifyContext } from "./verify.js";
 import { runReconcilePhase } from "./reconcile.js";
 import { listenOnSafePort } from "../testing/listen.js";
+import { forwardingMetrics } from "../telemetry/index.js";
+import { InMemoryCounters } from "./metrics.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
@@ -133,7 +135,11 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
     jobs,
     newWorker(overrides = {}) {
       const { ctx: ctxOverrides, verifyCtx, ...rest } = overrides;
-      const runCtx = { ...ctx, ...ctxOverrides };
+      // Day 3: a worker given `telemetry` hands it to every part, as the entrypoint does (main.ts).
+      const telemetry = rest.telemetry;
+      // ...and its counters forwarded to it, as main.ts does (forwardingMetrics).
+      const metrics = rest.metrics ?? (telemetry ? forwardingMetrics(new InMemoryCounters(), telemetry) : undefined);
+      const runCtx = { ...ctx, ...(telemetry ? { telemetry } : {}), ...ctxOverrides };
       const workerId = rest.workerId ?? `test-worker-${++seq}`;
       const leaseSeconds = rest.leaseSeconds ?? 300;
       const workerPool = rest.pool ?? pool;
@@ -151,6 +157,8 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
         statusDir: runCtx.statusDir,
         redact,
         fault: runCtx.fault,
+        telemetry,
+        metrics,
         ...verifyCtx,
       });
       return new Worker({
@@ -169,7 +177,8 @@ export async function createWorkerTestEnv(tag: string): Promise<WorkerTestEnv> {
         reconcile: (claim, controller, hardSignal) => runReconcilePhase(vctx(), claim, controller, hardSignal),
         // Like the entrypoint: recover expired leases before every dequeue (T6), then at most one due
         // reconcile (R1).
-        beforeDequeue: createRecoverySweep({ pool: workerPool, workerId, leaseSeconds, reconcile: true }),
+        beforeDequeue: createRecoverySweep({ pool: workerPool, workerId, leaseSeconds, reconcile: true, telemetry, metrics }),
+        metrics,
         ...rest,
       });
     },

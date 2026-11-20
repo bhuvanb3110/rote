@@ -20,6 +20,7 @@ export const BROWSER_TEST_FILES = [
   "src/replay/replay.test.ts",
   "src/replay/transfer.test.ts",
   "src/surface/locate.test.ts",
+  "src/telemetry/metricsPort.db.test.ts",
   "src/tenant/multiTenant.test.ts",
   "src/worker/worker.db.test.ts",
 ];
@@ -29,6 +30,7 @@ export const SLOW_TEST_FILES = [
   "src/worker/faults.db.test.ts",
   "src/worker/lease.db.test.ts",
   "src/worker/reconcileBank.db.test.ts",
+  "src/worker/telemetry.db.test.ts",
   "src/worker/verify.db.test.ts",
 ];
 

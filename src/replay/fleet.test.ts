@@ -652,3 +652,72 @@ describe("onStep hook (D34): additive, once per passed step, a throw rejects", (
     expect(seen.length).toBeLessThan(transferBase.steps.length);
   });
 });
+
+// Step 13a (docs/plans/step-13a.md section 3): telemetry's view of a run. Synchronous, never awaited, and an
+// exception or a rejected promise from it changes nothing. Absent: every other test in this file.
+describe("observe (Step 13a): additive, synchronous, can never change a run", () => {
+  type Event = Parameters<NonNullable<ReplayOptions["observe"]>>[0];
+
+  it("a full transfer: start/end for every step in order, irreversible only on the Submit step, the winning strategies, run_end last", async () => {
+    const events: Event[] = [];
+    const result = await transfer({ memo: "observe-order" }, { observe: (e) => void events.push(e) });
+    expect(result.status).toBe("success");
+    const ids = transferBase.steps.map((s) => s.id);
+    expect(events.filter((e) => e.kind === "step_start").map((e) => (e as { stepId: string }).stepId)).toEqual(ids);
+    const ends = events.filter((e): e is Extract<Event, { kind: "step_end" }> => e.kind === "step_end");
+    expect(ends.map((e) => e.stepId)).toEqual(ids);
+    expect(ends.every((e) => e.ended === "completed")).toBe(true);
+    // Each step's end comes right after its start (one step at a time), and run_end is the last event.
+    for (let i = 0; i < ids.length; i += 1) expect([events[2 * i]!.kind, events[2 * i + 1]!.kind]).toEqual(["step_start", "step_end"]);
+    expect(events[events.length - 1]).toMatchObject({ kind: "run_end", screenshotRetries: expect.any(Number) });
+    expect(ends.filter((e) => e.irreversible).map((e) => e.stepId)).toEqual(["step-11"]);
+    // Every step with a target reports the strategy that resolved it; tenant-a's Submit is found by role and name.
+    expect(ends.find((e) => e.stepId === "step-11")!.locatorStrategy).toBe("roleName");
+    expect(ends.filter((e) => transferBase.steps.find((s) => s.id === e.stepId)!.target).every((e) => typeof e.locatorStrategy === "string")).toBe(true);
+    // Nothing from the run's params or the page is in any event.
+    const text = JSON.stringify(events);
+    for (const v of ["observe-order", "10001", "10002", "12.34", CREDS.password]) expect(text).not.toContain(v);
+  }, 30_000);
+
+  it("a business outcome: the step the run ended at ends 'exited', and run_end still comes last", async () => {
+    const events: Event[] = [];
+    const result = await transfer({ memo: "observe-bo", toMemberId: "99999" }, { observe: (e) => void events.push(e) });
+    expect(result.status).toBe("business_outcome");
+    const ends = events.filter((e): e is Extract<Event, { kind: "step_end" }> => e.kind === "step_end");
+    expect(ends[ends.length - 1]!.ended).toBe("exited");
+    expect(events[events.length - 1]!.kind).toBe("run_end");
+    expect(events.filter((e) => e.kind === "step_start")).toHaveLength(ends.length);
+  }, 30_000);
+
+  it("a throwing observe and a rejecting async observe change nothing: same status, outputs and evidence kinds as without one; 1 row each", async () => {
+    const plain = await transfer({ memo: "observe-none" });
+    const kindsOf = async (r: ReplayResult) => (await evidenceLog(r)).map((e) => e.kind);
+    const throwing = await transfer({ memo: "observe-throws" }, {
+      observe: () => {
+        throw new Error("telemetry exploded");
+      },
+    });
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => void unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+    let rejecting: ReplayResult;
+    try {
+      rejecting = await transfer({ memo: "observe-rejects" }, {
+        observe: (async () => {
+          throw new Error("async telemetry exploded");
+        }) as unknown as ReplayOptions["observe"],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 50)); // let any stray rejection surface
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+    expect(unhandled).toEqual([]);
+    for (const r of [throwing, rejecting]) {
+      expect(r.status).toBe(plain.status);
+      expect(Object.keys(r.status === "success" ? r.outputs : {}).sort()).toEqual(Object.keys(plain.status === "success" ? plain.outputs : {}).sort());
+      expect(await kindsOf(r)).toEqual(await kindsOf(plain));
+    }
+    expect((await ledger()).map((row) => row.memo).sort()).toEqual(["observe-none", "observe-rejects", "observe-throws"]);
+    expect(browser.contexts()).toHaveLength(0);
+  }, 60_000); // three full transfers: vitest's 5 s default was too short under the full suite (evidence/step-13a/flakes.md)
+});
